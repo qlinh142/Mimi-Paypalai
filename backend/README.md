@@ -14,6 +14,19 @@ make emulators     # cửa sổ khác: Firestore + Auth emulator
 make run-api
 ```
 
+## Biến môi trường cho Mimi Online
+
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `PAYPAL_MODE` | `fake` | `sandbox`, `live`, `fake` (không gọi PayPal, cấm ở prod) hoặc `off` (tắt các route /orders, /mandate) |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | | Bắt buộc với `sandbox` và `live`. Lấy ở developer.paypal.com, mục Apps & Credentials |
+| `PAYPAL_VND_PER_USD` | `25000` | PayPal không nhận VND, đơn được tính bằng USD theo tỷ giá này (1000 đến 1000000) |
+| `GEMINI_LOCATION` | `global` | Vùng Vertex AI cho đọc hóa đơn và Verify ảnh giao hàng |
+
+Luồng: `POST /orders/basket` → `POST /orders` (tạo PayPal order) → người dùng duyệt trên PayPal →
+`POST /orders/{id}/capture` (ghi Spending, không cộng tồn kho) → `/advance` (cửa hàng sandbox mô phỏng giao)
+→ `/delivery/read` + `/verify` (chỉ lượng xác nhận vào Confirmed Inventory) → `/refund` nếu thiếu.
+
 ## Triển khai
 
 ```bash

@@ -17,6 +17,17 @@ Chạy với backend Go ở máy: `VITE_API_MODE=live`, điền cấu hình Fire
 `firebase emulators:start --only auth,firestore` và `go run ./cmd/mimi serve-api` (cổng 8080).
 Vite proxy `/api` sang 8080.
 
+## Mimi Online (PayPal sandbox)
+
+Kế hoạch → "Để Mimi mua online" → giỏ ở cửa hàng sandbox, kiểm tra Ủy quyền (ALLOW / ASK / BLOCK)
+→ thanh toán PayPal → Đơn hàng (mô phỏng giao) → chụp ảnh hàng nhận, xác nhận số lượng → Refund nếu thiếu.
+
+- Có `VITE_PAYPAL_CLIENT_ID` (sandbox): dùng PayPal Buttons thật, backend phải chạy `PAYPAL_MODE=sandbox`
+  với cùng ứng dụng PayPal.
+- Để trống: nút mô phỏng, dùng với `PAYPAL_MODE=fake` ở backend hoặc với chế độ mock.
+
+Ủy quyền mua online nằm trong Cài đặt.
+
 ## Ngôn ngữ giao diện
 
 Mặc định tiếng Anh (bản dự thi). Toàn bộ chữ nằm trong `src/i18n/en.ts` và `src/i18n/vi.ts`;
