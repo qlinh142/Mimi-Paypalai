@@ -22,11 +22,12 @@ type Reader struct {
 	client   *genai.Client
 	model    string
 	taxonomy []string
+	groups   []string // danh sách nhóm tiêu dùng đóng cho demo; rỗng: model tự đặt
 }
 
 var _ receipt.Reader = (*Reader)(nil)
 
-func New(ctx context.Context, project, location, model string, taxonomy []string) (*Reader, error) {
+func New(ctx context.Context, project, location, model string, taxonomy, groups []string) (*Reader, error) {
 	c, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Project:  project,
 		Location: location,
@@ -35,7 +36,7 @@ func New(ctx context.Context, project, location, model string, taxonomy []string
 	if err != nil {
 		return nil, fmt.Errorf("gemini: new client: %w", err)
 	}
-	return &Reader{client: c, model: model, taxonomy: taxonomy}, nil
+	return &Reader{client: c, model: model, taxonomy: taxonomy, groups: groups}, nil
 }
 
 // systemPrompt: text on the receipt is DATA. Any text in the image that looks like instructions is
@@ -57,6 +58,7 @@ type output struct {
 	Lines         []struct {
 		Name        string  `json:"name"`
 		Qty         float64 `json:"qty"`
+		Unit        string  `json:"unit"`
 		Amount      string  `json:"amount"`
 		CategoryKey string  `json:"category_key"`
 		GroupKey    string  `json:"group_key"`
@@ -66,6 +68,10 @@ type output struct {
 func (r *Reader) schema() *genai.Schema {
 	str := func(desc string) *genai.Schema { return &genai.Schema{Type: genai.TypeString, Description: desc} }
 	categories := append([]string{""}, r.taxonomy...)
+	group := str("consumption group, lowercase, hyphen-separated")
+	if len(r.groups) > 0 {
+		group = &genai.Schema{Type: genai.TypeString, Description: "consumption group; khac if none fits", Enum: r.groups}
+	}
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		// Only the allowed fields are stored. Address, phone number, and similar data have no output field.
@@ -83,9 +89,10 @@ func (r *Reader) schema() *genai.Schema {
 					Properties: map[string]*genai.Schema{
 						"name":         str("item name"),
 						"qty":          {Type: genai.TypeNumber},
-						"amount":       str("line total, verbatim"),
+						"unit":         str("unit printed next to the quantity (kg, g, l, ml, hop, goi, chai...), empty if none"),
+						"amount":       str("line total, verbatim, keep the minus sign for discount lines"),
 						"category_key": {Type: genai.TypeString, Enum: categories},
-						"group_key":    str("consumption group, lowercase, hyphen-separated"),
+						"group_key":    group,
 					},
 					Required: []string{"name", "qty", "amount"},
 				},
@@ -96,9 +103,13 @@ func (r *Reader) schema() *genai.Schema {
 }
 
 func (r *Reader) ReadPage(ctx context.Context, img receipt.Image, lang string) (receipt.Page, error) {
+	// lang là ngôn ngữ người dùng muốn đọc tên món (công tắc VI/EN), không phải ngôn ngữ của hóa đơn.
 	prompt := "Read this receipt."
-	if lang == "en" {
-		prompt += " Translate item names into Vietnamese if the receipt is in a foreign language."
+	switch lang {
+	case "en":
+		prompt += " Write item names in English, translating them if the receipt is in another language."
+	default:
+		prompt += " Write item names in Vietnamese, translating them if the receipt is in another language."
 	}
 	temp := float32(0)
 	resp, err := r.client.Models.GenerateContent(ctx, r.model,
@@ -128,7 +139,7 @@ func (r *Reader) ReadPage(ctx context.Context, img receipt.Image, lang string) (
 	}
 	for _, l := range out.Lines {
 		page.Lines = append(page.Lines, receipt.PageLine{
-			Name: l.Name, Qty: l.Qty, Amount: l.Amount, CategoryKey: l.CategoryKey, GroupKey: l.GroupKey,
+			Name: l.Name, Qty: l.Qty, Unit: l.Unit, Amount: l.Amount, CategoryKey: l.CategoryKey, GroupKey: l.GroupKey,
 		})
 	}
 	return page, nil

@@ -263,8 +263,8 @@ func (s *Service) merge(receiptID string, pages []Page) Draft {
 				cat = "" // không nằm trong taxonomy: để người dùng "Chọn nhóm"
 			}
 			d.Lines = append(d.Lines, DraftLine{
-				LineID: fmt.Sprintf("l%d", n), Name: name, Qty: l.Qty, Amount: l.Amount,
-				CategoryKey: cat, GroupKey: l.GroupKey, Habit: true,
+				LineID: fmt.Sprintf("l%d", n), Name: name, Qty: l.Qty, Unit: domain.NormalizeUnit(l.Unit), Amount: l.Amount,
+				CategoryKey: cat, GroupKey: normalizeGroupKey(l.GroupKey), Habit: true,
 			})
 		}
 	}
@@ -291,38 +291,80 @@ func (s *Service) applyFX(ctx context.Context, d *Draft) error {
 	}
 	var sum domain.VND
 	for i := range d.Lines {
-		v, ok := toVND(d.Lines[i].Amount, d.Currency, fx)
+		v, neg, ok := toVND(d.Lines[i].Amount, d.Currency, fx)
 		if ok {
+			if neg {
+				// Dòng khuyến mãi in số âm: giữ trong nháp để người dùng thấy, trừ vào tổng.
+				v = -v
+				d.Lines[i].Habit = false
+				d.Lines[i].Discount = true
+			}
 			d.Lines[i].AmountVND = &v
 			sum += v
 		}
 	}
 	d.SumVND = sum
 	if d.TotalPrinted != "" {
-		if total, ok := toVND(d.TotalPrinted, d.Currency, fx); ok {
-			d.TotalMismatch = total != sum
+		if total, _, ok := toVND(d.TotalPrinted, d.Currency, fx); ok {
+			var disc domain.VND
+			if d.DiscountTotal != "" {
+				disc, _, _ = toVND(d.DiscountTotal, d.Currency, fx)
+			}
+			// Dòng có thể là giá sau giảm (tổng = tổng dòng) hoặc giá gốc (tổng = tổng dòng
+			// trừ giảm giá). Khớp một trong hai, lệch không quá ngưỡng, thì coi là khớp.
+			d.TotalMismatch = !withinTolerance(total, sum) && !withinTolerance(total, sum-disc)
 		}
 	}
 	return nil
 }
 
-func toVND(amount, currency string, fx *FX) (domain.VND, bool) {
-	amount = strings.TrimSpace(amount)
+// TotalTolerance: lệch tổng không quá 1.000đ (làm tròn, phí túi) không hiện cảnh báo.
+const TotalTolerance domain.VND = 1_000
+
+func withinTolerance(a, b domain.VND) bool {
+	d := a - b
+	if d < 0 {
+		d = -d
+	}
+	return d <= TotalTolerance
+}
+
+// amountCleaner bỏ ký hiệu tiền tệ hay gặp trên hóa đơn: "64.000đ", "64,000 VND", "₫64.000".
+var amountCleaner = strings.NewReplacer("vnđ", "", "vnd", "", "đ", "", "₫", "", "$", "", "€", "", " ", "", "\u00a0", "")
+
+// toVND quy đổi số in trên hóa đơn sang đồng. Trả giá trị tuyệt đối và neg=true khi số
+// in là số âm ("-10.000", "(10.000)", "10.000-"), thường là dòng khuyến mãi.
+func toVND(amount, currency string, fx *FX) (v domain.VND, neg bool, ok bool) {
+	a := amountCleaner.Replace(strings.ToLower(strings.TrimSpace(amount)))
+	if strings.HasPrefix(a, "(") && strings.HasSuffix(a, ")") {
+		a, neg = a[1:len(a)-1], true
+	}
+	for _, minus := range []string{"-", "\u2212"} {
+		if strings.HasPrefix(a, minus) {
+			a, neg = strings.TrimPrefix(a, minus), true
+		} else if strings.HasSuffix(a, minus) {
+			a, neg = strings.TrimSuffix(a, minus), true
+		}
+	}
+	if a == "" {
+		return 0, false, false
+	}
 	if currency == "VND" {
 		// Hóa đơn Việt Nam hay in "64.000" hoặc "64,000": bỏ dấu phân cách nghìn.
-		clean := strings.NewReplacer(".", "", ",", "", " ", "").Replace(amount)
+		clean := strings.NewReplacer(".", "", ",", "").Replace(a)
 		n, err := strconv.ParseInt(clean, 10, 64)
 		if err != nil {
-			return 0, false
+			return 0, false, false
 		}
 		v, err := domain.NewVND(n)
-		return v, err == nil
+		return v, neg, err == nil
 	}
 	if fx == nil {
-		return 0, false
+		return 0, false, false
 	}
-	v, err := domain.ConvertToVND(amount, fx.Rate)
-	return v, err == nil
+	// Ngoại tệ in kiểu "1,234.50": bỏ dấu phẩy phân cách nghìn.
+	v, err := domain.ConvertToVND(strings.ReplaceAll(a, ",", ""), fx.Rate)
+	return v, neg, err == nil
 }
 
 // ---------- Lưu hóa đơn ----------
@@ -332,6 +374,7 @@ type SaveLine struct {
 	LineID      string  `json:"line_id"`
 	Name        string  `json:"name"`
 	Qty         float64 `json:"qty"`
+	Unit        string  `json:"unit,omitempty"`
 	Amount      string  `json:"amount"`
 	CategoryKey string  `json:"category_key"`
 	GroupKey    string  `json:"group_key"`
@@ -406,20 +449,28 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 	}
 
 	r := Receipt{ID: req.ReceiptID, Store: domain.CleanItemName(req.Store), PurchasedOn: on, Currency: currency, FX: fx, SavedAt: s.now()}
+	var lineDiscount domain.VND
 	for i, l := range req.Lines {
+		v, neg, ok := toVND(l.Amount, currency, fx)
+		if ok && neg {
+			// Dòng khuyến mãi: không phải món, trừ vào số đã chi và cộng vào tiết kiệm.
+			lineDiscount += v
+			continue
+		}
 		name := domain.CleanItemName(l.Name)
 		if name == "" || l.Qty <= 0 || l.Qty > 1000 || math.IsNaN(l.Qty) {
 			return Receipt{}, verr.With("line", i)
 		}
 		line := Line{
 			ID: l.LineID, Name: name, NameNorm: domain.NormalizeVi(name), Qty: l.Qty,
+			Unit: domain.NormalizeUnit(l.Unit),
 			Orig: strings.TrimSpace(l.Amount), Habit: l.Habit && req.UseForPrediction,
 		}
 		if s.taxonomy[l.CategoryKey] {
 			line.CategoryKey = l.CategoryKey
 		}
 		line.GroupKey = groupKeyFor(l.GroupKey, line.NameNorm)
-		if v, ok := toVND(l.Amount, currency, fx); ok {
+		if ok {
 			line.VND = &v
 			r.TotalVND += v
 		} else if currency == "VND" {
@@ -427,14 +478,25 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 		}
 		r.Lines = append(r.Lines, line)
 	}
+	if len(r.Lines) == 0 {
+		return Receipt{}, verr.With("field", "lines")
+	}
+	if lineDiscount > r.TotalVND {
+		return Receipt{}, verr.With("field", "lines").With("reason", "discount_exceeds_total")
+	}
+	r.TotalVND -= lineDiscount
+	r.DiscountVND = lineDiscount
 	if req.DiscountTotal != "" {
 		// Tiết kiệm = discount_total in trên hóa đơn (spec mục 3), không tự tính từ giá gốc.
-		// toVND đã chặn số âm và số phi lý.
-		dv, ok := toVND(req.DiscountTotal, currency, fx)
+		// Số in có thể âm ("-10.000"): lấy giá trị tuyệt đối. Khi có cả dòng khuyến mãi
+		// và tổng giảm giá, tổng in trên hóa đơn đã gồm các dòng đó nên lấy số lớn hơn.
+		dv, _, ok := toVND(req.DiscountTotal, currency, fx)
 		if !ok && currency == "VND" {
 			return Receipt{}, verr.With("field", "discount_total")
 		}
-		r.DiscountVND = dv
+		if dv > r.DiscountVND {
+			r.DiscountVND = dv
+		}
 	}
 	r.DedupeKey = fmt.Sprintf("%s|%s|%d", domain.NormalizeVi(r.Store), on, r.TotalVND)
 	r.PayloadHash = hashPayload(req)
@@ -443,11 +505,17 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 
 // groupKeyFor: nhóm do AI/taxonomy gán nếu hợp lệ, ngược lại dùng tên chuẩn hóa.
 func groupKeyFor(given, nameNorm string) string {
-	g := strings.TrimSpace(given)
+	g := normalizeGroupKey(given)
 	if validID(g) {
 		return g
 	}
 	return strings.ReplaceAll(nameNorm, " ", "-")
+}
+
+// normalizeGroupKey đưa khóa nhóm về một dạng: chữ thường, gạch nối. Danh sách nhóm demo
+// (benchmark/nhom_demo.json) viết "sua_tuoi", code và dữ liệu mẫu viết "sua-tuoi".
+func normalizeGroupKey(k string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(k)), "_", "-")
 }
 
 func hashPayload(req SaveRequest) string {

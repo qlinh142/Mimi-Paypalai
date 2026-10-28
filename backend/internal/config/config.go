@@ -41,7 +41,7 @@ func Load() (Config, error) {
 		Env:               get("MIMI_ENV", "dev"),
 		FirestoreDB:       get("FIRESTORE_DATABASE", "(default)"),
 		GeminiModel:       os.Getenv("GEMINI_MODEL"),
-		GeminiLocation:    get("GEMINI_LOCATION", "asia-southeast1"),
+		GeminiLocation:    get("GEMINI_LOCATION", "global"), // checklist 48h Gate 1: Vertex AI gọi endpoint global
 		AppCheckRequired:  get("APP_CHECK_REQUIRED", "true") == "true",
 		TasksQueue:        os.Getenv("TASKS_QUEUE"),
 		WorkerURL:         os.Getenv("WORKER_URL"),
@@ -75,9 +75,8 @@ func (c Config) RequireAPI() error {
 	if c.GeminiModel == "" {
 		errs = append(errs, errors.New("GEMINI_MODEL is required"))
 	}
-	if c.TasksQueue == "" || c.WorkerURL == "" || c.TasksSAEmail == "" {
-		errs = append(errs, errors.New("TASKS_QUEUE, WORKER_URL, TASKS_SA_EMAIL are required"))
-	}
+	// Cloud Tasks nằm ngoài phạm vi demo (checklist 48h): API chưa đẩy task nào nên không
+	// bắt buộc TASKS_QUEUE, WORKER_URL, TASKS_SA_EMAIL.
 	return errors.Join(errs...)
 }
 

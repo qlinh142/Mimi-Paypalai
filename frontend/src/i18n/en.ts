@@ -185,6 +185,7 @@ export const en = {
     noStore: "Store name not found",
     noDate: "No date",
     qty: (q: number) => `Qty ${q}`,
+    discountLine: "Discount",
     chooseGroup: "Choose group",
     noTotal: (sum: string) => `Items add up to ${sum}. The receipt has no printed total to compare.`,
     matches: (sum: string) => `Matches the printed total: ${sum}`,

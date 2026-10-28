@@ -88,7 +88,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		return err
 	}
 	taxonomy := loadTaxonomy()
-	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy)
+	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy, demoGroups())
 	if err != nil {
 		return err
 	}
@@ -215,5 +215,15 @@ func loadTaxonomy() []string {
 		"banh-keo", "an-vat", "me-be", "hoa-pham", "ve-sinh", "my-pham", "giay", "do-dung-bep",
 		"thu-cung", "thuoc", "van-phong-pham", "dien-gia-dung", "do-choi", "quan-ao", "giat-say",
 		"nha-cua", "the-thao", "dich-vu", "khac",
+	}
+}
+
+// demoGroups: danh sách nhóm tiêu dùng đóng cho demo, theo guides/doc-bill/benchmark/
+// nhom_demo.json (đổi "_" thành "-" cho khớp khóa trong code). Khóa phải trùng dữ liệu seed.
+func demoGroups() []string {
+	return []string{
+		"sua-tuoi", "sua-chua", "trung", "gao", "mi-goi", "dau-an", "nuoc-mam-gia-vi",
+		"nuoc-giat", "nuoc-rua-chen", "giay-ve-sinh", "dau-goi-sua-tam", "rau-cu-qua",
+		"thit-ca", "do-uong", "banh-keo", "khac",
 	}
 }

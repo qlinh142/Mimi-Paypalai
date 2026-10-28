@@ -165,6 +165,7 @@ export const vi: Messages = {
     noStore: "Chưa đọc được tên cửa hàng",
     noDate: "Chưa có ngày",
     qty: (q) => `Số lượng ${q}`,
+    discountLine: "Khuyến mãi",
     chooseGroup: "Chọn nhóm",
     noTotal: (sum) => `Tổng các món ${sum}. Hóa đơn không ghi tổng để đối chiếu.`,
     matches: (sum) => `Khớp tổng in trên hóa đơn: ${sum}`,

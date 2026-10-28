@@ -25,6 +25,7 @@ type Image struct {
 type PageLine struct {
 	Name        string
 	Qty         float64
+	Unit        string // đơn vị in trên hóa đơn ("kg", "hộp", "gói"...), "" nếu không có
 	Amount      string
 	Discount    string // "" nếu không có
 	CategoryKey string // khóa trong taxonomy 27 danh mục, "" nếu chưa chọn được
@@ -58,8 +59,10 @@ type DraftLine struct {
 	LineID      string      `json:"line_id"`
 	Name        string      `json:"name"`
 	Qty         float64     `json:"qty"`
+	Unit        string      `json:"unit,omitempty"` // domain.Unit: g, ml, cai...
 	Amount      string      `json:"amount"`
-	AmountVND   *domain.VND `json:"amount_vnd"` // nil khi chưa quy đổi được
+	AmountVND   *domain.VND `json:"amount_vnd"` // nil khi chưa quy đổi được; âm với dòng khuyến mãi
+	Discount    bool        `json:"discount,omitempty"`
 	CategoryKey string      `json:"category_key,omitempty"`
 	GroupKey    string      `json:"group_key,omitempty"`
 	Habit       bool        `json:"habit"`
@@ -111,6 +114,7 @@ type Line struct {
 	Name        string
 	NameNorm    string
 	Qty         float64
+	Unit        string // domain.Unit đã chuẩn hóa, "" nếu hóa đơn không in
 	Orig        string // số gốc in trên hóa đơn
 	VND         *domain.VND
 	CategoryKey string

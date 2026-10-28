@@ -304,10 +304,11 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
               <span>{l.name}</span>
               <span className="num">{l.amount_vnd != null ? formatVnd(l.amount_vnd) : `${l.amount} ${draft.currency}`}</span>
               <span className="sub">
-                {t.confirm.qty(l.qty)}
+                {l.discount ? t.confirm.discountLine : t.confirm.qty(l.qty)}
+                {!l.discount && l.unit && ` ${l.unit}`}
                 {l.amount_vnd == null && ` · ${t.confirm.notConverted}`}
               </span>
-              {!l.category_key && <button className="btn btn--quiet" style={{ minHeight: 36, gridColumn: 2 }}>{t.confirm.chooseGroup}</button>}
+              {!l.category_key && !l.discount && <button className="btn btn--quiet" style={{ minHeight: 36, gridColumn: 2 }}>{t.confirm.chooseGroup}</button>}
             </li>
           ))}
         </ul>

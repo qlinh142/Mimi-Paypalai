@@ -115,6 +115,7 @@ export function toSaveRequest(
       line_id: l.line_id,
       name: l.name,
       qty: l.qty,
+      unit: l.unit,
       amount: l.amount,
       category_key: l.category_key ?? "",
       group_key: l.group_key ?? "",

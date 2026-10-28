@@ -62,8 +62,10 @@ export type ReceiptDraftLine = {
   line_id: string;
   name: string;
   qty: number;
+  unit?: string;                // đơn vị đã chuẩn hóa: kg, g, l, ml, hop, goi...
   amount: string;               // nguyên văn in trên hóa đơn, ví dụ "64000" hoặc "12.50"
-  amount_vnd: number | null;    // null khi chưa quy đổi được sang VND
+  amount_vnd: number | null;    // null khi chưa quy đổi được sang VND; âm với dòng khuyến mãi
+  discount?: boolean;           // dòng khuyến mãi: trừ vào tổng, không phải món
   category_key?: string;        // vắng: hiện nút "Chọn nhóm"
   group_key?: string;
   habit: boolean;
@@ -96,6 +98,7 @@ export type SaveReceiptRequest = {
     line_id: string;
     name: string;
     qty: number;
+    unit?: string;
     amount: string;
     category_key: string;
     group_key: string;

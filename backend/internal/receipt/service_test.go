@@ -289,3 +289,96 @@ func TestSave(t *testing.T) {
 		}
 	})
 }
+
+func TestToVND(t *testing.T) {
+	cases := []struct {
+		in      string
+		want    domain.VND
+		neg, ok bool
+	}{
+		{"64.000", 64000, false, true},
+		{"64,000", 64000, false, true},
+		{"64.000đ", 64000, false, true},
+		{"64.000 VNĐ", 64000, false, true},
+		{"₫64.000", 64000, false, true},
+		{"-10.000", 10000, true, true},
+		{"(10.000)", 10000, true, true},
+		{"10.000-", 10000, true, true},
+		{"abc", 0, false, false},
+		{"", 0, false, false},
+	}
+	for _, c := range cases {
+		v, neg, ok := toVND(c.in, "VND", nil)
+		if v != c.want || neg != c.neg || ok != c.ok {
+			t.Errorf("toVND(%q) = %d,%v,%v want %d,%v,%v", c.in, v, neg, ok, c.want, c.neg, c.ok)
+		}
+	}
+}
+
+func TestReadDiscounts(t *testing.T) {
+	t.Run("discount line is subtracted and total within tolerance matches", func(t *testing.T) {
+		pg := Page{Store: "WinMart", PurchasedOn: "2026-10-15", TotalPrinted: "90.500đ", Lines: []PageLine{
+			{Name: "Sữa tươi", Qty: 2, Unit: "Hộp", Amount: "64.000đ", GroupKey: "sua_tuoi"},
+			{Name: "Nước rửa chén", Qty: 1, Amount: "38.000đ"},
+			{Name: "Giảm giá KM", Qty: 1, Amount: "-12.000đ"},
+		}}
+		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
+		d, err := s.Read(context.Background(), owner, "r-d1", "vi", []Image{{jpeg, "image/jpeg"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d.SumVND != 90000 || d.TotalMismatch {
+			t.Fatalf("sum %d mismatch %v", d.SumVND, d.TotalMismatch)
+		}
+		if !d.Lines[2].Discount || d.Lines[2].Habit || *d.Lines[2].AmountVND != -12000 {
+			t.Fatalf("discount line %+v", d.Lines[2])
+		}
+		if d.Lines[0].Unit != "hop" || d.Lines[0].GroupKey != "sua-tuoi" {
+			t.Fatalf("unit/group %+v", d.Lines[0])
+		}
+	})
+
+	t.Run("gross lines with printed discount total match", func(t *testing.T) {
+		pg := Page{TotalPrinted: "92.000", DiscountTotal: "-10.000", Lines: []PageLine{
+			{Name: "Sữa tươi", Qty: 2, Amount: "64.000"}, {Name: "Bánh", Qty: 1, Amount: "38.000"},
+		}}
+		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
+		d, err := s.Read(context.Background(), owner, "r-d2", "vi", []Image{{jpeg, "image/jpeg"}})
+		if err != nil || d.TotalMismatch {
+			t.Fatalf("err=%v mismatch=%v", err, d.TotalMismatch)
+		}
+	})
+
+	t.Run("real mismatch is flagged", func(t *testing.T) {
+		pg := Page{TotalPrinted: "150.000", Lines: []PageLine{{Name: "Sữa tươi", Qty: 2, Amount: "64.000"}}}
+		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
+		d, _ := s.Read(context.Background(), owner, "r-d3", "vi", []Image{{jpeg, "image/jpeg"}})
+		if !d.TotalMismatch {
+			t.Fatal("expected mismatch")
+		}
+	})
+}
+
+func TestSaveDiscounts(t *testing.T) {
+	req := SaveRequest{
+		ReceiptID: "r-s1", Store: "WinMart", PurchasedOn: "2026-10-15", Currency: "VND", UseForPrediction: true,
+		DiscountTotal: "-12.000đ",
+		Lines: []SaveLine{
+			{LineID: "l1", Name: "Sữa tươi", Qty: 2, Unit: "hop", Amount: "64.000đ", GroupKey: "sua_tuoi", Habit: true},
+			{LineID: "l2", Name: "Nước rửa chén", Qty: 1, Amount: "38.000đ", Habit: true},
+			{LineID: "l3", Name: "Giảm giá KM", Qty: 1, Amount: "-12.000đ"},
+		},
+	}
+	st := &fakeStore{saved: map[string]Receipt{}}
+	s := newSvc(t, nil, &fakeQuota{}, st)
+	if _, err := s.Save(context.Background(), owner, req); err != nil {
+		t.Fatal(err)
+	}
+	r := st.saved["r-s1"]
+	if r.TotalVND != 90000 || r.DiscountVND != 12000 || len(r.Lines) != 2 {
+		t.Fatalf("total %d discount %d lines %d", r.TotalVND, r.DiscountVND, len(r.Lines))
+	}
+	if r.Lines[0].GroupKey != "sua-tuoi" || r.Lines[0].Unit != "hop" {
+		t.Fatalf("line %+v", r.Lines[0])
+	}
+}

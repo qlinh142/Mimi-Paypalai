@@ -276,7 +276,7 @@ func lineDoc(l receipt.Line) map[string]any {
 		vnd = int64(*l.VND)
 	}
 	return map[string]any{
-		"line_id": l.ID, "name": l.Name, "name_norm": l.NameNorm, "qty": l.Qty, "orig": l.Orig,
+		"line_id": l.ID, "name": l.Name, "name_norm": l.NameNorm, "qty": l.Qty, "unit": l.Unit, "orig": l.Orig,
 		"line_total_vnd": vnd, "category_key": l.CategoryKey, "group_key": l.GroupKey, "habit": l.Habit,
 	}
 }
