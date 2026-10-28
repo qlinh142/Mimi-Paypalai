@@ -21,11 +21,38 @@ import (
 )
 
 // Line là một dòng giỏ đang mở (plan_items/{key} với status "open").
+// Mimi 2.0 mục 6: mỗi dòng mang số lượng, hạn cần (need-by), ưu tiên, nguồn và lý do.
 type Line struct {
 	Key         string
 	Name        string
 	CategoryKey string
 	AddedAt     time.Time
+	Qty         float64 // số lượng cần mua theo Unit; 0: chưa nhập
+	Unit        string  // đơn vị người dùng chọn (kg, hop, goi...), "" là cái
+	NeedBy      string  // YYYY-MM-DD hoặc ""
+	Priority    string  // high | normal | low
+	Source      string  // forecast | check | meal | manual
+	Reason      string
+	BoughtQty   float64 // đã mua theo hóa đơn/giao hàng, cùng đơn vị gốc với Qty; > 0 và < Qty: mua thiếu
+}
+
+// Nguồn của một dòng Kế hoạch (Mimi 2.0 mục 6).
+const (
+	SourceForecast = "forecast" // To Buy: Mimi dự báo sắp hết
+	SourceCheck    = "check"    // Check tồn: người dùng thêm từ Đồ dùng
+	SourceMeal     = "meal"     // nhu cầu từ bữa ăn / sự kiện
+	SourceManual   = "manual"
+)
+
+var validPriority = map[string]bool{"high": true, "normal": true, "low": true}
+
+// LinePatch là PATCH /plan/items/{key}: chỉ trường có mặt mới đổi.
+type LinePatch struct {
+	Qty      *float64 `json:"qty,omitempty"`
+	Unit     *string  `json:"unit,omitempty"`
+	NeedBy   *string  `json:"need_by,omitempty"`
+	Priority *string  `json:"priority,omitempty"`
+	Reason   *string  `json:"reason,omitempty"`
 }
 
 // State là thông tin chuyến mua: ngày, giờ, ghi chú.
@@ -39,6 +66,8 @@ type Store interface {
 	OpenLines(ctx context.Context, uid string) ([]Line, error)
 	// AddLine ghi đè dòng của nhóm thành "open" (kể cả khi trước đó đã "done").
 	AddLine(ctx context.Context, uid string, l Line) error
+	// UpdateLine ghi số lượng, need-by, ưu tiên, lý do của một dòng đang mở.
+	UpdateLine(ctx context.Context, uid string, l Line) error
 	// RemoveLine xóa dòng; nhóm không có trong giỏ cũng không lỗi.
 	RemoveLine(ctx context.Context, uid, key string) error
 	State(ctx context.Context, uid string) (State, error)
@@ -67,6 +96,13 @@ type CartItem struct {
 	DaysLeft    *int          `json:"days_left"`
 	UnitPrice   *int64        `json:"unit_price"` // null: chưa có giá
 	BestStore   string        `json:"best_store,omitempty"`
+	Qty         float64       `json:"qty"`
+	Unit        string        `json:"unit,omitempty"`
+	NeedBy      string        `json:"need_by,omitempty"`
+	Priority    string        `json:"priority"`
+	Source      string        `json:"source"`
+	Reason      string        `json:"reason,omitempty"`
+	BoughtQty   float64       `json:"bought_qty,omitempty"` // > 0: đã mua một phần
 }
 
 // Cart là phản hồi GET /plan.
@@ -140,7 +176,11 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Cart, error) {
 	}
 	today := domain.Today(s.now(), domain.Location(p.Timezone))
 	for _, l := range lines {
-		ci := CartItem{Key: l.Key, Name: l.Name, CategoryKey: l.CategoryKey, Status: domain.StatusWaiting}
+		ci := CartItem{
+			Key: l.Key, Name: l.Name, CategoryKey: l.CategoryKey, Status: domain.StatusWaiting,
+			Qty: l.Qty, Unit: l.Unit, NeedBy: l.NeedBy, Priority: orDefault(l.Priority, "normal"),
+			Source: orDefault(l.Source, SourceManual), Reason: l.Reason, BoughtQty: l.BoughtQty,
+		}
 		if r, ok := byKey[l.Key]; ok {
 			v := domain.ViewAt(r.Prediction, today, leadDays(p))
 			ci.Status, ci.DaysLeft = v.Status, v.DaysLeft
@@ -203,11 +243,96 @@ func (s *Service) Add(ctx context.Context, p authz.Principal, key string) (Cart,
 		return Cart{}, apperr.New(apperr.CodeValidation, "Giỏ đã đủ 100 món.").With("limit", MaxCartLines)
 	}
 	if !already {
-		if err := s.store.AddLine(ctx, p.UID, Line{Key: key, Name: rec.Name, CategoryKey: rec.CategoryKey, AddedAt: s.now()}); err != nil {
+		l := Line{Key: key, Name: rec.Name, CategoryKey: rec.CategoryKey, AddedAt: s.now(), Qty: 1, Priority: "normal", Source: SourceCheck}
+		today := domain.Today(s.now(), domain.Location(p.Timezone))
+		if v := domain.ViewAt(rec.Prediction, today, leadDays(p)); domain.InNeeds(v, item.NeedsHorizonDays) {
+			// Món đang trong "Cần mua": nguồn là dự báo, need-by là ngày dự kiến hết.
+			l.Source, l.NeedBy = SourceForecast, rec.Prediction.OutOn.String()
+			l.Reason = "Mimi dự báo sắp hết"
+			if rec.Prediction.OutOn.IsZero() {
+				l.NeedBy = ""
+			}
+		}
+		if err := s.store.AddLine(ctx, p.UID, l); err != nil {
 			return Cart{}, err
 		}
 	}
 	return s.Get(ctx, p)
+}
+
+// UpdateLine sửa số lượng, đơn vị, need-by, ưu tiên, lý do của một dòng đang mở.
+// Chưa tạo giao dịch và không đổi tồn kho (Mimi 2.0 mục 6).
+func (s *Service) UpdateLine(ctx context.Context, p authz.Principal, key string, patch LinePatch) (Cart, error) {
+	if err := authz.Can(p, authz.ActionWritePlan); err != nil {
+		return Cart{}, err
+	}
+	if !item.ValidKey(key) {
+		return Cart{}, apperr.ErrNotFound
+	}
+	lines, err := s.store.OpenLines(ctx, p.UID)
+	if err != nil {
+		return Cart{}, err
+	}
+	var l *Line
+	for i := range lines {
+		if lines[i].Key == key {
+			l = &lines[i]
+			break
+		}
+	}
+	if l == nil {
+		return Cart{}, apperr.ErrNotFound
+	}
+	bad := func(field, msg string) error {
+		return apperr.New(apperr.CodeValidation, msg).With("field", field)
+	}
+	if patch.Qty != nil {
+		if !(*patch.Qty > 0 && *patch.Qty <= 10_000) {
+			return Cart{}, bad("qty", "Số lượng phải lớn hơn 0.")
+		}
+		l.Qty = *patch.Qty
+	}
+	if patch.Unit != nil {
+		u := domain.NormalizeUnit(*patch.Unit)
+		if u == "" && strings.TrimSpace(*patch.Unit) != "" {
+			return Cart{}, bad("unit", "Đơn vị không hợp lệ.")
+		}
+		l.Unit = u
+	}
+	if patch.NeedBy != nil {
+		if *patch.NeedBy != "" {
+			d, err := domain.ParseDate(*patch.NeedBy)
+			today := domain.Today(s.now(), domain.Location(p.Timezone))
+			if err != nil || d.Before(today.AddDays(-1)) || d.After(today.AddDays(366)) {
+				return Cart{}, bad("need_by", "Ngày cần không hợp lệ.")
+			}
+		}
+		l.NeedBy = *patch.NeedBy
+	}
+	if patch.Priority != nil {
+		if !validPriority[*patch.Priority] {
+			return Cart{}, bad("priority", "Ưu tiên là high, normal hoặc low.")
+		}
+		l.Priority = *patch.Priority
+	}
+	if patch.Reason != nil {
+		r := strings.TrimSpace(*patch.Reason)
+		if utf8.RuneCountInString(r) > maxTripNote || strings.IndexFunc(r, unicode.IsControl) >= 0 {
+			return Cart{}, bad("reason", "Lý do tối đa 120 ký tự.")
+		}
+		l.Reason = r
+	}
+	if err := s.store.UpdateLine(ctx, p.UID, *l); err != nil {
+		return Cart{}, err
+	}
+	return s.Get(ctx, p)
+}
+
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
 }
 
 // Remove bỏ một món khỏi giỏ. Món không có trong giỏ vẫn coi là thành công.

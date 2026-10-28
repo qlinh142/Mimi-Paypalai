@@ -55,6 +55,7 @@ type (
 	Plan interface {
 		Get(ctx context.Context, p authz.Principal) (plan.Cart, error)
 		Add(ctx context.Context, p authz.Principal, key string) (plan.Cart, error)
+		UpdateLine(ctx context.Context, p authz.Principal, key string, patch plan.LinePatch) (plan.Cart, error)
 		Remove(ctx context.Context, p authz.Principal, key string) error
 		SetState(ctx context.Context, p authz.Principal, st plan.State) (plan.State, error)
 		Prices(ctx context.Context, p authz.Principal) (plan.Prices, error)
@@ -181,6 +182,7 @@ func (s *Server) Handler() http.Handler {
 	private("GET /spending", s.defaultTimeout, s.getSpending)
 	private("GET /plan", s.defaultTimeout, s.getPlan)
 	private("PUT /plan/items/{key}", s.defaultTimeout, s.addPlanItem)
+	private("PATCH /plan/items/{key}", s.defaultTimeout, s.patchPlanItem)
 	private("DELETE /plan/items/{key}", s.defaultTimeout, s.removePlanItem)
 	private("PUT /plan/state", s.defaultTimeout, s.putPlanState)
 	private("GET /plan/prices", s.defaultTimeout, s.getPlanPrices)

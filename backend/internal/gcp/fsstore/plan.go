@@ -36,6 +36,12 @@ func (s *Store) OpenLines(ctx context.Context, uid string) ([]plan.Line, error) 
 		l.Name, _ = m["name"].(string)
 		l.CategoryKey, _ = m["category_key"].(string)
 		l.AddedAt, _ = m["added_at"].(time.Time)
+		l.Qty, l.BoughtQty = asFloat(m["qty"]), asFloat(m["bought_qty"])
+		l.Unit, _ = m["unit"].(string)
+		l.NeedBy, _ = m["need_by"].(string)
+		l.Priority, _ = m["priority"].(string)
+		l.Source, _ = m["src"].(string)
+		l.Reason, _ = m["reason"].(string)
 		out = append(out, l)
 	}
 	return out, nil
@@ -43,11 +49,27 @@ func (s *Store) OpenLines(ctx context.Context, uid string) ([]plan.Line, error) 
 
 // AddLine ghi đè cả tài liệu (không merge) để xóa dấu "done" của lần mua trước.
 func (s *Store) AddLine(ctx context.Context, uid string, l plan.Line) error {
+	src := l.Source
+	if src == "" {
+		src = plan.SourceManual
+	}
 	_, err := s.user(uid).Collection("plan_items").Doc(l.Key).Set(ctx, map[string]any{
-		"status": "open", "name": l.Name, "category_key": l.CategoryKey, "added_at": l.AddedAt, "src": "manual",
+		"status": "open", "name": l.Name, "category_key": l.CategoryKey, "added_at": l.AddedAt, "src": src,
+		"qty": l.Qty, "unit": l.Unit, "need_by": l.NeedBy, "priority": l.Priority, "reason": l.Reason, "bought_qty": 0.0,
 	})
 	if err != nil {
 		return fmt.Errorf("plan add: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) UpdateLine(ctx context.Context, uid string, l plan.Line) error {
+	_, err := s.user(uid).Collection("plan_items").Doc(l.Key).Update(ctx, []firestore.Update{
+		{Path: "qty", Value: l.Qty}, {Path: "unit", Value: l.Unit}, {Path: "need_by", Value: l.NeedBy},
+		{Path: "priority", Value: l.Priority}, {Path: "reason", Value: l.Reason}, {Path: "updated_at", Value: time.Now()},
+	})
+	if err != nil {
+		return fmt.Errorf("plan update: %w", err)
 	}
 	return nil
 }

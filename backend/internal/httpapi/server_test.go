@@ -129,6 +129,10 @@ func (f *fakePlanStore) AddLine(_ context.Context, _ string, l plan.Line) error 
 	f.lines[l.Key] = l
 	return nil
 }
+func (f *fakePlanStore) UpdateLine(_ context.Context, _ string, l plan.Line) error {
+	f.lines[l.Key] = l
+	return nil
+}
 func (f *fakePlanStore) RemoveLine(_ context.Context, _ string, k string) error {
 	delete(f.lines, k)
 	return nil

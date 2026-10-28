@@ -269,6 +269,21 @@ func (s *Server) addPlanItem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, cart)
 }
 
+// patchPlanItem: sửa số lượng, đơn vị, need-by, ưu tiên, lý do của một dòng giỏ.
+func (s *Server) patchPlanItem(w http.ResponseWriter, r *http.Request) {
+	var patch plan.LinePatch
+	if err := decodeJSON(w, r, &patch, maxJSONBody); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	cart, err := s.plan.UpdateLine(r.Context(), principalFrom(r.Context()), r.PathValue("key"), patch)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cart)
+}
+
 func (s *Server) removePlanItem(w http.ResponseWriter, r *http.Request) {
 	if err := s.plan.Remove(r.Context(), principalFrom(r.Context()), r.PathValue("key")); err != nil {
 		s.writeError(w, r, err)

@@ -188,10 +188,12 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		}
 
 		planRefs := map[string]*firestore.DocumentRef{}
+		planDocs := map[string]map[string]any{}
 		for _, g := range allGroups {
 			ref := u.Collection("plan_items").Doc(g)
 			if snap, err := tx.Get(ref); err == nil && snap.Data()["status"] == "open" {
 				planRefs[g] = ref
+				planDocs[g] = snap.Data()
 			} else if err != nil && !isNotFound(err) {
 				return err
 			}
@@ -274,8 +276,12 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		if err := tx.Set(u.Collection("months").Doc(month), monthDoc, firestore.MergeAll); err != nil {
 			return err
 		}
-		for _, ref := range planRefs {
-			if err := tx.Update(ref, []firestore.Update{{Path: "status", Value: "done"}, {Path: "done_by", Value: r.ID}, {Path: "done_at", Value: now}}); err != nil {
+		// Reconcile (Mimi 2.0 mục 19): mua đủ số lượng trong Kế hoạch thì dòng xong; mua
+		// thiếu (cùng đơn vị) thì giữ mở và ghi lượng đã mua. Dòng chưa nhập số lượng coi là đủ.
+		for g, ref := range planRefs {
+			q, unit := lineQty(r.Lines, g)
+			upd, _ := reconcilePlanLine(planDocs[g], q, unit, r.ID, now)
+			if err := tx.Update(ref, upd); err != nil {
 				return err
 			}
 		}
@@ -293,6 +299,44 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		return receipt.SaveOutcome{}, err
 	}
 	return out, nil
+}
+
+// lineQty cộng lượng mua của một nhóm trong hóa đơn, theo đơn vị gốc của dòng đầu tiên.
+func lineQty(lines []receipt.Line, group string) (float64, domain.Unit) {
+	var total float64
+	var unit domain.Unit
+	for _, l := range lines {
+		if l.GroupKey != group {
+			continue
+		}
+		q, u := domain.ToBase(l.Qty, l.Unit)
+		if unit == "" {
+			unit = u
+		}
+		if u == unit {
+			total += q
+		}
+	}
+	return total, unit
+}
+
+// reconcilePlanLine trả thay đổi cho một dòng Kế hoạch khi có hàng vào. bought_qty lưu
+// theo đơn vị của dòng Kế hoạch (2 hộp, 1,5 kg) để hiển thị cạnh số lượng cần mua.
+func reconcilePlanLine(plan map[string]any, bought float64, boughtUnit domain.Unit, by string, now time.Time) ([]firestore.Update, bool) {
+	unit, _ := plan["unit"].(string)
+	qty := asFloat(plan["qty"])
+	already := asFloat(plan["bought_qty"])
+	factor, wantUnit := domain.ToBase(1, unit) // số đơn vị gốc trong một đơn vị của dòng
+	got := already
+	if wantUnit == boughtUnit && factor > 0 {
+		got += bought / factor
+	}
+	if qty > 0 && wantUnit == boughtUnit && got < qty {
+		return []firestore.Update{{Path: "bought_qty", Value: got}, {Path: "partial_by", Value: by}, {Path: "updated_at", Value: now}}, false
+	}
+	return []firestore.Update{
+		{Path: "status", Value: "done"}, {Path: "bought_qty", Value: got}, {Path: "done_by", Value: by}, {Path: "done_at", Value: now},
+	}, true
 }
 
 func lineDoc(l receipt.Line) map[string]any {

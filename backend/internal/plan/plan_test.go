@@ -29,6 +29,10 @@ func (m *memStore) OpenLines(context.Context, string) ([]Line, error) {
 	return out, nil
 }
 func (m *memStore) AddLine(_ context.Context, _ string, l Line) error { m.lines[l.Key] = l; return nil }
+func (m *memStore) UpdateLine(_ context.Context, _ string, l Line) error {
+	m.lines[l.Key] = l
+	return nil
+}
 func (m *memStore) RemoveLine(_ context.Context, _ string, k string) error {
 	delete(m.lines, k)
 	return nil
@@ -229,5 +233,47 @@ func TestState(t *testing.T) {
 		if _, err := svc.SetState(ctx, owner, s); !errors.As(err, &ae) || ae.Code != apperr.CodeValidation {
 			t.Errorf("case %d err=%v", i, err)
 		}
+	}
+}
+
+func TestPlanLineDetails(t *testing.T) {
+	ctx := context.Background()
+	svc, st := setup()
+	if _, err := svc.Add(ctx, owner, "sua"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Add(ctx, owner, "gao"); err != nil {
+		t.Fatal(err)
+	}
+	if l := st.lines["sua"]; l.Source != SourceForecast || l.NeedBy != "2026-10-16" || l.Qty != 1 {
+		t.Fatalf("forecast line %+v", l)
+	}
+	if l := st.lines["gao"]; l.Source != SourceCheck || l.NeedBy != "" {
+		t.Fatalf("check line %+v", l)
+	}
+
+	qty, unit, need, prio := 2.0, "Hộp", "2026-10-18", "high"
+	c, err := svc.UpdateLine(ctx, owner, "sua", LinePatch{Qty: &qty, Unit: &unit, NeedBy: &need, Priority: &prio})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sua CartItem
+	for _, it := range c.Items {
+		if it.Key == "sua" {
+			sua = it
+		}
+	}
+	if sua.Qty != 2 || sua.Unit != "hop" || sua.NeedBy != "2026-10-18" || sua.Priority != "high" {
+		t.Fatalf("updated %+v", sua)
+	}
+
+	zero, badPrio, past := 0.0, "urgent", "2020-01-01"
+	for i, p := range []LinePatch{{Qty: &zero}, {Priority: &badPrio}, {NeedBy: &past}} {
+		if _, err := svc.UpdateLine(ctx, owner, "sua", p); err == nil {
+			t.Errorf("case %d accepted", i)
+		}
+	}
+	if _, err := svc.UpdateLine(ctx, owner, "keo", LinePatch{Qty: &qty}); err == nil {
+		t.Fatal("line not in cart accepted")
 	}
 }
