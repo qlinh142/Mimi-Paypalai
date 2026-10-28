@@ -55,13 +55,15 @@ const (
 	ActionManageHousehold
 	ActionJoinHousehold
 	ActionLeaveHousehold
+	ActionManageMandate // Household Mandate (Mimi 2.0 mục 13)
+	ActionBuyOnline     // giỏ online, PayPal, verify, refund
 )
 
 var ownerOnly = map[Action]bool{
 	ActionReadReceipts: true, ActionWriteReceipts: true, ActionReadSpending: true,
 	ActionReadItemsFull: true, ActionWriteItems: true, ActionReadPlan: true,
 	ActionWritePlan: true, ActionManageRecurring: true, ActionSendAsk: true,
-	ActionManageHousehold: true,
+	ActionManageHousehold: true, ActionManageMandate: true, ActionBuyOnline: true,
 }
 
 var anyone = map[Action]bool{

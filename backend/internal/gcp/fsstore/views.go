@@ -82,6 +82,7 @@ func (s *Store) Month(ctx context.Context, uid, month string) (spending.Month, e
 		DiscountVND: asInt64(d["discount_vnd"]),
 		Receipts:    asInt64(d["receipts"]),
 		ByCategory:  map[string]int64{},
+		OnlineVND:   asInt64(d["online_vnd"]), OnlineOrders: asInt64(d["online_orders"]), RefundVND: asInt64(d["refund_vnd"]),
 	}
 	if cats, ok := d["by_category"].(map[string]any); ok {
 		for k, v := range cats {

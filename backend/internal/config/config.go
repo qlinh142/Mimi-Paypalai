@@ -31,6 +31,13 @@ type Config struct {
 	EmailAPIKey  string // gắn từ Secret Manager, chỉ worker và job cần
 	EmailFrom    string
 	TaxonomyKeys []string // nạp từ file nhúng trong binary, không từ env
+
+	// PayPal (Mimi 2.0 mục 15). PAYPAL_MODE: sandbox | live | fake | off.
+	// fake: giả lập trong bộ nhớ để demo khi chưa có tài khoản Sandbox.
+	PayPalMode     string
+	PayPalClientID string
+	PayPalSecret   string // gắn từ Secret Manager
+	VNDPerUSD      int64  // PayPal không nhận VND: tỷ giá quy đổi cho đơn online
 }
 
 func Load() (Config, error) {
@@ -51,6 +58,10 @@ func Load() (Config, error) {
 		ReadTimeout:       55 * time.Second,
 		DefaultTimeout:    10 * time.Second,
 		ReceiptDailyLimit: 20,
+		PayPalMode:        get("PAYPAL_MODE", "fake"),
+		PayPalClientID:    os.Getenv("PAYPAL_CLIENT_ID"),
+		PayPalSecret:      os.Getenv("PAYPAL_CLIENT_SECRET"),
+		VNDPerUSD:         25_000,
 	}
 	var errs []error
 	if c.ProjectID == "" {
@@ -62,6 +73,22 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("RECEIPT_DAILY_LIMIT invalid: %q", v))
 		}
 		c.ReceiptDailyLimit = n
+	}
+	if v := os.Getenv("PAYPAL_VND_PER_USD"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < 1_000 || n > 1_000_000 {
+			errs = append(errs, fmt.Errorf("PAYPAL_VND_PER_USD invalid: %q", v))
+		}
+		c.VNDPerUSD = n
+	}
+	switch c.PayPalMode {
+	case "fake", "off":
+	case "sandbox", "live":
+		if c.PayPalClientID == "" || c.PayPalSecret == "" {
+			errs = append(errs, errors.New("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required for PAYPAL_MODE="+c.PayPalMode))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("PAYPAL_MODE invalid: %q (sandbox | live | fake | off)", c.PayPalMode))
 	}
 	if c.Env == "prod" && !c.AppCheckRequired {
 		errs = append(errs, errors.New("APP_CHECK_REQUIRED must be true in prod"))

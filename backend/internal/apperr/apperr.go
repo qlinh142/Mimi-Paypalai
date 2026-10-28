@@ -12,43 +12,55 @@ import (
 type Code string
 
 const (
-	CodeBadRequest        Code = "bad_request"
-	CodeValidation        Code = "validation_failed"
-	CodeUnauthenticated   Code = "unauthenticated"
-	CodeAppCheck          Code = "app_check_failed"
-	CodeForbidden         Code = "forbidden"
-	CodeNotFound          Code = "not_found"
-	CodeConflict          Code = "conflict"
-	CodeReceiptConflict   Code = "receipt_conflict"
-	CodePossibleDuplicate Code = "possible_duplicate"
-	CodePayloadTooLarge   Code = "payload_too_large"
-	CodeUnsupportedMedia  Code = "unsupported_media"
-	CodeQuotaExceeded     Code = "quota_exceeded"
-	CodeRateLimited       Code = "rate_limited"
-	CodeReceiptUnreadable Code = "receipt_unreadable"
-	CodeAIUnavailable     Code = "ai_unavailable"
-	CodeNotImplemented    Code = "not_implemented"
-	CodeInternal          Code = "internal"
+	CodeBadRequest         Code = "bad_request"
+	CodeValidation         Code = "validation_failed"
+	CodeUnauthenticated    Code = "unauthenticated"
+	CodeAppCheck           Code = "app_check_failed"
+	CodeForbidden          Code = "forbidden"
+	CodeNotFound           Code = "not_found"
+	CodeConflict           Code = "conflict"
+	CodeReceiptConflict    Code = "receipt_conflict"
+	CodePossibleDuplicate  Code = "possible_duplicate"
+	CodePayloadTooLarge    Code = "payload_too_large"
+	CodeUnsupportedMedia   Code = "unsupported_media"
+	CodeQuotaExceeded      Code = "quota_exceeded"
+	CodeRateLimited        Code = "rate_limited"
+	CodeReceiptUnreadable  Code = "receipt_unreadable"
+	CodeAIUnavailable      Code = "ai_unavailable"
+	CodeNotImplemented     Code = "not_implemented"
+	CodeInternal           Code = "internal"
+	CodeMandateBlocked     Code = "mandate_blocked"     // Household Mandate chặn: vi phạm rule cứng
+	CodeApprovalRequired   Code = "approval_required"   // Household Mandate cần người dùng duyệt
+	CodeInvalidState       Code = "invalid_state"       // thao tác không hợp với trạng thái đơn hàng
+	CodePaymentFailed      Code = "payment_failed"      // PayPal từ chối hoặc chưa hoàn tất
+	CodePaymentNotEnabled  Code = "payment_not_enabled" // chưa cấu hình PayPal
+	CodePaymentUnavailable Code = "payment_unavailable" // PayPal lỗi tạm thời, thử lại được
 )
 
 var statusByCode = map[Code]int{
-	CodeBadRequest:        http.StatusBadRequest,
-	CodeValidation:        http.StatusUnprocessableEntity,
-	CodeUnauthenticated:   http.StatusUnauthorized,
-	CodeAppCheck:          http.StatusUnauthorized,
-	CodeForbidden:         http.StatusForbidden,
-	CodeNotFound:          http.StatusNotFound,
-	CodeConflict:          http.StatusConflict,
-	CodeReceiptConflict:   http.StatusConflict,
-	CodePossibleDuplicate: http.StatusConflict,
-	CodePayloadTooLarge:   http.StatusRequestEntityTooLarge,
-	CodeUnsupportedMedia:  http.StatusUnsupportedMediaType,
-	CodeQuotaExceeded:     http.StatusTooManyRequests,
-	CodeRateLimited:       http.StatusTooManyRequests,
-	CodeReceiptUnreadable: http.StatusUnprocessableEntity,
-	CodeAIUnavailable:     http.StatusServiceUnavailable,
-	CodeNotImplemented:    http.StatusNotImplemented,
-	CodeInternal:          http.StatusInternalServerError,
+	CodeBadRequest:         http.StatusBadRequest,
+	CodeValidation:         http.StatusUnprocessableEntity,
+	CodeUnauthenticated:    http.StatusUnauthorized,
+	CodeAppCheck:           http.StatusUnauthorized,
+	CodeForbidden:          http.StatusForbidden,
+	CodeNotFound:           http.StatusNotFound,
+	CodeConflict:           http.StatusConflict,
+	CodeReceiptConflict:    http.StatusConflict,
+	CodePossibleDuplicate:  http.StatusConflict,
+	CodePayloadTooLarge:    http.StatusRequestEntityTooLarge,
+	CodeUnsupportedMedia:   http.StatusUnsupportedMediaType,
+	CodeQuotaExceeded:      http.StatusTooManyRequests,
+	CodeRateLimited:        http.StatusTooManyRequests,
+	CodeReceiptUnreadable:  http.StatusUnprocessableEntity,
+	CodeAIUnavailable:      http.StatusServiceUnavailable,
+	CodeNotImplemented:     http.StatusNotImplemented,
+	CodeInternal:           http.StatusInternalServerError,
+	CodeMandateBlocked:     http.StatusForbidden,
+	CodeApprovalRequired:   http.StatusConflict,
+	CodeInvalidState:       http.StatusConflict,
+	CodePaymentFailed:      http.StatusPaymentRequired,
+	CodePaymentNotEnabled:  http.StatusServiceUnavailable,
+	CodePaymentUnavailable: http.StatusServiceUnavailable,
 }
 
 // Error là lỗi có thể trả thẳng cho client.

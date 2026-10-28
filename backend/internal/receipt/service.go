@@ -147,6 +147,12 @@ var allowedMIME = map[string][]byte{
 	"image/webp": []byte("RIFF"),
 }
 
+// ValidImage kiểm tra MIME được phép và byte đầu file khớp MIME (không tin Content-Type).
+func ValidImage(mime string, data []byte) bool {
+	magic, ok := allowedMIME[mime]
+	return ok && bytes.HasPrefix(data, magic)
+}
+
 func (s *Service) validateImages(receiptID string, imgs []Image) error {
 	if !validID(receiptID) {
 		return apperr.New(apperr.CodeValidation, "Mã hóa đơn không hợp lệ.").With("field", "receipt_id")

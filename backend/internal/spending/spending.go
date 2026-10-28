@@ -19,6 +19,10 @@ type Month struct {
 	DiscountVND int64
 	Receipts    int64
 	ByCategory  map[string]int64
+	// Mimi Online (PayPal): đã nằm trong SpentVND, tách ra để hiển thị; RefundVND đã trừ khỏi SpentVND.
+	OnlineVND    int64
+	OnlineOrders int64
+	RefundVND    int64
 }
 
 // ReceiptRow là một hóa đơn trong danh sách của Sổ chi tiêu.
@@ -50,6 +54,9 @@ type Report struct {
 	Saved             int64           `json:"saved"`
 	SavedRatio        *float64        `json:"saved_ratio"` // discount / (spent + discount); null khi không có giảm giá
 	ReceiptCount      int64           `json:"receipt_count"`
+	OnlineSpent       int64           `json:"online_spent"`  // chi qua PayPal, net sau refund
+	OnlineOrders      int64           `json:"online_orders"` // số đơn PayPal đã thanh toán
+	Refunded          int64           `json:"refunded"`      // tổng refund PayPal trong tháng
 	ByCategory        []CategoryShare `json:"by_category"`
 	TopSavingReceipts []ReceiptRow    `json:"top_saving_receipts"`
 	RecentReceipts    []ReceiptRow    `json:"recent_receipts"`
@@ -92,6 +99,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, month string) (Rep
 func Build(month string, cur, prev Month, rows []ReceiptRow) Report {
 	r := Report{
 		Month: month, Spent: cur.SpentVND, Saved: cur.DiscountVND, ReceiptCount: cur.Receipts,
+		OnlineSpent: cur.OnlineVND, OnlineOrders: cur.OnlineOrders, Refunded: cur.RefundVND,
 		ByCategory: []CategoryShare{}, TopSavingReceipts: []ReceiptRow{}, RecentReceipts: []ReceiptRow{},
 	}
 	if prev.SpentVND > 0 {

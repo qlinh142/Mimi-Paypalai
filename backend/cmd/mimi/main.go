@@ -30,6 +30,8 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/inbox"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
 	"github.com/smartlife-lab/mimi/backend/internal/notify"
+	"github.com/smartlife-lab/mimi/backend/internal/order"
+	"github.com/smartlife-lab/mimi/backend/internal/paypal"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/platform/logx"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
@@ -104,6 +106,14 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	}
 	items := item.New(store, nil)
 	planSvc := plan.New(store, store, nil)
+	payments, err := newPayments(cfg)
+	if err != nil {
+		return err
+	}
+	orders, err := order.New(store, store, order.NewSandboxCatalog(time.Now()), payments, reader, cfg.VNDPerUSD, log, nil)
+	if err != nil {
+		return err
+	}
 	api, err := httpapi.New(httpapi.Deps{
 		Log: log, Tokens: auth, AppCheck: appCheck, Principals: store, Profiles: store,
 		Receipts: receipts, Items: items, Ready: store,
@@ -112,11 +122,29 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Notes:    inbox.New(items, planSvc, nil),
 		Spending: spending.New(store),
 		Settings: user.NewSettingsService(store, nil),
+		Orders:   orders,
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout))
 	if err != nil {
 		return err
 	}
 	return listen(ctx, log, cfg.Port, api.Handler())
+}
+
+// newPayments chọn PayPal theo PAYPAL_MODE. off trả nil: các route thanh toán báo
+// payment_not_enabled thay vì âm thầm giả lập.
+func newPayments(cfg config.Config) (order.Payments, error) {
+	switch cfg.PayPalMode {
+	case "sandbox":
+		return paypal.New(paypal.SandboxBaseURL, cfg.PayPalClientID, cfg.PayPalSecret)
+	case "live":
+		return paypal.New(paypal.LiveBaseURL, cfg.PayPalClientID, cfg.PayPalSecret)
+	case "fake":
+		if cfg.Env == "prod" {
+			return nil, errors.New("PAYPAL_MODE=fake is not allowed in prod")
+		}
+		return paypal.NewFake(), nil
+	}
+	return nil, nil
 }
 
 // serveWorker: nhận task từ Cloud Tasks. Cloud Run đã kiểm tra OIDC (ingress internal,
