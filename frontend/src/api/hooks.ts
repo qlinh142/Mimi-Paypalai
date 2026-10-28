@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryLabel } from "../i18n";
-import { apiGet, apiSend, apiSendQueued, apiUploadReceipt } from "./client";
+import { apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
 import type {
-  Cart, HomeSummary, Item, ItemDetail, ItemsQuery, Me, Notification, PlanPrices, PlanState, QuickStock,
-  ReceiptDraft, SaveReceiptRequest, SaveReceiptResult, SettingsPatch, SpendingReport,
+  Basket, Cart, DeliveryObservation, HomeSummary, Item, ItemDetail, ItemsQuery, Mandate, Me, Notification, Order,
+  PlanLinePatch, PlanPrices, PlanState, QuickStock, ReceiptDraft, RefundReason, SaveReceiptRequest, SaveReceiptResult,
+  SettingsPatch, SpendingReport,
 } from "./types";
 
 /** API chỉ trả category_key; nhãn hiển thị lấy theo ngôn ngữ giao diện. */
@@ -21,6 +22,9 @@ export const qk = {
   spending: (month: string) => ["spending", month] as const,
   notifications: ["notifications"] as const,
   planPrices: ["plan", "prices"] as const,
+  mandate: ["mandate"] as const,
+  orders: ["orders"] as const,
+  order: (id: string) => ["orders", id] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: qk.me, queryFn: () => apiGet<Me>("/me") });
@@ -77,6 +81,19 @@ export function useUndoStock() {
       qc.invalidateQueries({ queryKey: qk.items() });
       qc.invalidateQueries({ queryKey: qk.item(previous.key) });
       qc.invalidateQueries({ queryKey: qk.home });
+    },
+  });
+}
+
+/** SET số lượng thực tế: tạo Confirmed Inventory mới, không sửa lịch sử mua (Mimi 2.0 mục 4). */
+export function useSetQuantity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; qty: number; unit: string }) =>
+      apiSend<Item>("PUT", `${itemPath(v.key)}/quantity`, { qty: v.qty, unit: v.unit }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: qk.items() });
+      qc.invalidateQueries({ queryKey: qk.item(v.key) });
     },
   });
 }
@@ -153,6 +170,17 @@ export function usePlanItem() {
   });
 }
 
+/** Sửa số lượng, đơn vị, need-by, ưu tiên của một dòng Kế hoạch. */
+export function usePlanLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; patch: PlanLinePatch }) =>
+      apiSend<Cart>("PATCH", `/plan/items/${encodeURIComponent(v.key)}`, v.patch),
+    onSuccess: (data) => qc.setQueryData(qk.plan, data),
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.plan }),
+  });
+}
+
 export function useSavePlanState() {
   const qc = useQueryClient();
   return useMutation({
@@ -182,5 +210,67 @@ export function useSaveSettings() {
       qc.invalidateQueries({ queryKey: qk.home });
       qc.invalidateQueries({ queryKey: qk.items() });
     },
+  });
+}
+
+// ================= Mimi Online: Mandate, giỏ online, PayPal, giao hàng, Verify, Refund =================
+
+export const useMandate = () => useQuery({ queryKey: qk.mandate, queryFn: () => apiGet<Mandate>("/mandate") });
+
+export function useSaveMandate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (m: Mandate) => apiSend<Mandate>("PUT", "/mandate", m),
+    onSuccess: (m) => qc.setQueryData(qk.mandate, m),
+  });
+}
+
+/** Giỏ online dựng từ Kế hoạch, kèm kết quả Household Mandate. Chưa tạo giao dịch. */
+export const useBasket = (keys: string[], enabled = true) =>
+  useQuery({
+    queryKey: ["basket", keys] as const,
+    queryFn: () => apiSend<Basket>("POST", "/orders/basket", { keys }),
+    enabled,
+  });
+
+export const useOrders = () =>
+  useQuery({ queryKey: qk.orders, queryFn: async () => (await apiGet<{ orders: Order[] }>("/orders")).orders });
+
+export const useOrder = (id: string) =>
+  useQuery({ queryKey: qk.order(id), queryFn: () => apiGet<Order>(`/orders/${encodeURIComponent(id)}`), enabled: id !== "" });
+
+/** Mọi thao tác trên đơn trả về đơn mới; cập nhật cache và làm mới các màn liên quan. */
+function useOrderAction<V>(fn: (v: V) => Promise<Order>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (o) => {
+      qc.setQueryData(qk.order(o.id), o);
+      qc.invalidateQueries({ queryKey: qk.orders });
+      qc.invalidateQueries({ queryKey: qk.plan });
+      qc.invalidateQueries({ queryKey: qk.items() });
+      qc.invalidateQueries({ queryKey: ["spending"] });
+      qc.invalidateQueries({ queryKey: qk.home });
+    },
+  });
+}
+
+const orderPath = (id: string) => `/orders/${encodeURIComponent(id)}`;
+
+export const useCheckout = () =>
+  useOrderAction((v: { keys: string[]; approve: boolean }) => apiSend<Order>("POST", "/orders", v));
+export const useCaptureOrder = () => useOrderAction((id: string) => apiSend<Order>("POST", `${orderPath(id)}/capture`));
+export const useAdvanceOrder = () => useOrderAction((id: string) => apiSend<Order>("POST", `${orderPath(id)}/advance`));
+export const useVerifyOrder = () =>
+  useOrderAction((v: { id: string; actual: Record<string, number> }) =>
+    apiSend<Order>("POST", `${orderPath(v.id)}/verify`, { actual: v.actual }));
+export const useRefundOrder = () =>
+  useOrderAction((v: { id: string; reason: RefundReason; amount_vnd: number; note: string }) =>
+    apiSend<Order>("POST", `${orderPath(v.id)}/refund`, { reason: v.reason, amount_vnd: v.amount_vnd, note: v.note }));
+
+export function useReadDelivery() {
+  return useMutation({
+    mutationFn: async (v: { id: string; images: Blob[] }) =>
+      (await apiUploadImages<{ items: DeliveryObservation[] }>(`${orderPath(v.id)}/delivery/read`, v.images)).items,
   });
 }

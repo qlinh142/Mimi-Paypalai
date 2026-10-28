@@ -2,8 +2,8 @@ import { t, uiLang } from "../i18n";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-import { useMe, useSaveSettings } from "../api/hooks";
-import type { Me, SettingsPatch } from "../api/types";
+import { useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
+import type { Mandate, MandateCategory, Me, SettingsPatch } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 
 const LEAD_DAYS = [1, 2, 3, 5, 7, 10, 14, 21, 30];
@@ -60,6 +60,8 @@ export function Settings() {
           </div>
         )}
         {me.data && <SettingsForm me={me.data} />}
+
+        <MandateSection />
 
         <section className="plan-sec">
           <h2>{t.settings.account}</h2>
@@ -161,6 +163,74 @@ function SettingsForm({ me }: { me: Me }) {
       {save.isError && <p className="error" role="alert">{t.settings.saveFailed}</p>}
       <button type="submit" className="btn btn--primary btn--block btn--lg" aria-disabled={!dirty || save.isPending || undefined}>
         {save.isPending ? t.confirm.saving : save.isSuccess && !dirty ? t.settings.saved : t.settings.save}
+      </button>
+    </form>
+  );
+}
+
+const MANDATE_CATS: MandateCategory[] = ["grocery", "household"];
+
+/** Household Mandate (Mimi 2.0 mục 13): phạm vi Mimi được tự thanh toán online. Chỉ chủ nhà sửa được. */
+function MandateSection() {
+  const q = useMandate();
+  return (
+    <section className="plan-sec" aria-labelledby="mandate-h">
+      <h2 id="mandate-h">{t.mandate.title}</h2>
+      <p className="hint">{t.mandate.intro}</p>
+      {q.data && <MandateForm initial={q.data} />}
+      <Link to="/orders" className="link-row">
+        <span>{t.settings.ordersLink}</span>
+        <ChevronRight size={20} aria-hidden />
+      </Link>
+    </section>
+  );
+}
+
+function MandateForm({ initial }: { initial: Mandate }) {
+  const [m, setM] = useState<Mandate>(initial);
+  const save = useSaveMandate();
+  const toggleCat = (c: MandateCategory, on: boolean) =>
+    setM({ ...m, categories: on ? [...m.categories.filter((x) => x !== c), c] : m.categories.filter((x) => x !== c) });
+  const num = (v: string, max: number) => Math.min(max, Math.max(0, Math.round(Number(v) || 0)));
+
+  return (
+    <form
+      className="plan-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!save.isPending) save.mutate(m);
+      }}
+    >
+      <label className="switch-row">
+        {t.mandate.enabled}
+        <input type="checkbox" role="switch" {...{ switch: "" }} checked={m.enabled} onChange={(e) => setM({ ...m, enabled: e.target.checked })} />
+      </label>
+      <fieldset className="plan-form">
+        <legend>{t.mandate.categories}</legend>
+        {MANDATE_CATS.map((c) => (
+          <label key={c} className="switch-row">
+            {t.mandate.categoryNames[c]}
+            <input type="checkbox" checked={m.categories.includes(c)} onChange={(e) => toggleCat(c, e.target.checked)} />
+          </label>
+        ))}
+      </fieldset>
+      <label>
+        {t.mandate.tolerance}
+        <input type="number" inputMode="numeric" min={0} max={50} value={m.price_tolerance_pct} onChange={(e) => setM({ ...m, price_tolerance_pct: num(e.target.value, 50) })} />
+      </label>
+      <div className="plan-form__row">
+        <label>
+          {t.mandate.maxOrder}
+          <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_order_vnd} onChange={(e) => setM({ ...m, max_order_vnd: num(e.target.value, 100_000_000) })} />
+        </label>
+        <label>
+          {t.mandate.maxDay}
+          <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_day_vnd} onChange={(e) => setM({ ...m, max_day_vnd: num(e.target.value, 100_000_000) })} />
+        </label>
+      </div>
+      {save.isError && <p className="error" role="alert">{t.settings.saveFailed}</p>}
+      <button type="submit" className="btn btn--quiet btn--block" aria-disabled={save.isPending || undefined}>
+        {save.isPending ? t.confirm.saving : save.isSuccess ? t.mandate.saved : t.mandate.save}
       </button>
     </form>
   );

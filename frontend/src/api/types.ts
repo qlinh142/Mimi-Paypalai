@@ -42,6 +42,18 @@ export type Item = {
   confidence?: "low" | "mid" | "high" | "" | null;
   source: "predicted" | "manual";
   predicted_out_on?: string | null; // YYYY-MM-DD
+  stock?: Stock;               // tồn theo số lượng; vắng khi chưa có hóa đơn nào ghi số lượng
+};
+
+/** Mimi 2.0 mục 4: Confirmed Inventory (có bằng chứng) tách khỏi Estimated Inventory (Mimi ước tính). */
+export type Stock = {
+  estimated: number;
+  unit: "g" | "ml" | "pc";
+  confirmed: number;
+  confirmed_on: string;        // YYYY-MM-DD
+  confirmed_source: "receipt" | "delivery" | "manual";
+  rate_per_day?: number;
+  days_of_stock?: number;
 };
 
 /** GET /items/{key}: mọi trường của Item kèm tối đa 10 lần mua gần nhất. */
@@ -119,7 +131,20 @@ export type CartItem = {
   days_left: number | null;
   unit_price: number | null;   // null: chưa có giá
   best_store?: string;
+  qty: number;
+  unit?: string;
+  need_by?: string;            // YYYY-MM-DD
+  priority: PlanPriority;
+  source: PlanSource;
+  reason?: string;
+  bought_qty?: number;         // > 0: đã mua một phần
 };
+
+export type PlanPriority = "high" | "normal" | "low";
+export type PlanSource = "forecast" | "check" | "meal" | "manual";
+
+/** PATCH /plan/items/{key}: chỉ gửi trường thay đổi. */
+export type PlanLinePatch = Partial<{ qty: number; unit: string; need_by: string; priority: PlanPriority; reason: string }>;
 
 export type PlanState = { buy_date: string; buy_hour: number | null; trip_note: string };
 
@@ -153,6 +178,9 @@ export type SpendingReport = {
   saved: number;
   saved_ratio: number | null;
   receipt_count: number;
+  online_spent?: number;       // chi qua PayPal (net sau refund), đã nằm trong spent
+  online_orders?: number;
+  refunded?: number;
   by_category: { key: string; amount: number; pct: number }[];
   top_saving_receipts: ReceiptSummary[];
   recent_receipts: ReceiptSummary[];
@@ -174,3 +202,83 @@ export type SettingsPatch = Partial<{
 }>;
 
 export type ApiErrorBody = { code: string; message: string };
+
+// ================= Mimi Online (Mimi 2.0 mục 12 đến 19) =================
+
+export type MandateCategory = "grocery" | "household";
+
+/** Household Mandate: phạm vi Mimi được tự mua online. */
+export type Mandate = {
+  enabled: boolean;
+  categories: MandateCategory[];
+  price_tolerance_pct: number;
+  max_order_vnd: number;
+  max_day_vnd: number;
+};
+
+export type MandateResult = "ALLOW" | "ASK" | "BLOCK";
+export type MandateReason = { key?: string; code: string; result: MandateResult; detail: string };
+
+export type OrderLine = {
+  key: string;
+  name: string;
+  product_name: string;
+  category_key?: string;
+  category: MandateCategory;
+  qty: number;                 // số gói
+  unit: string;
+  pack_qty: number;
+  plan_qty: number;
+  plan_unit?: string;
+  unit_price_vnd: number;
+  snapshot_price_vnd: number;
+  total_vnd: number;
+  need_by?: string;
+  eta: string;
+  verified_qty?: number;
+  match?: "match" | "partial" | "missing";
+};
+
+export type Basket = {
+  merchant: string;
+  lines: OrderLine[];
+  missing: string[];
+  total_vnd: number;
+  amount_usd: string;
+  vnd_per_usd: number;
+  snapshot_at: string;
+  decision: { result: MandateResult; reasons: MandateReason[] };
+};
+
+export type OrderState = "awaiting_payment" | "paid" | "ordered" | "shipped" | "delivered" | "verified";
+
+export type OrderRefund = {
+  id: string; ref: string; amount_vnd: number; amount_usd: string;
+  reason: RefundReason; status: string; at: string;
+};
+export type RefundReason = "missing" | "wrong" | "damaged" | "other";
+
+export type Order = {
+  id: string;
+  state: OrderState;
+  merchant: string;
+  lines: OrderLine[];
+  total_vnd: number;
+  amount_usd: string;
+  vnd_per_usd: number;
+  decision: { result: MandateResult; reasons: MandateReason[] };
+  approved_by_user: boolean;
+  paypal_order_id: string;
+  approve_url?: string;
+  paypal_capture_id?: string;
+  paid_at?: string;
+  eta: string;
+  events: { state: OrderState; at: string }[];
+  refunds: OrderRefund[];
+  refunded_vnd: number;
+  net_vnd: number;
+  suggested_refund_vnd: number;
+  created_at: string;
+};
+
+export type DeliveryObservation = { key: string; qty: number; confidence: "low" | "mid" | "high" };

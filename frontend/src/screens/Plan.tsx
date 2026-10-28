@@ -1,12 +1,13 @@
 import { t } from "../i18n";
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Pencil, Plus, ShoppingBag, X } from "lucide-react";
 import { ApiError } from "../api/client";
-import { useItems, usePlan, usePlanItem, usePlanPrices, useSavePlanState } from "../api/hooks";
-import type { CartItem, Item, PlanPrices, PlanState } from "../api/types";
+import { useItems, usePlan, usePlanItem, usePlanLine, usePlanPrices, useSavePlanState } from "../api/hooks";
+import type { CartItem, Item, PlanPriority, PlanPrices, PlanState } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT } from "../components/ItemRow";
-import { formatVnd } from "../lib/text";
+import { formatDayMonth, formatVnd } from "../lib/text";
 
 /** Dòng phụ dưới tên món: tồn hiện tại, cùng cách nói với màn Đồ dùng. */
 function stockText(i: Pick<Item, "status" | "days_left">): string {
@@ -96,6 +97,10 @@ export function Plan() {
                   <span className="num">{cart.estimate != null ? formatVnd(cart.estimate) : "–"}</span>
                 </p>
                 {cart.missing_price > 0 && <p className="hint">{t.plan.missing(cart.missing_price)}</p>}
+                <Link to="/plan/online" className="btn btn--primary btn--block">
+                  <ShoppingBag size={18} aria-hidden /> {t.online.cta}
+                </Link>
+                <p className="hint">{t.online.ctaHint}</p>
               </>
             )}
           </section>
@@ -114,11 +119,20 @@ export function Plan() {
 }
 
 function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRemove: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const qtyText = `${item.qty || 1}${item.unit ? ` ${item.unit}` : ""}`;
   return (
-    <li className="plan-row">
+    <li className="plan-row" style={{ flexWrap: "wrap" }}>
       <CategoryIcon category={item.category_key} />
       <span className="plan-row__text">
         <span className="plan-row__name">{item.name}</span>
+        <span className="plan-row__sub">
+          {t.planLine.qty} {qtyText}
+          {item.need_by && ` · ${t.planLine.needBy} ${formatDayMonth(item.need_by)}`}
+          {item.priority === "high" && ` · ${t.planLine.priorities.high}`}
+          {` · ${t.planLine.sources[item.source]}`}
+        </span>
+        {item.bought_qty ? <span className="plan-row__sub">{t.planLine.bought(item.bought_qty, item.qty)}</span> : null}
         <span className="plan-row__sub">
           {stockText(item)} ·{" "}
           {item.unit_price != null && item.best_store
@@ -126,6 +140,9 @@ function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRe
             : t.plan.noPrice}
         </span>
       </span>
+      <button type="button" className="icon-btn" aria-label={t.planLine.edit(item.name)} aria-expanded={editing} onClick={() => setEditing(!editing)}>
+        <Pencil size={18} aria-hidden />
+      </button>
       <button
         type="button"
         className="icon-btn"
@@ -135,7 +152,65 @@ function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRe
       >
         <X size={20} aria-hidden />
       </button>
+      {editing && <LineEditor item={item} onDone={() => setEditing(false)} />}
     </li>
+  );
+}
+
+const PRIORITIES: PlanPriority[] = ["high", "normal", "low"];
+
+/** Sửa số lượng, đơn vị, need-by, ưu tiên của một dòng. Chưa tạo giao dịch, không đổi tồn kho. */
+function LineEditor({ item, onDone }: { item: CartItem; onDone: () => void }) {
+  const edit = usePlanLine();
+  const [qty, setQty] = useState(String(item.qty || 1));
+  const [unit, setUnit] = useState(item.unit ?? "");
+  const [needBy, setNeedBy] = useState(item.need_by ?? "");
+  const [priority, setPriority] = useState<PlanPriority>(item.priority);
+  const value = Number(qty.replace(",", "."));
+  const valid = Number.isFinite(value) && value > 0;
+  return (
+    <form
+      className="plan-form"
+      style={{ flexBasis: "100%" }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid || edit.isPending) return;
+        edit.mutate({ key: item.key, patch: { qty: value, unit, need_by: needBy, priority } }, { onSuccess: onDone });
+      }}
+    >
+      <div className="plan-form__row">
+        <label>
+          {t.planLine.qty}
+          <input inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+        </label>
+        <label>
+          {t.stock.unit}
+          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+            {["", "kg", "g", "l", "ml", "hop", "goi", "chai", "qua", "loc"].map((u) => (
+              <option key={u} value={u}>{u || t.stock.units.pc}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="plan-form__row">
+        <label>
+          {t.planLine.needBy}
+          <input type="date" value={needBy} onChange={(e) => setNeedBy(e.target.value)} />
+        </label>
+        <label>
+          {t.planLine.priority}
+          <select value={priority} onChange={(e) => setPriority(e.target.value as PlanPriority)}>
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>{t.planLine.priorities[p]}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {edit.isError && <p className="error" role="alert">{edit.error instanceof ApiError ? edit.error.message : t.common.genericError}</p>}
+      <button type="submit" className="btn btn--quiet btn--block" aria-disabled={!valid || edit.isPending || undefined}>
+        {t.planLine.done}
+      </button>
+    </form>
   );
 }
 

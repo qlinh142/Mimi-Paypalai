@@ -55,7 +55,7 @@ export function Spending() {
             <button className="btn btn--quiet" onClick={() => q.refetch()}>{t.common.retry}</button>
           </div>
         )}
-        {r && (r.receipt_count === 0 ? <EmptyMonth month={month} /> : <Report r={r} month={month} />)}
+        {r && (r.receipt_count === 0 && !r.online_orders ? <EmptyMonth month={month} /> : <Report r={r} month={month} />)}
       </div>
     </MainFrame>
   );
@@ -86,6 +86,12 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
           {" · "}
           {t.spending.receipts(r.receipt_count)}
         </p>
+        {(r.online_spent ?? 0) > 0 && (
+          <p className="spend-hero__sub">
+            <Link to="/orders">{t.spending.online(formatVnd(r.online_spent ?? 0), r.online_orders ?? 0)}</Link>
+            {(r.refunded ?? 0) > 0 && ` · ${t.spending.refunded(formatVnd(r.refunded ?? 0))}`}
+          </p>
+        )}
         {r.saved > 0 && (
           <p className="spend-hero__saved">
             {t.spending.saved(formatVnd(r.saved))}

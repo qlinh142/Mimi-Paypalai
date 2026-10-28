@@ -150,3 +150,17 @@ export async function apiUploadReceipt<T>(receiptId: string, images: Blob[], lan
   }
   return parse<T>(res);
 }
+
+/** Gửi ảnh hàng nhận dạng multipart cho Verify; ảnh đã được nén ở máy và không được lưu. */
+export async function apiUploadImages<T>(path: string, images: Blob[]): Promise<T> {
+  const form = new FormData();
+  images.forEach((b, i) => form.append("images", b, `d${i + 1}.jpg`));
+  const h = await headers();
+  let res: Response;
+  try {
+    res = await rawFetch(path, { method: "POST", headers: h, body: form });
+  } catch {
+    throw new OfflineError("offline");
+  }
+  return parse<T>(res);
+}

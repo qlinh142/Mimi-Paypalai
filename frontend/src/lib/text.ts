@@ -54,3 +54,12 @@ export function addMonths(ym: string, n: number): string {
   const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
+
+const qtyFmt = new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { maximumFractionDigits: 2 });
+
+/** Số lượng tồn theo đơn vị gốc của API: 2500 g → "2.5 kg", 1500 ml → "1.5 l", 3 pc → "3 pcs". */
+export function formatQty(qty: number, unit: "g" | "ml" | "pc", pcLabel: string): string {
+  if (unit === "g") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} kg` : `${qtyFmt.format(qty)} g`;
+  if (unit === "ml") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} l` : `${qtyFmt.format(qty)} ml`;
+  return `${qtyFmt.format(qty)} ${pcLabel}`;
+}
