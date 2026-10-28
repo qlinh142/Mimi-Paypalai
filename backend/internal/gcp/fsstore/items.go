@@ -67,6 +67,40 @@ func decodeOverride(v any) *domain.Override {
 	return o
 }
 
+func baselineDoc(b domain.Baseline) map[string]any {
+	return map[string]any{"qty": b.Qty, "unit": string(b.Unit), "on": b.On.String(), "source": string(b.Source)}
+}
+
+func decodeBaseline(v any) domain.Baseline {
+	m, _ := v.(map[string]any)
+	if m == nil {
+		return domain.Baseline{}
+	}
+	b := domain.Baseline{Qty: asFloat(m["qty"])}
+	u, _ := m["unit"].(string)
+	src, _ := m["source"].(string)
+	b.Unit, b.Source = domain.Unit(u), domain.BaselineSource(src)
+	if s, _ := m["on"].(string); s != "" {
+		b.On, _ = domain.ParseDate(s)
+	}
+	return b
+}
+
+func decodeConsumed(v any) []domain.Consumption {
+	xs, _ := v.([]any)
+	out := make([]domain.Consumption, 0, len(xs))
+	for _, x := range xs {
+		m, _ := x.(map[string]any)
+		s, _ := m["on"].(string)
+		on, err := domain.ParseDate(s)
+		if err != nil {
+			continue
+		}
+		out = append(out, domain.Consumption{Qty: asFloat(m["qty"]), On: on})
+	}
+	return out
+}
+
 func decodeRecord(snap *firestore.DocumentSnapshot) item.Record {
 	d := snap.Data()
 	r := item.Record{GroupKey: snap.Ref.ID, Prediction: decodePrediction(d["prediction"]), Override: decodeOverride(d["override"])}
@@ -77,6 +111,9 @@ func decodeRecord(snap *firestore.DocumentSnapshot) item.Record {
 	if s, _ := d["last_purchase"].(string); s != "" {
 		r.LastPurchase, _ = domain.ParseDate(s)
 	}
+	r.Baseline = decodeBaseline(d["stock"])
+	r.RatePerDay = asFloat(d["rate_per_day"])
+	r.Consumed = decodeConsumed(d["consumed"])
 	return r
 }
 
@@ -159,6 +196,39 @@ func (s *Store) mutateOverride(ctx context.Context, uid, key string, next func(*
 		return tx.Update(ref, []firestore.Update{
 			{Path: "override", Value: ovDoc},
 			{Path: "prediction", Value: predictionDoc(rec.Prediction)},
+			{Path: "updated_at", Value: time.Now()},
+		})
+	})
+	return rec, err
+}
+
+// SetBaseline ghi Confirmed Inventory mới; các lần tiêu thụ trước mốc này bị bỏ vì đã
+// nằm trong lượng người dùng vừa đếm.
+func (s *Store) SetBaseline(ctx context.Context, uid, key string, b domain.Baseline) (item.Record, error) {
+	ref := s.user(uid).Collection("items").Doc(key)
+	var rec item.Record
+	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if isNotFound(err) {
+			return apperr.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		rec = decodeRecord(snap)
+		rec.Baseline = b
+		var kept []any
+		var keptC []domain.Consumption
+		for _, c := range rec.Consumed {
+			if c.On.After(b.On) {
+				kept = append(kept, map[string]any{"qty": c.Qty, "on": c.On.String()})
+				keptC = append(keptC, c)
+			}
+		}
+		rec.Consumed = keptC
+		return tx.Update(ref, []firestore.Update{
+			{Path: "stock", Value: baselineDoc(b)},
+			{Path: "consumed", Value: kept},
 			{Path: "updated_at", Value: time.Now()},
 		})
 	})

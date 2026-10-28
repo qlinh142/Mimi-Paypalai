@@ -44,6 +44,7 @@ type (
 		ListShared(ctx context.Context, p authz.Principal, horizon int) ([]item.SharedItem, error)
 		ChangeStock(ctx context.Context, p authz.Principal, key string, c item.StockChange) (item.Item, error)
 		UndoStock(ctx context.Context, p authz.Principal, key string, actedAt time.Time) (item.Item, error)
+		SetQuantity(ctx context.Context, p authz.Principal, key string, q item.QuantitySet) (item.Item, error)
 	}
 	Home interface {
 		Get(ctx context.Context, p authz.Principal) (home.Summary, error)
@@ -175,6 +176,7 @@ func (s *Server) Handler() http.Handler {
 	private("GET /items/{key}", s.defaultTimeout, s.getItem)
 	private("PATCH /items/{key}/stock", s.defaultTimeout, s.changeStock)
 	private("DELETE /items/{key}/override", s.defaultTimeout, s.undoStock)
+	private("PUT /items/{key}/quantity", s.defaultTimeout, s.setQuantity)
 	private("GET /households/needs", s.defaultTimeout, s.listSharedNeeds)
 	private("GET /spending", s.defaultTimeout, s.getSpending)
 	private("GET /plan", s.defaultTimeout, s.getPlan)

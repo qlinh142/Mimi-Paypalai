@@ -5,6 +5,7 @@ package item
 
 import (
 	"context"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,11 @@ type Record struct {
 	LastPurchase  domain.Date
 	Dropped       bool
 	AskLaterUntil *domain.Date
+	// Tồn theo số lượng (Mimi 2.0 mục 4): Baseline là Confirmed Inventory, RatePerDay là
+	// tốc độ dùng ước tính, Consumed là các lần tiêu thụ đã ghi (bữa ăn đã qua).
+	Baseline   domain.Baseline
+	RatePerDay float64
+	Consumed   []domain.Consumption
 }
 
 // Store đọc ghi items. Mọi hàm nhận uid của Principal, không nhận uid từ request.
@@ -35,6 +41,8 @@ type Store interface {
 	// có (lần bấm sau thắng), rồi tính lại Prediction bằng domain.Predict.
 	SetOverride(ctx context.Context, uid, groupKey string, ov domain.Override) (Record, error)
 	ClearOverride(ctx context.Context, uid, groupKey string, setAt time.Time) (Record, error)
+	// SetBaseline ghi mốc tồn mới do người dùng xác nhận; không sửa lịch sử mua.
+	SetBaseline(ctx context.Context, uid, groupKey string, b domain.Baseline) (Record, error)
 	// OwnerOf trả uid chủ nhà để thành viên đọc danh sách dùng chung.
 	OwnerOf(ctx context.Context, householdID string) (string, error)
 	// History trả các lần mua thói quen gần nhất của một nhóm, mới nhất trước
@@ -74,6 +82,18 @@ type Item struct {
 	PurchaseCount int           `json:"purchase_count"`
 	Confidence    string        `json:"confidence,omitempty"`
 	Source        string        `json:"source"`
+	Stock         *Stock        `json:"stock,omitempty"` // nil khi chưa có số lượng nào
+}
+
+// Stock tách Confirmed Inventory (có bằng chứng) và Estimated Inventory (Mimi ước tính).
+type Stock struct {
+	Estimated       float64 `json:"estimated"`
+	Unit            string  `json:"unit"` // g | ml | pc
+	Confirmed       float64 `json:"confirmed"`
+	ConfirmedOn     string  `json:"confirmed_on"`
+	ConfirmedSource string  `json:"confirmed_source"` // receipt | delivery | manual
+	RatePerDay      float64 `json:"rate_per_day,omitempty"`
+	DaysOfStock     *int    `json:"days_of_stock,omitempty"`
 }
 
 // SharedItem là kiểu riêng cho thành viên nhà: KHÔNG có trường giá hay chi tiêu nào,
@@ -139,7 +159,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, q Query) ([]Item,
 		if q.Tab == "soon" && !domain.InNeeds(v, q.Horizon) {
 			continue
 		}
-		out = append(out, toItem(r, v))
+		out = append(out, toItem(r, v, today))
 	}
 	sortByDays(out)
 	return out, nil
@@ -192,8 +212,9 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, key string) (Detai
 	if hist == nil {
 		hist = []HistoryEntry{} // JSON trả [] thay vì null
 	}
-	v := domain.ViewAt(rec.Prediction, domain.Today(s.now(), loc(p)), lead(p))
-	return Detail{Item: toItem(rec, v), History: hist}, nil
+	today := domain.Today(s.now(), loc(p))
+	v := domain.ViewAt(rec.Prediction, today, lead(p))
+	return Detail{Item: toItem(rec, v, today), History: hist}, nil
 }
 
 // CountNeeds đếm món trong "Cần mua" với khoảng ngày horizon, cùng quy tắc với màn
@@ -271,7 +292,8 @@ func (s *Service) ChangeStock(ctx context.Context, p authz.Principal, key string
 	if err != nil {
 		return Item{}, err
 	}
-	return toItem(rec, domain.ViewAt(rec.Prediction, domain.Today(now, loc(p)), lead(p))), nil
+	today := domain.Today(now, loc(p))
+	return toItem(rec, domain.ViewAt(rec.Prediction, today, lead(p)), today), nil
 }
 
 // UndoStock xóa bản sửa tay (Hoàn tác). Không nhận cả tài liệu từ client.
@@ -286,10 +308,45 @@ func (s *Service) UndoStock(ctx context.Context, p authz.Principal, key string, 
 	if err != nil {
 		return Item{}, err
 	}
-	return toItem(rec, domain.ViewAt(rec.Prediction, domain.Today(s.now(), loc(p)), lead(p))), nil
+	today := domain.Today(s.now(), loc(p))
+	return toItem(rec, domain.ViewAt(rec.Prediction, today, lead(p)), today), nil
 }
 
-func toItem(r Record, v domain.View) Item {
+// QuantitySet là thao tác "SET số lượng thực tế" (Mimi 2.0 mục 4). Unit nhận dạng in
+// trên bao bì ("kg", "hộp"...), server quy về g | ml | pc.
+type QuantitySet struct {
+	Qty  float64 `json:"qty"`
+	Unit string  `json:"unit"`
+}
+
+// MaxStockQty chặn số phi lý: 1 tấn, 1.000 lít hoặc 100.000 cái.
+const MaxStockQty = 1_000_000
+
+// SetQuantity tạo Confirmed Inventory baseline mới từ lượng người dùng đếm được.
+// Lịch sử mua giữ nguyên; tồn ước tính tính lại từ mốc này.
+func (s *Service) SetQuantity(ctx context.Context, p authz.Principal, key string, q QuantitySet) (Item, error) {
+	if err := authz.Can(p, authz.ActionWriteItems); err != nil {
+		return Item{}, err
+	}
+	if !ValidKey(key) {
+		return Item{}, apperr.ErrNotFound
+	}
+	if q.Qty < 0 || math.IsNaN(q.Qty) || math.IsInf(q.Qty, 0) {
+		return Item{}, apperr.New(apperr.CodeValidation, "Số lượng không hợp lệ.").With("field", "qty")
+	}
+	qty, unit := domain.ToBase(q.Qty, q.Unit)
+	if qty > MaxStockQty {
+		return Item{}, apperr.New(apperr.CodeValidation, "Số lượng quá lớn.").With("field", "qty")
+	}
+	today := domain.Today(s.now(), loc(p))
+	rec, err := s.store.SetBaseline(ctx, p.UID, key, domain.Baseline{Qty: qty, Unit: unit, On: today, Source: domain.BaselineManual})
+	if err != nil {
+		return Item{}, err
+	}
+	return toItem(rec, domain.ViewAt(rec.Prediction, today, lead(p)), today), nil
+}
+
+func toItem(r Record, v domain.View, today domain.Date) Item {
 	it := Item{
 		Key: r.GroupKey, Name: r.Name, CategoryKey: r.CategoryKey,
 		Status: v.Status, DaysLeft: v.DaysLeft, PurchaseCount: r.Prediction.PurchaseCount,
@@ -298,6 +355,14 @@ func toItem(r Record, v domain.View) Item {
 	}
 	if !r.Prediction.OutOn.IsZero() {
 		it.OutOn = r.Prediction.OutOn.String()
+	}
+	if !r.Baseline.On.IsZero() {
+		est := domain.EstimateAt(r.Baseline, r.RatePerDay, r.Consumed, today)
+		it.Stock = &Stock{
+			Estimated: est, Unit: string(r.Baseline.Unit),
+			Confirmed: r.Baseline.Qty, ConfirmedOn: r.Baseline.On.String(), ConfirmedSource: string(r.Baseline.Source),
+			RatePerDay: r.RatePerDay, DaysOfStock: domain.DaysOfStock(est, r.RatePerDay),
+		}
 	}
 	return it
 }

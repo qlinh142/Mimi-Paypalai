@@ -180,6 +180,21 @@ func (s *Server) changeStock(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, it)
 }
 
+// setQuantity: "SET số lượng thực tế" tạo Confirmed Inventory baseline mới.
+func (s *Server) setQuantity(w http.ResponseWriter, r *http.Request) {
+	var q item.QuantitySet
+	if err := decodeJSON(w, r, &q, maxJSONBody); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	it, err := s.items.SetQuantity(r.Context(), principalFrom(r.Context()), r.PathValue("key"), q)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, it)
+}
+
 func (s *Server) undoStock(w http.ResponseWriter, r *http.Request) {
 	actedAt, err := time.Parse(time.RFC3339, r.URL.Query().Get("acted_at"))
 	if err != nil {

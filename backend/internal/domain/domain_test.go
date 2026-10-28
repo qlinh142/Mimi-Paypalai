@@ -169,3 +169,37 @@ func TestQuietHours(t *testing.T) {
 		t.Fatal("noon should not be quiet")
 	}
 }
+
+func TestQuantity(t *testing.T) {
+	d := func(s string) Date { x, _ := ParseDate(s); return x }
+	if q, u := ToBase(2, "Kg"); q != 2000 || u != UnitGram {
+		t.Fatalf("kg: %v %v", q, u)
+	}
+	if q, u := ToBase(3, "Hộp"); q != 3 || u != UnitPiece {
+		t.Fatalf("hop: %v %v", q, u)
+	}
+	if q, u := ToBase(1.5, "L"); q != 1500 || u != UnitML {
+		t.Fatalf("l: %v %v", q, u)
+	}
+	b := Baseline{Qty: 1000, Unit: UnitGram, On: d("2026-10-01"), Source: BaselineReceipt}
+	used := []Consumption{{Qty: 200, On: d("2026-10-03")}, {Qty: 999, On: d("2026-09-01")}}
+	if got := EstimateAt(b, 50, used, d("2026-10-05")); got != 600 { // 1000 - 4*50 - 200
+		t.Fatalf("estimate %v", got)
+	}
+	if got := EstimateAt(b, 50, nil, d("2026-12-01")); got != 0 {
+		t.Fatalf("estimate never negative: %v", got)
+	}
+	nb := AfterPurchase(b, 50, nil, 2000, UnitGram, d("2026-10-11"), BaselineReceipt)
+	if nb.Qty != 2500 || !nb.On.Equal(d("2026-10-11")) {
+		t.Fatalf("after purchase %+v", nb)
+	}
+	if nb := AfterPurchase(b, 50, nil, 3, UnitPiece, d("2026-10-11"), BaselineReceipt); nb.Qty != 3 {
+		t.Fatalf("unit change keeps only new qty: %+v", nb)
+	}
+	if r := ConsumptionRate([]float64{1000, 2000}, 10); r != 150 {
+		t.Fatalf("rate %v", r)
+	}
+	if ShoppingDelta(1500, 500) != 1000 || ShoppingDelta(100, 500) != 0 {
+		t.Fatal("delta")
+	}
+}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/item"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
 )
 
@@ -101,10 +102,21 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 	// Nhóm có dòng habit=true mới cần tính lại dự đoán.
 	groups := map[string]string{} // group_key -> tên hiển thị
 	cats := map[string]string{}
+	type qty struct {
+		qty  float64
+		unit domain.Unit
+	}
+	bought := map[string]qty{} // lượng mua trong hóa đơn này, theo đơn vị gốc
 	for _, l := range r.Lines {
 		if l.Habit && l.GroupKey != "" {
 			groups[l.GroupKey] = l.Name
 			cats[l.GroupKey] = l.CategoryKey
+			q, u := domain.ToBase(l.Qty, l.Unit)
+			if b, ok := bought[l.GroupKey]; ok && b.unit != u {
+				continue // cùng nhóm nhưng khác đơn vị (kg và gói): giữ đơn vị gặp trước
+			}
+			b := bought[l.GroupKey]
+			bought[l.GroupKey] = qty{qty: b.qty + q, unit: u}
 		}
 	}
 	allGroups := make([]string, 0, len(r.Lines))
@@ -143,6 +155,8 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		type groupState struct {
 			history  []domain.Purchase
 			override *domain.Override
+			qtys     []float64 // lượng mỗi lần mua trước, theo đơn vị gốc của baseline
+			prev     item.Record
 		}
 		states := map[string]*groupState{}
 		for g := range groups {
@@ -159,9 +173,14 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 				if d, err := domain.ParseDate(fmt.Sprint(h.Data()["purchased_on"])); err == nil {
 					st.history = append(st.history, domain.Purchase{On: d, Habit: true})
 				}
+				unit, _ := h.Data()["unit"].(string)
+				if q, bu := domain.ToBase(asFloat(h.Data()["qty"]), unit); bu == bought[g].unit {
+					st.qtys = append(st.qtys, q)
+				}
 			}
 			if snap, err := tx.Get(u.Collection("items").Doc(g)); err == nil {
 				st.override = decodeOverride(snap.Data()["override"])
+				st.prev = decodeRecord(snap)
 			} else if !isNotFound(err) {
 				return err
 			}
@@ -219,9 +238,15 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 			st := states[g]
 			hist := append(st.history, domain.Purchase{On: r.PurchasedOn, Habit: true})
 			pred := domain.Predict(hist, st.override)
+			// Tồn theo số lượng: baseline mới = tồn ước tính tại ngày mua + lượng vừa mua;
+			// tốc độ dùng = lượng trung bình mỗi lần mua / chu kỳ mua.
+			b := bought[g]
+			baseline := domain.AfterPurchase(st.prev.Baseline, st.prev.RatePerDay, st.prev.Consumed, b.qty, b.unit, r.PurchasedOn, domain.BaselineReceipt)
+			rate := domain.ConsumptionRate(append(st.qtys, b.qty), pred.IntervalDays)
 			if err := tx.Set(u.Collection("items").Doc(g), map[string]any{
 				"name": name, "name_norm": domain.NormalizeVi(name), "category_key": cats[g],
 				"last_purchase": latest(hist).String(), "prediction": predictionDoc(pred),
+				"stock": baselineDoc(baseline), "rate_per_day": rate, "consumed": []any{},
 				"dropped": false, "updated_at": now,
 			}, firestore.MergeAll); err != nil {
 				return err

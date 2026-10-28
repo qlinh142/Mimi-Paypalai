@@ -56,6 +56,15 @@ func (m *memStore) ClearOverride(_ context.Context, uid, k string, _ time.Time) 
 	m.recs[uid][k] = r
 	return r, nil
 }
+func (m *memStore) SetBaseline(_ context.Context, uid, k string, b domain.Baseline) (Record, error) {
+	r, ok := m.recs[uid][k]
+	if !ok {
+		return Record{}, apperr.ErrNotFound
+	}
+	r.Baseline = b
+	m.recs[uid][k] = r
+	return r, nil
+}
 func (m *memStore) OwnerOf(context.Context, string) (string, error) { return "owner", nil }
 
 func date(s string) domain.Date { d, _ := domain.ParseDate(s); return d }
@@ -177,4 +186,29 @@ func TestDetailAndNeedsCount(t *testing.T) {
 			t.Fatalf("err=%v n=%d", err, n)
 		}
 	})
+}
+
+func TestSetQuantity(t *testing.T) {
+	now := time.Date(2026, 10, 16, 3, 0, 0, 0, time.UTC)
+	st := &memStore{recs: map[string]map[string]Record{"owner": {
+		"gao": {GroupKey: "gao", Name: "Gạo", RatePerDay: 200, Prediction: domain.Prediction{PurchaseCount: 4, Source: "predicted"}},
+	}}}
+	svc := New(st, func() time.Time { return now })
+	owner := authz.Principal{UID: "owner", Role: authz.RoleOwner, Timezone: "Asia/Ho_Chi_Minh"}
+
+	it, err := svc.SetQuantity(context.Background(), owner, "gao", QuantitySet{Qty: 2.5, Unit: "kg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if it.Stock == nil || it.Stock.Confirmed != 2500 || it.Stock.Unit != "g" || it.Stock.ConfirmedSource != "manual" ||
+		it.Stock.Estimated != 2500 || it.Stock.DaysOfStock == nil || *it.Stock.DaysOfStock != 12 {
+		t.Fatalf("stock %+v", it.Stock)
+	}
+	if _, err := svc.SetQuantity(context.Background(), owner, "gao", QuantitySet{Qty: -1}); err == nil {
+		t.Fatal("negative qty accepted")
+	}
+	member := authz.Principal{UID: "m", Role: authz.RoleMember}
+	if _, err := svc.SetQuantity(context.Background(), member, "gao", QuantitySet{Qty: 1}); err == nil {
+		t.Fatal("member can set quantity")
+	}
 }
