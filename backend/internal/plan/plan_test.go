@@ -194,11 +194,11 @@ func TestRules(t *testing.T) {
 	if _, err := svc.Add(ctx, owner, "../x"); !errors.Is(err, apperr.ErrNotFound) {
 		t.Fatalf("invalid key err=%v", err)
 	}
-	if _, err := svc.Get(ctx, member); !errors.Is(err, apperr.ErrForbidden) {
-		t.Fatalf("member read err=%v", err)
+	if _, err := svc.Get(ctx, member); err != nil {
+		t.Fatalf("member reads own plan err=%v", err)
 	}
-	if _, err := svc.Add(ctx, member, "sua"); !errors.Is(err, apperr.ErrForbidden) {
-		t.Fatalf("member write err=%v", err)
+	if _, err := svc.Add(ctx, authz.Principal{UID: "x"}, "sua"); !errors.Is(err, apperr.ErrForbidden) {
+		t.Fatalf("unknown role write err=%v", err)
 	}
 	for i := 0; i < MaxCartLines; i++ {
 		st.lines[string(rune('a'+i%26))+strings.Repeat("x", i/26+1)] = Line{}
@@ -275,5 +275,42 @@ func TestPlanLineDetails(t *testing.T) {
 	}
 	if _, err := svc.UpdateLine(ctx, owner, "keo", LinePatch{Qty: &qty}); err == nil {
 		t.Fatal("line not in cart accepted")
+	}
+}
+
+func TestPhase(t *testing.T) {
+	today, _ := domain.ParseDate("2026-10-20")
+	cases := []struct {
+		st   State
+		want string
+	}{
+		{State{}, PhasePlanning},
+		{State{BuyDate: "2026-10-25"}, PhasePlanning},
+		{State{BuyDate: "2026-10-20"}, PhaseShopping},
+		{State{BuyDate: "2026-10-18", ReconciledOn: "2026-10-18"}, PhaseReconciled},
+		{State{ReconciledOn: "2026-10-10"}, PhaseReconciled},
+		// Đặt ngày mua mới sau lần đối chiếu: quay lại lập kế hoạch.
+		{State{BuyDate: "2026-10-25", ReconciledOn: "2026-10-18"}, PhasePlanning},
+	}
+	for _, c := range cases {
+		if got := c.st.phase(today); got != c.want {
+			t.Errorf("%+v: %s, want %s", c.st, got, c.want)
+		}
+	}
+}
+
+func TestSetStateMinuteAndIgnoresReconciled(t *testing.T) {
+	svc, _ := setup()
+	h, m := 9, 30
+	got, err := svc.SetState(context.Background(), owner, State{BuyDate: "2026-10-18", BuyHour: &h, BuyMinute: &m, ReconciledOn: "2026-10-01"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.BuyMinute == nil || *got.BuyMinute != 30 || got.ReconciledOn != "" {
+		t.Fatalf("%+v", got)
+	}
+	bad := 60
+	if _, err := svc.SetState(context.Background(), owner, State{BuyHour: &h, BuyMinute: &bad}); err == nil {
+		t.Fatal("minute 60 accepted")
 	}
 }

@@ -5,16 +5,29 @@ import (
 	"strings"
 )
 
-// Unit là đơn vị gốc của tồn kho (Mimi 2.0 mục 4): khối lượng tính bằng gram, thể tích
-// bằng ml, còn lại đếm theo cái (hộp, gói, chai, quả...). Mọi số lượng tồn đều quy về
-// một trong ba đơn vị này để cộng trừ được với nhau.
+// Unit là canonical unit của tồn kho (0.1 mục 6.1): khối lượng tính bằng gram, thể tích
+// bằng ml, chiều dài bằng mét, còn lại đếm theo item (quả, viên, cuộn... là nhãn hiển thị
+// theo count_unit_code của taxonomy, không phải đơn vị lưu). Chỉ cộng trừ được các số
+// lượng cùng Unit; không tự quy đổi g và ml (0.1 mục 9).
 type Unit string
 
 const (
 	UnitGram  Unit = "g"
 	UnitML    Unit = "ml"
-	UnitPiece Unit = "pc"
+	UnitMeter Unit = "m"
+	UnitItem  Unit = "item"
 )
+
+// ParseUnit đọc Unit đã lưu. "pc" là tên cũ của item trước taxonomy 1.2.
+func ParseUnit(s string) Unit {
+	switch s {
+	case "g", "ml", "m", "item":
+		return Unit(s)
+	case "pc":
+		return UnitItem
+	}
+	return ""
+}
 
 // unitAliases: đơn vị in trên hóa đơn (đã bỏ dấu, chữ thường) → đơn vị gốc và hệ số.
 var unitAliases = map[string]struct {
@@ -25,12 +38,15 @@ var unitAliases = map[string]struct {
 	"kg": {UnitGram, 1000}, "kgs": {UnitGram, 1000}, "can": {UnitGram, 1000}, // "cân" = kg
 	"lang": {UnitGram, 100}, // "lạng"
 	"ml":   {UnitML, 1}, "l": {UnitML, 1000}, "lit": {UnitML, 1000}, "litre": {UnitML, 1000}, "liter": {UnitML, 1000},
-	"pc": {UnitPiece, 1}, "pcs": {UnitPiece, 1}, "cai": {UnitPiece, 1}, "chiec": {UnitPiece, 1},
-	"hop": {UnitPiece, 1}, "goi": {UnitPiece, 1}, "chai": {UnitPiece, 1}, "lon": {UnitPiece, 1},
-	"tui": {UnitPiece, 1}, "bich": {UnitPiece, 1}, "qua": {UnitPiece, 1}, "trai": {UnitPiece, 1},
-	"cuon": {UnitPiece, 1}, "bo": {UnitPiece, 1}, "vi": {UnitPiece, 1}, "hu": {UnitPiece, 1},
-	"thung": {UnitPiece, 1}, "loc": {UnitPiece, 1}, "khay": {UnitPiece, 1}, "bao": {UnitPiece, 1},
-	"cay": {UnitPiece, 1}, "tuyp": {UnitPiece, 1}, "ea": {UnitPiece, 1}, "unit": {UnitPiece, 1},
+	"m": {UnitMeter, 1}, "met": {UnitMeter, 1}, "cm": {UnitMeter, 0.01},
+	"item": {UnitItem, 1}, "o": {UnitItem, 1}, "vien": {UnitItem, 1}, "mieng": {UnitItem, 1}, "to": {UnitItem, 1},
+	"doi": {UnitItem, 1}, "cap": {UnitItem, 1}, "pack": {UnitItem, 1}, "combo": {UnitItem, 1},
+	"pc": {UnitItem, 1}, "pcs": {UnitItem, 1}, "cai": {UnitItem, 1}, "chiec": {UnitItem, 1},
+	"hop": {UnitItem, 1}, "goi": {UnitItem, 1}, "chai": {UnitItem, 1}, "lon": {UnitItem, 1},
+	"tui": {UnitItem, 1}, "bich": {UnitItem, 1}, "qua": {UnitItem, 1}, "trai": {UnitItem, 1},
+	"cuon": {UnitItem, 1}, "bo": {UnitItem, 1}, "vi": {UnitItem, 1}, "hu": {UnitItem, 1},
+	"thung": {UnitItem, 1}, "loc": {UnitItem, 1}, "khay": {UnitItem, 1}, "bao": {UnitItem, 1},
+	"cay": {UnitItem, 1}, "tuyp": {UnitItem, 1}, "ea": {UnitItem, 1}, "unit": {UnitItem, 1},
 }
 
 // NormalizeUnit chuẩn hóa đơn vị in trên hóa đơn thành khóa trong unitAliases
@@ -43,11 +59,11 @@ func NormalizeUnit(s string) string {
 	return ""
 }
 
-// ToBase quy một số lượng về đơn vị gốc: (2, "kg") → (2000, g). Đơn vị không rõ coi là cái.
+// ToBase quy một số lượng về đơn vị gốc: (2, "kg") → (2000, g). Đơn vị không rõ coi là item.
 func ToBase(qty float64, unit string) (float64, Unit) {
 	a, ok := unitAliases[NormalizeUnit(unit)]
 	if !ok {
-		return qty, UnitPiece
+		return qty, UnitItem
 	}
 	return qty * a.factor, a.base
 }

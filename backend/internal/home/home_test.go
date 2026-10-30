@@ -73,11 +73,11 @@ func TestHome(t *testing.T) {
 			t.Fatalf("err=%v got=%+v", err, got)
 		}
 	})
-	t.Run("member never sees spending or plan", func(t *testing.T) {
+	t.Run("member sees own spending and plan", func(t *testing.T) {
 		st := &fakeStore{raw: Raw{SpentVND: 999, MonthHasData: true}}
 		pl := &fakePlan{n: 2}
 		got, err := New(st, &fakeNeeds{n: 2}, pl, func() time.Time { return now }).Get(ctx, member)
-		if err != nil || got.SpentThisMonth != nil || got.Plan.ItemCount != 0 || got.NeedsCount != 2 || pl.called {
+		if err != nil || got.SpentThisMonth == nil || *got.SpentThisMonth != 999 || got.Plan.ItemCount != 2 || got.NeedsCount != 2 || !pl.called {
 			t.Fatalf("err=%v got=%+v", err, got)
 		}
 	})

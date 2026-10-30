@@ -225,8 +225,11 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
     patch:
       tags: [items]
-      x-status: planned
-      summary: Sửa tên và loại (lưu classification_corrections), hỏi lại sau, bỏ món
+      summary: Sửa tên chuẩn hóa hoặc chuyển món sang nhóm đúng (0.1 mục 3.2)
+      description: >
+        group_key khác key hiện tại thì mọi lần mua chuyển sang nhóm mới (số liệu giữ nguyên),
+        tồn còn lại gộp vào nhóm mới theo từng chiều đo, ghi classification_corrections và xóa
+        món cũ. Phản hồi là món ở key mới.
       parameters: [{ $ref: "#/components/parameters/ItemKey" }]
       requestBody:
         required: true
@@ -236,11 +239,11 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                name: { type: string, maxLength: 120 }
-                category_key: { type: string }
-                ask_later_until: { type: string, format: date }
-                dropped: { type: boolean }
-      responses: { "200": { description: OK } }
+                name: { type: string, maxLength: 60 }
+                group_key: { type: string, description: "Khóa nhóm taxonomy 0.2" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Item" } } } }
+        "422": { $ref: "#/components/responses/Error" }
   /items/{key}/stock:
     patch:
       tags: [items]
@@ -281,6 +284,12 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Item" } } } }
         "403": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/Error" }
+  /items/{key}/price-history:
+    get:
+      tags: [items]
+      summary: "8.1 mục 14.1: giá gần nhất, thấp nhất, trung bình theo đơn giá chuẩn hóa (đ / g, ml, m, item)"
+      parameters: [{ $ref: "#/components/parameters/ItemKey" }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ItemPriceHistory" } } } } }
   /needs:
     get:
       tags: [items]
@@ -302,16 +311,43 @@ paths:
   /forecast:
     get:
       tags: [spending]
-      x-status: planned
-      summary: Dự báo 30 ngày (định kỳ + kế hoạch + món dự đoán hết, không tính trùng)
-      parameters: [{ name: days, in: query, schema: { type: integer, enum: [30], default: 30 } }]
+      summary: Dự báo 30 ngày (2.1 mục 7) = kỳ định kỳ pending trong cửa sổ (kể cả quá hạn) + món dự đoán hết theo giá đã trả gần nhất
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Forecast" } } } } }
   /recurring:
-    get: { tags: [spending], x-status: planned, summary: Khoản định kỳ và voucher, responses: { "200": { description: OK } } }
-    post: { tags: [spending], x-status: planned, summary: Thêm khoản định kỳ, responses: { "201": { description: Created } } }
+    get:
+      tags: [spending]
+      summary: Khoản định kỳ, kỳ đang chờ (current), lịch sử kỳ và trạng thái hiển thị
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringList" } } } } }
+    post:
+      tags: [spending]
+      summary: Thêm khoản định kỳ; tạo luôn kỳ pending đầu tiên (không cộng Spending)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Recurring" } } } }
+        "422": { $ref: "#/components/responses/Error" }
   /recurring/{id}:
-    patch: { tags: [spending], x-status: planned, summary: Sửa khoản, parameters: [{ name: id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: OK } } }
-    delete: { tags: [spending], x-status: planned, summary: Xóa khoản, parameters: [{ name: id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted } } }
+    patch:
+      tags: [spending]
+      summary: Sửa khoản (chỉ gửi trường đổi). Đổi hạn thì thay kỳ pending hiện tại.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RecurringInput" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Recurring" } } } }, "404": { $ref: "#/components/responses/Error" } }
+    delete: { tags: [spending], summary: "Xóa khoản và các kỳ pending (kỳ đã paid / matched giữ làm lịch sử)", parameters: [{ name: id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted } } }
+  /recurring/occurrences/{id}/pay:
+    post:
+      tags: [spending]
+      summary: "Rule R2: xác nhận đã trả; cộng Spending tháng trả, rời Forecast, tạo kỳ sau"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { paid_at: { type: string, format: date } } } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Occurrence" } } } }
+        "409": { description: "invalid_state: kỳ đã xử lý", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /recurring/occurrences/{id}/skip:
+    post:
+      tags: [spending]
+      summary: Kỳ này không phát sinh; không cộng Spending, tạo kỳ sau
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Occurrence" } } } } }
   /recurring/scan:
     post:
       tags: [spending]
@@ -333,8 +369,23 @@ paths:
   /plan/items/{key}:
     put:
       tags: [plan]
-      summary: Cho món trong Đồ dùng vào giỏ (một dòng mở mỗi nhóm, gọi lại không tạo thêm dòng). Không có thân.
-      parameters: [{ $ref: "#/components/parameters/ItemKey" }]
+      summary: Cho món vào giỏ (một dòng mở mỗi nhóm, gọi lại không tạo thêm dòng)
+      description: |
+        Món trong Đồ dùng: không cần thân. Món chưa từng mua (3.1 mục 3A.4): key là group key của taxonomy
+        (GET /taxonomy) hoặc "custom-..." kèm name. Mọi route /plan/... nhận ?plan_id= (mặc định "default").
+      parameters: [{ $ref: "#/components/parameters/ItemKey" }, { $ref: "#/components/parameters/PlanId" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string, maxLength: 60 }
+                qty: { type: number, exclusiveMinimum: 0, maximum: 10000 }
+                unit: { type: string }
+                category_key: { type: string }
       responses:
         "200": { description: Giỏ sau khi thêm, content: { application/json: { schema: { $ref: "#/components/schemas/Cart" } } } }
         "404": { $ref: "#/components/responses/Error" }
@@ -378,6 +429,50 @@ paths:
       tags: [plan]
       summary: Nơi mua tối ưu (một hàm tính chung cho Giỏ, Giá tốt và ô Trang chủ)
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlanPrices" } } } } }
+
+  /plan/price-history:
+    get:
+      tags: [plan]
+      summary: "8.1 mục 14.2: ước tính giỏ theo đơn giá chuẩn hóa đã trả (90 ngày), độ phủ từng nơi, phương án chia nơi"
+      description: Một nơi chỉ có estimated_total khi có giá cho mọi món. Xếp hạng theo độ phủ, rồi tổng, rồi độ mới.
+      parameters: [{ $ref: "#/components/parameters/PlanId" }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/BasketPrices" } } } } }
+  /plan/delegated:
+    get:
+      tags: [plan, household]
+      summary: "4.1 mục 9.2: vòng mua hộ được giao cho tôi (to_me, còn mở) và vòng tôi đã gửi (from_me)"
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Delegated" } } } } }
+  /plans:
+    get:
+      tags: [plan]
+      summary: "3.1 mục 3A: Plan mặc định và các Plan đặt tên"
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { plans: { type: array, items: { $ref: "#/components/schemas/PlanMeta" } } } } } } } }
+    post:
+      tags: [plan]
+      summary: Tạo Plan đặt tên (tối đa 10 Plan đang dùng)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PlanInput" } } } }
+      responses: { "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/PlanMeta" } } } }, "422": { $ref: "#/components/responses/Error" } }
+  /plans/{id}:
+    patch:
+      tags: [plan]
+      summary: Đổi tên hoặc lưu trữ (archived chặn ghi)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PlanInput" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlanMeta" } } } } }
+    delete:
+      tags: [plan]
+      summary: Xóa Plan và các dòng; bị chặn (invalid_state) khi có món đang nhờ mua
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "204": { description: Deleted }, "409": { $ref: "#/components/responses/Error" } }
+  /taxonomy:
+    get:
+      tags: [items]
+      summary: "0.2: bộ nhóm sản phẩm dùng chung (key canonical, nhãn vi/en, chiều đo, đơn vị); ?q= tìm không dấu"
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: lang, in: query, schema: { type: string, enum: [vi, en] } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100 } }
+      responses: { "200": { description: OK } }
 
   # ---------------- Mimi Online ----------------
   # Chỉ đăng ký khi PAYPAL_MODE khác off. Payment không đổi tồn kho; chỉ Verify mới cộng Confirmed Inventory.
@@ -515,20 +610,50 @@ paths:
 
   # ---------------- Nhà mình ----------------
   /households:
-    get: { tags: [household], x-status: planned, summary: Nhà của tôi và thành viên, responses: { "200": { description: OK } } }
-    patch: { tags: [household], x-status: planned, summary: Tắt giỏ chung (chủ giỏ), responses: { "200": { description: OK } } }
+    get: { tags: [household], summary: "Nhà của tôi, thành viên, vai trò; mã mời còn hạn (chỉ chủ nhà)", responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Household" } } } } } }
+    patch:
+      tags: [household]
+      summary: Đổi tên nhà (chủ nhà); nhà một người được tạo khi đặt tên
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { name: { type: string, maxLength: 40 } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Household" } } } } }
   /households/invites:
     post:
       tags: [household]
-      x-status: planned
-      summary: Mời bằng email (link dùng một lần, hết hạn 7 ngày, tối đa 10 lời mời đang chờ)
-      responses: { "201": { description: Created }, "409": { $ref: "#/components/responses/Error" } }
+      summary: Tạo mã mời 8 ký tự, hết hạn 48 giờ (mã cũ hết hiệu lực)
+      responses: { "201": { description: Created, content: { application/json: { schema: { type: object, properties: { code: { type: string }, expires_at: { type: string, format: date-time } } } } } } }
   /households/join:
-    post: { tags: [household], x-status: planned, summary: Vào nhà bằng token mời, responses: { "200": { description: OK } } }
+    post:
+      tags: [household]
+      summary: Vào nhà bằng mã mời (tối đa 8 người); đang ở nhà khác có người thì phải rời trước
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Household" } } } }, "404": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
   /households/leave:
-    post: { tags: [household], x-status: planned, summary: Thành viên rời nhà, responses: { "204": { description: Left } } }
+    post: { tags: [household], summary: "Rời nhà; vòng mua hộ còn mở có mình bị hủy, món trả về Owner", responses: { "204": { description: Left } } }
   /households/members/{uid}:
-    delete: { tags: [household], x-status: planned, summary: Chủ giỏ xóa thành viên, parameters: [{ name: uid, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Removed } } }
+    delete: { tags: [household], summary: Chủ nhà xóa thành viên, parameters: [{ name: uid, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Removed } } }
+  /households/shopping-assignments:
+    post:
+      tags: [household]
+      summary: "4.1 mục 9.1: gửi các món đang mở của một Plan cho một thành viên cùng nhà (dòng Plan → assigned)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [buyer_uid, keys]
+              properties:
+                buyer_uid: { type: string }
+                plan_id: { type: string }
+                keys: { type: array, maxItems: 60, items: { type: string } }
+                note: { type: string, maxLength: 120 }
+      responses: { "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Assignment" } } } }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /households/shopping-assignments/{id}/cancel:
+    post:
+      tags: [household]
+      summary: "Case 4: Owner hủy vòng còn mở; món chưa mua trả về open"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Assignment" } } } } }
   /households/needs:
     get:
       tags: [household]
@@ -556,6 +681,11 @@ components:
       in: path
       required: true
       schema: { $ref: "#/components/schemas/ClientId" }
+    PlanId:
+      name: plan_id
+      in: query
+      required: false
+      schema: { type: string, default: default }
     OrderId:
       name: id
       in: path
@@ -585,7 +715,10 @@ components:
           enum: [bad_request, validation_failed, unauthenticated, app_check_failed, forbidden, not_found,
                  conflict, receipt_conflict, possible_duplicate, payload_too_large, unsupported_media,
                  quota_exceeded, rate_limited, receipt_unreadable, ai_unavailable, not_implemented, internal, timeout,
-                 mandate_blocked, approval_required, invalid_state, payment_failed, payment_not_enabled, payment_unavailable]
+                 mandate_blocked, approval_required, invalid_state, payment_failed, payment_not_enabled, payment_unavailable,
+                 too_many_images, image_too_large, unreadable_image, no_items, read_failed, invalid_purchase_date,
+                 invalid_line_total, invalid_quantity, transaction_conflict]
+        retryable: { type: boolean, description: "true: thử lại cùng yêu cầu có thể thành công (lỗi tạm thời, xung đột transaction)" }
         message: { type: string, description: "Câu tiếng Việt ngắn, an toàn để hiển thị" }
         fields: { type: object, additionalProperties: true }
     Settings:
@@ -675,8 +808,15 @@ components:
               unit: { type: string }
               amount: { type: string }
               category_key: { type: string }
-              group_key: { type: string }
+              group_key: { type: string, description: "Nhóm 0.2; người dùng bấm Chọn nhóm thì danh mục chi tiêu lấy theo nhóm" }
               habit: { type: boolean, description: "Tại nhà (true) hay Chuyến đi (false)" }
+              raw_name: { type: string, description: "Kết quả chuẩn hóa lúc đọc (1.1), gửi lại nguyên vẹn" }
+              brand: { type: string }
+              product_name: { type: string }
+              source_language: { type: string }
+              package_count: { type: number }
+              package_size: { type: number }
+              package_unit: { type: string }
     SaveResult:
       type: object
       properties:
@@ -772,12 +912,140 @@ components:
         from: { type: string, format: date }
         to: { type: string, format: date }
         total: { $ref: "#/components/schemas/Vnd" }
-        estimated: { type: boolean }
-        recurring: { type: array, items: { type: object } }
-        planned: { type: array, items: { type: object } }
-        predicted: { type: array, items: { type: object } }
-        missing_price: { type: array, items: { type: string } }
-        not_enough_data: { type: array, items: { type: string } }
+        recurring_total: { $ref: "#/components/schemas/Vnd" }
+        shopping_total: { $ref: "#/components/schemas/Vnd" }
+        recurring: { type: array, items: { $ref: "#/components/schemas/Occurrence" } }
+        shopping:
+          type: array
+          items: { type: object, properties: { key: { type: string }, name: { type: string }, out_on: { type: string, format: date }, amount: { type: [integer, "null"] } } }
+        missing_prices: { type: integer }
+    Recurring:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        amount: { $ref: "#/components/schemas/Vnd" }
+        currency: { type: string, enum: [VND] }
+        cycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
+        next_due_at: { type: string, format: date }
+        active: { type: boolean }
+        category_key: { type: string }
+        display: { type: string, enum: [overdue, due_today, due_soon, upcoming, paused] }
+        current: { $ref: "#/components/schemas/Occurrence" }
+        history: { type: array, items: { $ref: "#/components/schemas/Occurrence" } }
+    RecurringList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Recurring" } }
+        monthly_total: { $ref: "#/components/schemas/Vnd" }
+    RecurringInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 60 }
+        amount: { type: integer, minimum: 1 }
+        cycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
+        next_due_at: { type: string, format: date }
+        category_key: { type: string }
+        active: { type: boolean }
+    Occurrence:
+      type: object
+      properties:
+        id: { type: string }
+        recurring_id: { type: string }
+        name: { type: string }
+        due_at: { type: string, format: date }
+        amount: { $ref: "#/components/schemas/Vnd" }
+        status: { type: string, enum: [pending, paid, matched, skipped] }
+        paid_at: { type: string, format: date }
+        source_type: { type: string, enum: [manual, receipt] }
+        source_id: { type: string }
+    PlanMeta:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [active, archived] }
+        default: { type: boolean }
+        item_count: { type: integer }
+        buy_date: { type: string }
+    PlanInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 40 }
+        status: { type: string, enum: [active, archived] }
+    PriceObservation:
+      type: object
+      properties:
+        store_name: { type: string }
+        paid_price: { $ref: "#/components/schemas/Vnd" }
+        purchased_at: { type: string, format: date }
+        canonical_quantity: { type: number }
+        canonical_unit: { type: string, enum: [g, ml, m, item] }
+        unit_price: { type: number }
+    ItemPriceHistory:
+      type: object
+      properties:
+        group_key: { type: string }
+        purchase_count: { type: integer }
+        canonical_unit: { type: string }
+        last_purchase: { oneOf: [{ $ref: "#/components/schemas/PriceObservation" }, { type: "null" }] }
+        lowest_historical: { oneOf: [{ $ref: "#/components/schemas/PriceObservation" }, { type: "null" }] }
+        average_unit_price: { type: [number, "null"] }
+        other_dimension_count: { type: integer }
+        history: { type: array, items: { $ref: "#/components/schemas/PriceObservation" } }
+        window_days: { type: integer }
+    BasketPrices:
+      type: object
+      properties:
+        basket_item_count: { type: integer }
+        store_options:
+          type: array
+          items:
+            type: object
+            properties:
+              store_name: { type: string }
+              covered_items: { type: integer }
+              total_items: { type: integer }
+              estimated_total: { type: [integer, "null"] }
+              covered_subtotal: { type: integer }
+              missing_keys: { type: array, items: { type: string } }
+        split_store_option:
+          type: [object, "null"]
+          properties:
+            estimated_total: { type: integer }
+            stores: { type: array, items: { type: object, properties: { store_name: { type: string }, keys: { type: array, items: { type: string } }, total: { type: integer } } } }
+        recommend: { type: string, enum: [single, split, none] }
+        no_history: { type: array, items: { type: string } }
+    Household:
+      type: object
+      properties:
+        id: { type: string, description: "Rỗng: nhà một người" }
+        name: { type: string }
+        owner_uid: { type: string }
+        my_role: { type: string, enum: [owner, member] }
+        members: { type: array, items: { type: object, properties: { uid: { type: string }, display_name: { type: string }, role: { type: string }, joined_at: { type: string, format: date-time } } } }
+        invite: { type: object, properties: { code: { type: string }, expires_at: { type: string, format: date-time } } }
+    Assignment:
+      type: object
+      properties:
+        assignment_id: { type: string }
+        owner_uid: { type: string }
+        owner_display_name: { type: string }
+        buyer_uid: { type: string }
+        buyer_display_name: { type: string }
+        plan_id: { type: string }
+        status: { type: string, enum: [assigned, shopping, completed, closed_partial, cancelled] }
+        note: { type: string }
+        items:
+          type: array
+          items: { type: object, properties: { consumption_group_key: { type: string }, name_display: { type: string }, qty: { type: number }, unit: { type: string }, status: { type: string, enum: [assigned, done, returned] } } }
+    Delegated:
+      type: object
+      properties:
+        to_me: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
+        from_me: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
     PlanState:
       type: object
       additionalProperties: false

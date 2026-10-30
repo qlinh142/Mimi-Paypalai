@@ -132,7 +132,12 @@ func (s *Server) saveReceipt(w http.ResponseWriter, r *http.Request) {
 	if out.Replayed {
 		status = http.StatusOK
 	}
-	writeJSON(w, status, map[string]any{"receipt_id": out.ReceiptID, "status": "saved", "replayed": out.Replayed})
+	body := map[string]any{"receipt_id": out.ReceiptID, "status": "saved", "replayed": out.Replayed,
+		"plan_done": nonNilStrings(out.PlanDone), "recurring_matched": nonNilStrings(out.Recurring)}
+	if out.Assignment != nil {
+		body["assignment"] = out.Assignment
+	}
+	writeJSON(w, status, body)
 }
 
 func (s *Server) listItems(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +193,21 @@ func (s *Server) setQuantity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	it, err := s.items.SetQuantity(r.Context(), principalFrom(r.Context()), r.PathValue("key"), q)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, it)
+}
+
+// correctItem: sửa tên chuẩn hóa hoặc chuyển món sang nhóm đúng (0.1 mục 3.2).
+func (s *Server) correctItem(w http.ResponseWriter, r *http.Request) {
+	var c item.Correction
+	if err := decodeJSON(w, r, &c, maxJSONBody); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	it, err := s.items.Correct(r.Context(), principalFrom(r.Context()), r.PathValue("key"), c)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -251,6 +271,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPlan(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	cart, err := s.plan.Get(r.Context(), principalFrom(r.Context()))
 	if err != nil {
 		s.writeError(w, r, err)
@@ -259,9 +280,18 @@ func (s *Server) getPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, cart)
 }
 
-// addPlanItem: PUT không có thân; khóa nhóm nằm trên đường dẫn. Trả giỏ sau khi thêm.
+// addPlanItem: khóa nhóm nằm trên đường dẫn; thân tùy chọn {name, qty, unit, category_key}
+// cho món từ taxonomy hoặc tự nhập (3.1). Trả giỏ sau khi thêm.
 func (s *Server) addPlanItem(w http.ResponseWriter, r *http.Request) {
-	cart, err := s.plan.Add(r.Context(), principalFrom(r.Context()), r.PathValue("key"))
+	r = withPlan(r)
+	var req plan.AddRequest
+	if r.ContentLength > 0 {
+		if err := decodeJSON(w, r, &req, maxJSONBody); err != nil {
+			s.writeError(w, r, err)
+			return
+		}
+	}
+	cart, err := s.plan.AddWith(r.Context(), principalFrom(r.Context()), r.PathValue("key"), req)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -271,6 +301,7 @@ func (s *Server) addPlanItem(w http.ResponseWriter, r *http.Request) {
 
 // patchPlanItem: sửa số lượng, đơn vị, need-by, ưu tiên, lý do của một dòng giỏ.
 func (s *Server) patchPlanItem(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	var patch plan.LinePatch
 	if err := decodeJSON(w, r, &patch, maxJSONBody); err != nil {
 		s.writeError(w, r, err)
@@ -285,6 +316,7 @@ func (s *Server) patchPlanItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) removePlanItem(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	if err := s.plan.Remove(r.Context(), principalFrom(r.Context()), r.PathValue("key")); err != nil {
 		s.writeError(w, r, err)
 		return
@@ -293,6 +325,7 @@ func (s *Server) removePlanItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) putPlanState(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	var st plan.State
 	if err := decodeJSON(w, r, &st, maxJSONBody); err != nil {
 		s.writeError(w, r, err)
@@ -307,6 +340,7 @@ func (s *Server) putPlanState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPlanPrices(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	pr, err := s.plan.Prices(r.Context(), principalFrom(r.Context()))
 	if err != nil {
 		s.writeError(w, r, err)

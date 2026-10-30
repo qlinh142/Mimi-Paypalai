@@ -93,6 +93,9 @@ func (fakeItems) UndoStock(context.Context, authz.Principal, string, time.Time) 
 func (fakeItems) SetQuantity(context.Context, authz.Principal, string, item.QuantitySet) (item.Item, error) {
 	return item.Item{}, nil
 }
+func (fakeItems) Correct(context.Context, authz.Principal, string, item.Correction) (item.Item, error) {
+	return item.Item{}, nil
+}
 
 type fakeHome struct{}
 
@@ -232,9 +235,9 @@ func TestServer(t *testing.T) {
 			}
 		}
 	})
-	t.Run("member is forbidden from full items", func(t *testing.T) {
+	t.Run("member reads own items", func(t *testing.T) {
 		rec, body := do(h, "GET", "/items", "member-tok", "")
-		if rec.Code != 403 || body["code"] != "forbidden" {
+		if rec.Code != 200 {
 			t.Fatalf("status %d body %v", rec.Code, body)
 		}
 	})
@@ -269,7 +272,7 @@ func TestServer(t *testing.T) {
 		if rec, _ := do(h, "GET", "/api/items/khong-co", "owner-tok", ""); rec.Code != 404 {
 			t.Fatalf("missing item status %d", rec.Code)
 		}
-		if rec, _ := do(h, "GET", "/api/items/sua", "member-tok", ""); rec.Code != 403 {
+		if rec, _ := do(h, "GET", "/api/items/sua", "member-tok", ""); rec.Code != 200 {
 			t.Fatalf("member status %d", rec.Code)
 		}
 	})
@@ -281,7 +284,7 @@ func TestServer(t *testing.T) {
 		if rec, body := do(h, "GET", "/api/spending?month=10-2026", "owner-tok", ""); rec.Code != 422 || body["code"] != "validation_failed" {
 			t.Fatalf("bad month status %d body %v", rec.Code, body)
 		}
-		if rec, _ := do(h, "GET", "/api/spending?month=2026-10", "member-tok", ""); rec.Code != 403 {
+		if rec, _ := do(h, "GET", "/api/spending?month=2026-10", "member-tok", ""); rec.Code != 200 {
 			t.Fatalf("member status %d", rec.Code)
 		}
 	})
@@ -349,7 +352,7 @@ func TestServer(t *testing.T) {
 		if rec, _ := do(h9, "DELETE", "/api/plan/items/sua", "owner-tok", ""); rec.Code != 204 {
 			t.Fatalf("remove status %d", rec.Code)
 		}
-		if rec, _ := do(h9, "GET", "/api/plan", "member-tok", ""); rec.Code != 403 {
+		if rec, _ := do(h9, "GET", "/api/plan", "member-tok", ""); rec.Code != 200 {
 			t.Fatalf("member status %d", rec.Code)
 		}
 	})

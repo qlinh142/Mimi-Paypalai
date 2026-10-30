@@ -7,6 +7,9 @@ import type { ItemDetail as ItemDetailData } from "../api/types";
 import { TopBar, useUndo, MainFrame } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT, statusTone } from "../components/ItemRow";
 import { formatDayMonth, formatQty } from "../lib/text";
+import { FixItemSection, LotsSection, PriceHistorySection } from "../components/ItemExtras";
+import { AddToPlanButton } from "../components/PlanExtras";
+import { m1 } from "../i18n/m1";
 
 const CONFIDENCE = t.detail.confidenceLevels;
 
@@ -80,7 +83,11 @@ export function ItemDetail() {
               ))}
             </div>
             <p className="hint">{t.detail.hint}</p>
+            <AddToPlanButton itemKey={item.key} />
             <StockSection item={item} onSaved={() => q.refetch()} />
+            <LotsSection item={item} />
+            <PriceHistorySection itemKey={item.key} />
+            <FixItemSection key={item.key} item={item} />
           </>
         )}
       </div>
@@ -96,8 +103,9 @@ const SET_UNITS = ["kg", "g", "l", "ml", "cai", "hop", "goi", "chai", "qua"] as 
  */
 function StockSection({ item, onSaved }: { item: ItemDetailData; onSaved: () => void }) {
   const set = useSetQuantity();
+  const [action, setAction] = useState<"set" | "increase" | "decrease">("set");
   const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState<string>(item.stock?.unit === "g" ? "kg" : item.stock?.unit === "ml" ? "l" : "cai");
+  const [unit, setUnit] = useState<string>(item.stock?.unit === "g" ? "kg" : item.stock?.unit === "ml" ? "l" : item.stock?.unit === "m" ? "m" : "cai");
   const st = item.stock;
   const pc = t.stock.units.pc;
   const value = Number(qty.replace(",", "."));
@@ -108,7 +116,13 @@ function StockSection({ item, onSaved }: { item: ItemDetailData; onSaved: () => 
       {st ? (
         <dl className="facts">
           <dt>{t.stock.estimated}</dt>
-          <dd className="num">{formatQty(st.estimated, st.unit, pc)}</dd>
+          <dd className="num">
+            {formatQty(st.estimated, st.unit, pc)}
+            {/* Chiều đo khác (0.1 mục 20): mỗi chiều một dòng, không cộng thành một tổng. */}
+            {(st.parts ?? []).map((p) => (
+              <span key={p.unit}> · {formatQty(p.estimated, p.unit, pc)}</span>
+            ))}
+          </dd>
           <dt>{t.detail.source}</dt>
           <dd>{t.stock.confirmed(formatQty(st.confirmed, st.unit, pc), formatDayMonth(st.confirmed_on), t.stock.sources[st.confirmed_source])}</dd>
           {st.days_of_stock != null && (
@@ -126,9 +140,19 @@ function StockSection({ item, onSaved }: { item: ItemDetailData; onSaved: () => 
         onSubmit={(e) => {
           e.preventDefault();
           if (!valid || set.isPending) return;
-          set.mutate({ key: item.key, qty: value, unit }, { onSuccess: () => { setQty(""); onSaved(); } });
+          set.mutate({ key: item.key, qty: value, unit, action }, { onSuccess: () => { setQty(""); onSaved(); } });
         }}
       >
+        {st && (
+          <label>
+            {m1.quantity.action}
+            <select value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
+              <option value="set">{m1.quantity.set}</option>
+              <option value="increase">{m1.quantity.increase}</option>
+              <option value="decrease">{m1.quantity.decrease}</option>
+            </select>
+          </label>
+        )}
         <div className="plan-form__row">
           <label>
             {t.stock.qty}
@@ -143,11 +167,21 @@ function StockSection({ item, onSaved }: { item: ItemDetailData; onSaved: () => 
             </select>
           </label>
         </div>
-        {set.isError && <p className="error" role="alert">{t.common.genericError}</p>}
+        {set.isError && <p className="error" role="alert">{set.error instanceof ApiError ? set.error.message : t.common.genericError}</p>}
         {set.isSuccess && <p className="hint">{t.stock.saved}</p>}
         <button type="submit" className="btn btn--quiet btn--block" aria-disabled={!valid || set.isPending || undefined}>
           {t.stock.set}
         </button>
+        {st && st.estimated > 0 && (
+          <button
+            type="button"
+            className="btn btn--quiet btn--block"
+            aria-disabled={set.isPending || undefined}
+            onClick={() => !set.isPending && set.mutate({ key: item.key, qty: 0, unit: "", action: "mark_out" }, { onSuccess: onSaved })}
+          >
+            {m1.quantity.markOut}
+          </button>
+        )}
       </form>
     </section>
   );

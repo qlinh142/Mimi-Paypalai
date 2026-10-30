@@ -26,6 +26,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/gemini"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
+	"github.com/smartlife-lab/mimi/backend/internal/household"
 	"github.com/smartlife-lab/mimi/backend/internal/httpapi"
 	"github.com/smartlife-lab/mimi/backend/internal/inbox"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
@@ -34,8 +35,11 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/paypal"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/platform/logx"
+	"github.com/smartlife-lab/mimi/backend/internal/pricing"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
+	"github.com/smartlife-lab/mimi/backend/internal/recurring"
 	"github.com/smartlife-lab/mimi/backend/internal/spending"
+	groupTaxonomy "github.com/smartlife-lab/mimi/backend/internal/taxonomy"
 	"github.com/smartlife-lab/mimi/backend/internal/user"
 )
 
@@ -90,13 +94,13 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		return err
 	}
 	taxonomy := loadTaxonomy()
-	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy, demoGroups())
+	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy, groupTaxonomy.Keys())
 	if err != nil {
 		return err
 	}
 	receipts, err := receipt.New(reader, store, store, store, store, log,
 		receipt.WithDailyLimit(cfg.ReceiptDailyLimit),
-		receipt.WithTaxonomy(taxonomy))
+		receipt.WithTaxonomy(taxonomy), receipt.WithPageCache(store))
 	if err != nil {
 		return err
 	}
@@ -105,7 +109,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		appCheck = auth
 	}
 	items := item.New(store, nil)
-	planSvc := plan.New(store, store, nil)
+	planSvc := plan.New(store, store, nil).WithPlans(store)
 	payments, err := newPayments(cfg)
 	if err != nil {
 		return err
@@ -123,6 +127,10 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Spending: spending.New(store),
 		Settings: user.NewSettingsService(store, nil),
 		Orders:   orders,
+		// Bộ spec Mimi 1.0: khoản định kỳ + dự báo (2.1), nhà + mua hộ (4.1), lịch sử giá (8.1).
+		Recurring:  recurring.NewService(store, store, store, nil),
+		Households: household.New(store, store, nil),
+		Pricing:    pricing.New(store, store, nil),
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout))
 	if err != nil {
 		return err
@@ -243,15 +251,5 @@ func loadTaxonomy() []string {
 		"banh-keo", "an-vat", "me-be", "hoa-pham", "ve-sinh", "my-pham", "giay", "do-dung-bep",
 		"thu-cung", "thuoc", "van-phong-pham", "dien-gia-dung", "do-choi", "quan-ao", "giat-say",
 		"nha-cua", "the-thao", "dich-vu", "khac",
-	}
-}
-
-// demoGroups: danh sách nhóm tiêu dùng đóng cho demo, theo guides/doc-bill/benchmark/
-// nhom_demo.json (đổi "_" thành "-" cho khớp khóa trong code). Khóa phải trùng dữ liệu seed.
-func demoGroups() []string {
-	return []string{
-		"sua-tuoi", "sua-chua", "trung", "gao", "mi-goi", "dau-an", "nuoc-mam-gia-vi",
-		"nuoc-giat", "nuoc-rua-chen", "giay-ve-sinh", "dau-goi-sua-tam", "rau-cu-qua",
-		"thit-ca", "do-uong", "banh-keo", "khac",
 	}
 }

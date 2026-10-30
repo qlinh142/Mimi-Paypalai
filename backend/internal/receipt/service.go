@@ -15,14 +15,19 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/taxonomy"
 )
 
 // Service điều phối đọc và lưu hóa đơn.
 type Service struct {
 	reader Reader
+	pages  PageCache // nil: không giữ kết quả từng ảnh
 	drafts DraftCache
 	quota  Quota
 	fx     FXRates
@@ -61,6 +66,11 @@ func WithPageTimeout(d time.Duration) Option {
 	}
 }
 
+// WithPageCache giữ kết quả đọc từng ảnh để chụp lại một ảnh không phải đọc lại cả hóa đơn.
+func WithPageCache(c PageCache) Option {
+	return func(s *Service) error { s.pages = c; return nil }
+}
+
 func WithClock(now func() time.Time) Option {
 	return func(s *Service) error { s.now = now; return nil }
 }
@@ -82,8 +92,8 @@ func New(reader Reader, drafts DraftCache, quota Quota, fx FXRates, store Store,
 		reader: reader, drafts: drafts, quota: quota, fx: fx, store: store, log: log,
 		now:          time.Now,
 		dailyLimit:   20,
-		maxPages:     8,
-		maxPageBytes: 4 << 20,
+		maxPages:     MaxPages,
+		maxPageBytes: MaxPageBytes,
 		maxLines:     150,
 		pageTimeout:  20 * time.Second,
 		retryBudget:  25 * time.Second,
@@ -99,11 +109,26 @@ func New(reader Reader, drafts DraftCache, quota Quota, fx FXRates, store Store,
 // ---------- Đọc hóa đơn ----------
 
 // Read đọc các ảnh của MỘT hóa đơn và trả bản nháp. Không lưu ảnh.
+//
+// BUG-05: lỗi được tách theo nguyên nhân (too_many_images, image_too_large, unreadable_image
+// kèm số thứ tự ảnh, no_items, read_failed). Ảnh đã đọc được giữ kết quả trong PageCache theo
+// hash nội dung, nên khi người dùng chỉ chụp lại một ảnh lỗi thì các ảnh còn lại không gọi AI
+// lần nữa. Bước đọc không bao giờ ghi purchases, tồn kho, chi tiêu hay Kế hoạch.
 func (s *Service) Read(ctx context.Context, p authz.Principal, receiptID, lang string, imgs []Image) (Draft, error) {
 	if err := authz.Can(p, authz.ActionWriteReceipts); err != nil {
 		return Draft{}, err
 	}
+	started := s.now()
+	logRead := func(stage string, err error, extra ...any) {
+		attrs := []any{"receipt_id", receiptID, "stage", stage, "image_count", len(imgs),
+			"image_bytes", imageSizes(imgs), "duration_ms", s.now().Sub(started).Milliseconds()}
+		if err != nil {
+			attrs = append(attrs, "error_code", string(apperr.From(err).Code))
+		}
+		s.log.InfoContext(ctx, "receipt read", append(attrs, extra...)...)
+	}
 	if err := s.validateImages(receiptID, imgs); err != nil {
+		logRead("validate", err)
 		return Draft{}, err
 	}
 
@@ -111,15 +136,17 @@ func (s *Service) Read(ctx context.Context, p authz.Principal, receiptID, lang s
 	if cached, err := s.drafts.Get(ctx, p.UID, receiptID); err != nil {
 		s.log.WarnContext(ctx, "draft cache get failed", "err", err)
 	} else if cached != nil {
+		logRead("draft_cache", nil)
 		return *cached, nil
 	}
 
 	loc := userLocation(p)
 	day := domain.Today(s.now(), loc).String()
 	if err := s.quota.Reserve(ctx, p.UID, day, s.dailyLimit); err != nil {
+		logRead("quota", err)
 		return Draft{}, err
 	}
-	pages, unreadable, err := s.readPages(ctx, imgs, lang)
+	pages, aiCalls, err := s.readPages(ctx, p.UID, imgs, lang)
 	if err != nil {
 		// Lỗi đọc không trừ lượt của người dùng. Dùng context riêng vì ctx có thể đã hết hạn.
 		relCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
@@ -127,18 +154,33 @@ func (s *Service) Read(ctx context.Context, p authz.Principal, receiptID, lang s
 		if rerr := s.quota.Release(relCtx, p.UID, day); rerr != nil {
 			s.log.ErrorContext(ctx, "quota release failed", "err", rerr)
 		}
+		logRead("gemini_read", err, "ai_calls", aiCalls)
 		return Draft{}, err
 	}
 
 	d := s.merge(receiptID, pages)
-	d.UnreadablePages = unreadable
+	if len(d.Lines) == 0 {
+		err := apperr.New(apperr.CodeNoItems, "Chưa thấy món nào. Chụp lại rõ hơn.")
+		logRead("merge", err, "ai_calls", aiCalls)
+		return Draft{}, err
+	}
 	if err := s.applyFX(ctx, &d); err != nil {
+		logRead("fx", err)
 		return Draft{}, err
 	}
 	if err := s.drafts.Put(ctx, p.UID, d); err != nil {
 		s.log.WarnContext(ctx, "draft cache put failed", "err", err) // không chặn người dùng
 	}
+	logRead("done", nil, "ai_calls", aiCalls, "lines", len(d.Lines))
 	return d, nil
+}
+
+func imageSizes(imgs []Image) []int {
+	out := make([]int, len(imgs))
+	for i, img := range imgs {
+		out[i] = len(img.Data)
+	}
+	return out
 }
 
 var allowedMIME = map[string][]byte{
@@ -153,64 +195,95 @@ func ValidImage(mime string, data []byte) bool {
 	return ok && bytes.HasPrefix(data, magic)
 }
 
+// MaxPages, MaxPageBytes: giới hạn của BUG-05 mục 6 (tối đa 10 ảnh, mỗi ảnh 5 MB sau nén).
+const (
+	MaxPages     = 10
+	MaxPageBytes = 5 << 20
+)
+
 func (s *Service) validateImages(receiptID string, imgs []Image) error {
 	if !validID(receiptID) {
 		return apperr.New(apperr.CodeValidation, "Mã hóa đơn không hợp lệ.").With("field", "receipt_id")
 	}
 	if len(imgs) == 0 {
-		return apperr.New(apperr.CodeValidation, "Chưa có ảnh hóa đơn.")
+		return apperr.New(apperr.CodeValidation, "Chưa có ảnh hóa đơn.").With("field", "images")
 	}
 	if len(imgs) > s.maxPages {
-		return apperr.New(apperr.CodeValidation, fmt.Sprintf("Mỗi hóa đơn tối đa %d ảnh.", s.maxPages))
+		return apperr.New(apperr.CodeTooManyImages, fmt.Sprintf("Một hóa đơn tối đa %d ảnh.", s.maxPages)).With("limit", s.maxPages)
 	}
 	for i, img := range imgs {
 		if len(img.Data) > s.maxPageBytes {
-			return apperr.New(apperr.CodePayloadTooLarge, "Ảnh quá lớn.").With("page", i+1)
+			return apperr.New(apperr.CodeImageTooLarge, fmt.Sprintf("Ảnh số %d quá nặng. Chụp lại ảnh này.", i+1)).With("image_index", i+1)
 		}
 		magic, ok := allowedMIME[img.MIME]
 		if !ok || !bytes.HasPrefix(img.Data, magic) { // không tin Content-Type do client gửi
-			return apperr.New(apperr.CodeUnsupportedMedia, "Chỉ nhận ảnh JPEG, PNG hoặc WebP.").With("page", i+1)
+			return apperr.New(apperr.CodeUnsupportedMedia, "Chỉ nhận ảnh JPEG, PNG hoặc WebP.").With("image_index", i+1)
 		}
 	}
 	return nil
 }
 
 // readPages đọc song song mọi trang; mỗi trang có timeout riêng, retry một lần với lỗi
-// tạm thời nếu còn đủ thời gian trong ngân sách của request.
-func (s *Service) readPages(ctx context.Context, imgs []Image, lang string) ([]Page, int, error) {
+// tạm thời nếu còn đủ thời gian trong ngân sách của request. Trang đã đọc được lấy từ
+// PageCache nếu có. Trả số lần thực sự gọi AI (để log).
+func (s *Service) readPages(ctx context.Context, uid string, imgs []Image, lang string) ([]Page, int, error) {
 	pages := make([]Page, len(imgs))
 	errs := make([]error, len(imgs))
+	called := make([]bool, len(imgs))
 	var wg sync.WaitGroup
 	for i, img := range imgs {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			hash := imageHash(img)
+			if s.pages != nil {
+				if cached, err := s.pages.GetPage(ctx, uid, hash); err == nil && cached != nil {
+					pages[i] = *cached
+					return
+				}
+			}
+			called[i] = true
 			pages[i], errs[i] = s.readOne(ctx, img, lang)
+			if errs[i] == nil && s.pages != nil {
+				if err := s.pages.PutPage(ctx, uid, hash, pages[i]); err != nil {
+					s.log.WarnContext(ctx, "page cache put failed", "err", err)
+				}
+			}
 		}()
 	}
 	wg.Wait()
+	calls := 0
+	for _, c := range called {
+		if c {
+			calls++
+		}
+	}
 
-	readable := 0
+	var unreadable []int
 	for i, err := range errs {
 		switch {
 		case err == nil:
-			readable++
 		case errors.Is(err, ErrUnreadable):
-			s.log.InfoContext(ctx, "page unreadable", "page", i+1)
+			unreadable = append(unreadable, i+1)
 		default:
-			return nil, 0, apperr.Wrap(apperr.CodeAIUnavailable, "Mimi đang bận, thử lại sau ít phút.", err)
+			return nil, calls, apperr.Wrap(apperr.CodeReadFailed, "Mimi chưa đọc được. Ảnh vẫn được giữ, hãy thử lại.", err).
+				With("image_index", i+1)
 		}
 	}
-	if readable == 0 {
-		return nil, 0, apperr.New(apperr.CodeReceiptUnreadable, "Mimi chưa đọc được hóa đơn này. Chụp lại rõ hơn, đủ sáng và thẳng.")
-	}
-	out := pages[:0]
-	for i := range pages {
-		if errs[i] == nil {
-			out = append(out, pages[i])
+	if len(unreadable) > 0 {
+		msg := fmt.Sprintf("Ảnh số %d chưa rõ. Chụp lại ảnh này rõ hơn.", unreadable[0])
+		if len(unreadable) == len(imgs) && len(imgs) == 1 {
+			msg = "Mimi chưa đọc được hóa đơn này. Chụp lại rõ hơn, đủ sáng và thẳng."
 		}
+		return nil, calls, apperr.New(apperr.CodeUnreadableImage, msg).
+			With("image_index", unreadable[0]).With("image_indexes", unreadable)
 	}
-	return out, len(imgs) - readable, nil
+	return pages, calls, nil
+}
+
+func imageHash(img Image) string {
+	sum := sha256.Sum256(img.Data)
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *Service) readOne(ctx context.Context, img Image, lang string) (Page, error) {
@@ -218,6 +291,9 @@ func (s *Service) readOne(ctx context.Context, img Image, lang string) (Page, er
 		pctx, cancel := context.WithTimeout(ctx, s.pageTimeout)
 		page, err := s.reader.ReadPage(pctx, img, lang)
 		cancel()
+		if errors.Is(err, ErrNoItems) {
+			return Page{}, nil // ảnh chỉ có phần tổng của hóa đơn dài: hợp lệ, không có dòng
+		}
 		if err == nil || errors.Is(err, ErrUnreadable) || attempt >= 1 {
 			return page, err
 		}
@@ -232,11 +308,14 @@ func (s *Service) readOne(ctx context.Context, img Image, lang string) (Page, er
 	}
 }
 
-// merge ghép các trang bằng code: cửa hàng và ngày lấy từ trang đầu tiên có thông tin,
-// tổng in lấy từ trang cuối có tổng (thường là trang cuối của hóa đơn dài).
+// merge ghép các trang bằng code (không nhờ AI ghép tiền): cửa hàng và ngày lấy từ trang
+// đầu tiên có thông tin, tổng in lấy từ trang có dòng tổng (thường là trang cuối).
+// Chỉ bỏ dòng trùng khi có từ 2 dòng liên tiếp giống hệt ở vùng nối hai ảnh; một dòng
+// giống nhau đơn lẻ được giữ (có thể là mua hai lần cùng món).
 func (s *Service) merge(receiptID string, pages []Page) Draft {
 	d := Draft{ReceiptID: receiptID, Currency: "VND", Pages: len(pages)}
 	n := 0
+	var prev []PageLine
 	for _, pg := range pages {
 		if d.Store == "" {
 			d.Store = domain.CleanItemName(pg.Store)
@@ -255,26 +334,151 @@ func (s *Service) merge(receiptID string, pages []Page) Draft {
 		if pg.DiscountTotal != "" {
 			d.DiscountTotal = pg.DiscountTotal
 		}
-		for _, l := range pg.Lines {
+		lines := pg.Lines[overlap(prev, pg.Lines):]
+		if len(pg.Lines) > 0 {
+			prev = pg.Lines
+		}
+		for _, l := range lines {
 			if len(d.Lines) >= s.maxLines {
 				break
 			}
-			name := domain.CleanItemName(l.Name)
-			if name == "" {
+			dl, ok := s.draftLine(l)
+			if !ok {
 				continue
 			}
 			n++
-			cat := l.CategoryKey
-			if !s.taxonomy[cat] {
-				cat = "" // không nằm trong taxonomy: để người dùng "Chọn nhóm"
-			}
-			d.Lines = append(d.Lines, DraftLine{
-				LineID: fmt.Sprintf("l%d", n), Name: name, Qty: l.Qty, Unit: domain.NormalizeUnit(l.Unit), Amount: l.Amount,
-				CategoryKey: cat, GroupKey: normalizeGroupKey(l.GroupKey), Habit: true,
-			})
+			dl.LineID = fmt.Sprintf("l%d", n)
+			d.Lines = append(d.Lines, dl)
 		}
 	}
 	return d
+}
+
+// overlap: số dòng đầu của trang sau trùng hệt các dòng cuối của trang trước, chỉ tính
+// khi trùng từ 2 dòng liên tiếp trở lên.
+func overlap(prev, next []PageLine) int {
+	best := 0
+	for k := 2; k <= min(len(prev), len(next)); k++ {
+		same := true
+		for i := 0; i < k; i++ {
+			if !sameLine(prev[len(prev)-k+i], next[i]) {
+				same = false
+				break
+			}
+		}
+		if same {
+			best = k
+		}
+	}
+	return best
+}
+
+func sameLine(a, b PageLine) bool {
+	return domain.NormalizeVi(a.RawName) == domain.NormalizeVi(b.RawName) && a.Qty == b.Qty &&
+		strings.TrimSpace(a.Amount) == strings.TrimSpace(b.Amount)
+}
+
+// draftLine chuẩn hóa một dòng AI đọc: tên theo 7.1, nhóm theo taxonomy 0.2, quy cách và
+// lượng canonical theo 0.1. Dòng không có tên thì bỏ.
+func (s *Service) draftLine(l PageLine) (DraftLine, bool) {
+	raw := domain.CleanItemName(l.RawName)
+	if raw == "" {
+		return DraftLine{}, false
+	}
+	group := canonicalGroup(l.GroupKey)
+	dl := DraftLine{
+		Qty: l.Qty, Unit: domain.NormalizeUnit(l.Unit), Amount: l.Amount,
+		CategoryKey: s.category(l.CategoryKey, group), GroupKey: group, Habit: true,
+	}
+	pn := domain.NormalizeProductName(raw, l.Brand, l.ProductName, taxonomy.Brand)
+	dl.Product = Product{
+		RawName: raw, Brand: pn.Brand, ProductName: pn.ProductName, DetailName: pn.DetailName, ProductKey: pn.ProductKey,
+		SourceLang:   strings.ToLower(strings.TrimSpace(l.SourceLang)),
+		PackageCount: l.PackageCount, PackageSize: l.PackageSize, PackageUnit: domain.NormalizeUnit(l.PackageUnit),
+	}
+	dl.Name = displayName(pn, raw)
+	pk, reasons := measure(raw, dl.Qty, dl.Unit, l.PackageCount, l.PackageSize, l.PackageUnit, dl.GroupKey)
+	dl.CanonicalQty, dl.CanonicalUnit = pk.Total, string(pk.Unit)
+	dl.ReviewReasons = reviewReasons(dl.CategoryKey, dl.GroupKey, reasons)
+	dl.NeedsReview = len(dl.ReviewReasons) > 0
+	return dl, true
+}
+
+// displayName: tên chi tiết (brand + tên riêng) nếu có; không thì tên in trên bill đã bỏ
+// quy cách và marketing, viết theo 7.1. Tên nhóm (Sữa bột) do client tra theo ngôn ngữ.
+func displayName(pn domain.ProductName, raw string) string {
+	if pn.DetailName != "" {
+		return pn.DetailName
+	}
+	if n := domain.FormatField(domain.StripQuantity(domain.StripMarketing(raw))); n != "" {
+		return n
+	}
+	return domain.FormatField(raw)
+}
+
+// canonicalGroup: chỉ nhận group_key thuộc taxonomy 0.2; "khac" hoặc khóa lạ là chưa phân
+// nhóm (không tự tạo khóa mới, 0.2 mục 12).
+// category chọn danh mục chi tiêu: khóa AI / người dùng gửi nếu hợp lệ, nếu không thì
+// lấy theo nhóm sản phẩm (người dùng bấm "Chọn nhóm" chỉ chọn nhóm). "" = Cần phân loại.
+func (s *Service) category(key, group string) string {
+	if s.taxonomy[key] {
+		return key
+	}
+	if c := taxonomy.SpendingCategory(group); s.taxonomy[c] {
+		return c
+	}
+	return ""
+}
+
+func canonicalGroup(k string) string {
+	k = taxonomy.Normalize(k)
+	if taxonomy.Has(k) {
+		return k
+	}
+	return ""
+}
+
+// measure tính tổng lượng canonical của một dòng theo thứ tự ưu tiên 0.1 mục 8:
+//  1. hàng cân ký: số lượng in cạnh đơn vị đo (1,2 kg) là tổng lượng;
+//  2. quy cách in trong tên (luật cố định) rồi quy cách AI đã tách, nhân số lượng mua;
+//  3. số đếm tự nhiên (2 cái). Đếm cho nhóm mặc định đo theo g/ml/m thì cần xác nhận.
+func measure(raw string, qty float64, unit string, aiCount, aiSize float64, aiUnit, group string) (domain.Packaging, []string) {
+	if qty <= 0 || math.IsNaN(qty) {
+		qty = 1
+	}
+	if unit != "" {
+		if total, base := domain.ToBase(qty, unit); base != domain.UnitItem {
+			return domain.Packaging{Structure: fmt.Sprintf("%g %s", qty, unit), Count: 1, Size: qty, SizeUnit: unit,
+				Total: math.Round(total*1000) / 1000, Unit: base}, nil
+		}
+	}
+	pk := domain.ParsePackaging(raw)
+	if !pk.Known() {
+		pk = domain.PackagingFrom(aiCount, aiSize, aiUnit)
+	}
+	if pk.Known() {
+		return pk.ForLines(qty), nil
+	}
+	count := pk.Count
+	if count <= 0 {
+		count = 1
+	}
+	pk = domain.Packaging{Count: count, Total: math.Round(count*qty*1000) / 1000, Unit: domain.UnitItem}
+	if def, ok := taxonomy.DefaultUnit(group); ok && def != domain.UnitItem {
+		return pk, []string{"count_for_measured_group"}
+	}
+	return pk, nil
+}
+
+func reviewReasons(category, group string, extra []string) []string {
+	var out []string
+	if category == "" {
+		out = append(out, "missing_category")
+	}
+	if group == "" {
+		out = append(out, "missing_group")
+	}
+	return append(out, extra...)
 }
 
 func (s *Service) applyFX(ctx context.Context, d *Draft) error {
@@ -319,6 +523,8 @@ func (s *Service) applyFX(ctx context.Context, d *Draft) error {
 			// Dòng có thể là giá sau giảm (tổng = tổng dòng) hoặc giá gốc (tổng = tổng dòng
 			// trừ giảm giá). Khớp một trong hai, lệch không quá ngưỡng, thì coi là khớp.
 			d.TotalMismatch = !withinTolerance(total, sum) && !withinTolerance(total, sum-disc)
+			match := !d.TotalMismatch
+			d.TotalMatch = &match
 		}
 	}
 	return nil
@@ -376,15 +582,24 @@ func toVND(amount, currency string, fx *FX) (v domain.VND, neg bool, ok bool) {
 // ---------- Lưu hóa đơn ----------
 
 // SaveLine là dòng người dùng đã xác nhận (có thể đã sửa tên, bỏ dòng, đổi nhóm, tắt habit).
+// Các field sản phẩm là kết quả chuẩn hóa một lần lúc đọc, client gửi lại nguyên vẹn;
+// lượng canonical luôn được server tính lại từ chúng, không nhận từ client.
 type SaveLine struct {
-	LineID      string  `json:"line_id"`
-	Name        string  `json:"name"`
-	Qty         float64 `json:"qty"`
-	Unit        string  `json:"unit,omitempty"`
-	Amount      string  `json:"amount"`
-	CategoryKey string  `json:"category_key"`
-	GroupKey    string  `json:"group_key"`
-	Habit       bool    `json:"habit"`
+	LineID       string  `json:"line_id"`
+	Name         string  `json:"name"`
+	Qty          float64 `json:"qty"`
+	Unit         string  `json:"unit,omitempty"`
+	Amount       string  `json:"amount"`
+	CategoryKey  string  `json:"category_key"`
+	GroupKey     string  `json:"group_key"`
+	Habit        bool    `json:"habit"`
+	RawName      string  `json:"raw_name,omitempty"`
+	Brand        string  `json:"brand,omitempty"`
+	ProductName  string  `json:"product_name,omitempty"`
+	SourceLang   string  `json:"source_language,omitempty"`
+	PackageCount float64 `json:"package_count,omitempty"`
+	PackageSize  float64 `json:"package_size,omitempty"`
+	PackageUnit  string  `json:"package_unit,omitempty"`
 }
 
 type SaveRequest struct {
@@ -396,47 +611,79 @@ type SaveRequest struct {
 	Lines            []SaveLine `json:"lines"`
 	UseForPrediction bool       `json:"use_for_prediction"`
 	ConfirmDuplicate bool       `json:"confirm_duplicate"`
+	// SourcePlanID: quét từ trong một Plan thì chỉ đối chiếu Plan đó (3.1 mục 3A.6).
+	SourcePlanID string `json:"source_plan_id,omitempty"`
+	// AssignmentID: Buyer quét hóa đơn cho một vòng mua hộ (4.1 mục 9.3).
+	AssignmentID string `json:"assignment_id,omitempty"`
 }
 
 // Save kiểm tra, tính lại mọi con số bằng code rồi ghi trong một transaction.
+// Gửi lại cùng receipt_id và cùng nội dung (mạng chậm, bấm Lưu hai lần) trả kết quả cũ,
+// không ghi gì thêm (BUG-06 mục 7).
 func (s *Service) Save(ctx context.Context, p authz.Principal, req SaveRequest) (SaveOutcome, error) {
 	if err := authz.Can(p, authz.ActionWriteReceipts); err != nil {
 		return SaveOutcome{}, err
 	}
+	started := s.now()
+	logSave := func(stage string, err error) {
+		attrs := []any{"receipt_id", req.ReceiptID, "stage", stage, "line_count", len(req.Lines),
+			"duration_ms", s.now().Sub(started).Milliseconds()}
+		if err != nil {
+			attrs = append(attrs, "error_code", string(apperr.From(err).Code))
+		}
+		s.log.InfoContext(ctx, "receipt save", attrs...)
+	}
 	r, err := s.build(ctx, p, req)
 	if err != nil {
+		logSave("validate", err)
 		return SaveOutcome{}, err
 	}
 	if !req.ConfirmDuplicate {
 		dup, err := s.store.HasSimilar(ctx, p.UID, r.DedupeKey, r.ID)
 		if err != nil {
-			return SaveOutcome{}, apperr.Wrap(apperr.CodeInternal, "Chưa lưu được, thử lại.", err)
+			err = apperr.Wrap(apperr.CodeInternal, "Mimi chưa lưu được hóa đơn. Dữ liệu bạn vừa sửa vẫn được giữ.", err)
+			logSave("duplicate_check", err)
+			return SaveOutcome{}, err
 		}
 		if dup {
-			return SaveOutcome{}, apperr.New(apperr.CodePossibleDuplicate, "Hóa đơn này giống một hóa đơn đã lưu. Vẫn lưu?")
+			err := apperr.New(apperr.CodePossibleDuplicate, "Hóa đơn này giống một hóa đơn đã lưu. Vẫn lưu?")
+			logSave("duplicate_check", err)
+			return SaveOutcome{}, err
 		}
 	}
 	out, err := s.store.SaveReceipt(ctx, p.UID, r, userLocation(p))
 	if err != nil {
-		return SaveOutcome{}, err // Store đã trả apperr (receipt_conflict) hoặc lỗi hạ tầng
+		if status.Code(err) == codes.Aborted {
+			err = apperr.Wrap(apperr.CodeTransactionConflict, "Đang có thay đổi khác cùng lúc, thử lưu lại.", err)
+		}
+		logSave("confirm_transaction", err)
+		return SaveOutcome{}, err // Store đã trả apperr (receipt_conflict...) hoặc lỗi hạ tầng
 	}
+	logSave("committed", nil)
 	return out, nil
 }
 
 func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest) (Receipt, error) {
-	verr := apperr.New(apperr.CodeValidation, "Hóa đơn chưa hợp lệ.")
 	if !validID(req.ReceiptID) {
-		return Receipt{}, verr.With("field", "receipt_id")
+		return Receipt{}, apperr.New(apperr.CodeValidation, "Mã hóa đơn không hợp lệ.").With("field", "receipt_id")
+	}
+	badDate := func(msg string) *apperr.Error {
+		return apperr.New(apperr.CodeInvalidPurchaseDate, msg).With("field", "purchased_on")
 	}
 	on, err := domain.ParseDate(req.PurchasedOn)
 	if err != nil {
-		return Receipt{}, verr.With("field", "purchased_on")
+		return Receipt{}, badDate("Ngày mua không hợp lệ.")
 	}
 	if on.After(domain.Today(s.now(), userLocation(p)).AddDays(1)) {
-		return Receipt{}, verr.With("field", "purchased_on").With("reason", "future")
+		return Receipt{}, badDate("Ngày mua nằm trong tương lai.").With("reason", "future")
 	}
 	if len(req.Lines) == 0 || len(req.Lines) > s.maxLines {
-		return Receipt{}, verr.With("field", "lines")
+		return Receipt{}, apperr.New(apperr.CodeValidation, "Hóa đơn chưa có món nào.").With("field", "lines")
+	}
+	for _, id := range []struct{ field, v string }{{"source_plan_id", req.SourcePlanID}, {"assignment_id", req.AssignmentID}} {
+		if id.v != "" && !validID(id.v) {
+			return Receipt{}, apperr.New(apperr.CodeValidation, "Mã không hợp lệ.").With("field", id.field)
+		}
 	}
 	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
 	if currency == "" {
@@ -454,9 +701,19 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 		}
 	}
 
-	r := Receipt{ID: req.ReceiptID, Store: domain.CleanItemName(req.Store), PurchasedOn: on, Currency: currency, FX: fx, SavedAt: s.now()}
+	storeKey, _ := domain.StoreKey(req.Store)
+	r := Receipt{
+		ID: req.ReceiptID, Store: domain.CleanItemName(req.Store), StoreKey: storeKey, PurchasedOn: on,
+		Currency: currency, FX: fx, SavedAt: s.now(), SourcePlanID: req.SourcePlanID, AssignmentID: req.AssignmentID,
+	}
 	var lineDiscount domain.VND
-	for i, l := range req.Lines {
+	for _, l := range req.Lines {
+		lineErr := func(code apperr.Code, field, msg string) error {
+			return apperr.New(code, msg).With("line_id", l.LineID).With("field", field)
+		}
+		if !validID(l.LineID) {
+			return Receipt{}, lineErr(apperr.CodeValidation, "line_id", "Dòng hóa đơn không hợp lệ.")
+		}
 		v, neg, ok := toVND(l.Amount, currency, fx)
 		if ok && neg {
 			// Dòng khuyến mãi: không phải món, trừ vào số đã chi và cộng vào tiết kiệm.
@@ -464,31 +721,53 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 			continue
 		}
 		name := domain.CleanItemName(l.Name)
-		if name == "" || l.Qty <= 0 || l.Qty > 1000 || math.IsNaN(l.Qty) {
-			return Receipt{}, verr.With("line", i)
+		raw := domain.CleanItemName(l.RawName)
+		if raw == "" {
+			raw = name // dòng người dùng tự thêm: tên nhập tay là raw_name
 		}
+		if name == "" && raw == "" {
+			return Receipt{}, lineErr(apperr.CodeValidation, "name", "Món này chưa có tên.")
+		}
+		if name == "" {
+			name = raw
+		}
+		if l.Qty <= 0 || l.Qty > 1000 || math.IsNaN(l.Qty) {
+			return Receipt{}, lineErr(apperr.CodeInvalidQuantity, "qty", "Số lượng của món này chưa hợp lệ.")
+		}
+		if !ok && currency == "VND" {
+			return Receipt{}, lineErr(apperr.CodeInvalidLineTotal, "amount", "Giá của món này chưa hợp lệ.")
+		}
+		group := canonicalGroup(l.GroupKey)
+		cat := s.category(l.CategoryKey, group)
+		unit := domain.NormalizeUnit(l.Unit)
+		pn := domain.NormalizeProductName(raw, l.Brand, l.ProductName, taxonomy.Brand)
+		pk, extra := measure(raw, l.Qty, unit, l.PackageCount, l.PackageSize, l.PackageUnit, group)
 		line := Line{
-			ID: l.LineID, Name: name, NameNorm: domain.NormalizeVi(name), Qty: l.Qty,
-			Unit: domain.NormalizeUnit(l.Unit),
+			ID: l.LineID, Name: name, NameNorm: domain.NormalizeVi(name), Qty: l.Qty, Unit: unit,
 			Orig: strings.TrimSpace(l.Amount), Habit: l.Habit && req.UseForPrediction,
+			CategoryKey: cat, GroupKey: group, Structure: pk.Structure,
+			Product: Product{
+				RawName: raw, Brand: pn.Brand, ProductName: pn.ProductName, DetailName: pn.DetailName, ProductKey: pn.ProductKey,
+				SourceLang:   strings.ToLower(strings.TrimSpace(l.SourceLang)),
+				PackageCount: pk.Count, PackageSize: pk.Size, PackageUnit: pk.SizeUnit,
+				CanonicalQty: pk.Total, CanonicalUnit: string(pk.Unit),
+			},
 		}
-		if s.taxonomy[l.CategoryKey] {
-			line.CategoryKey = l.CategoryKey
-		}
-		line.GroupKey = groupKeyFor(l.GroupKey, line.NameNorm)
+		// Dòng chưa đủ phân loại vẫn được lưu (purchase + chi tiêu) nhưng chưa vào tồn kho
+		// và dự đoán cho tới khi người dùng phân loại (BUG-06 mục 5.3, 0.1 mục 20).
+		line.NeedsReview = len(reviewReasons(cat, group, extra)) > 0
 		if ok {
 			line.VND = &v
 			r.TotalVND += v
-		} else if currency == "VND" {
-			return Receipt{}, verr.With("line", i).With("field", "amount")
 		}
 		r.Lines = append(r.Lines, line)
 	}
 	if len(r.Lines) == 0 {
-		return Receipt{}, verr.With("field", "lines")
+		return Receipt{}, apperr.New(apperr.CodeValidation, "Hóa đơn chưa có món nào.").With("field", "lines")
 	}
 	if lineDiscount > r.TotalVND {
-		return Receipt{}, verr.With("field", "lines").With("reason", "discount_exceeds_total")
+		return Receipt{}, apperr.New(apperr.CodeValidation, "Tổng khuyến mãi lớn hơn tổng hóa đơn.").
+			With("field", "lines").With("reason", "discount_exceeds_total")
 	}
 	r.TotalVND -= lineDiscount
 	r.DiscountVND = lineDiscount
@@ -498,7 +777,7 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 		// và tổng giảm giá, tổng in trên hóa đơn đã gồm các dòng đó nên lấy số lớn hơn.
 		dv, _, ok := toVND(req.DiscountTotal, currency, fx)
 		if !ok && currency == "VND" {
-			return Receipt{}, verr.With("field", "discount_total")
+			return Receipt{}, apperr.New(apperr.CodeValidation, "Tổng giảm giá không hợp lệ.").With("field", "discount_total")
 		}
 		if dv > r.DiscountVND {
 			r.DiscountVND = dv
@@ -507,15 +786,6 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 	r.DedupeKey = fmt.Sprintf("%s|%s|%d", domain.NormalizeVi(r.Store), on, r.TotalVND)
 	r.PayloadHash = hashPayload(req)
 	return r, nil
-}
-
-// groupKeyFor: nhóm do AI/taxonomy gán nếu hợp lệ, ngược lại dùng tên chuẩn hóa.
-func groupKeyFor(given, nameNorm string) string {
-	g := normalizeGroupKey(given)
-	if validID(g) {
-		return g
-	}
-	return strings.ReplaceAll(nameNorm, " ", "-")
 }
 
 // normalizeGroupKey đưa khóa nhóm về một dạng: chữ thường, gạch nối. Danh sách nhóm demo

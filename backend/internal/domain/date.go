@@ -37,6 +37,7 @@ func (d Date) Before(o Date) bool { return d.t.Before(o.t) }
 func (d Date) After(o Date) bool  { return d.t.After(o.t) }
 func (d Date) Equal(o Date) bool  { return d.t.Equal(o.t) }
 func (d Date) Month() string      { return d.t.Format("2006-01") }
+func (d Date) Day() int           { return d.t.Day() }
 
 // At trả về thời điểm hour:min của ngày d theo múi giờ loc.
 func (d Date) At(hour, min int, loc *time.Location) time.Time {

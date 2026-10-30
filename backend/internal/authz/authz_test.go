@@ -17,8 +17,11 @@ func TestCan(t *testing.T) {
 		want apperr.Code // "" = allowed
 	}{
 		{"owner reads spending", owner, ActionReadSpending, ""},
-		{"member cannot read spending", member, ActionReadSpending, apperr.CodeForbidden},
-		{"member cannot read full items", member, ActionReadItemsFull, apperr.CodeForbidden},
+		{"member reads own spending", member, ActionReadSpending, ""},
+		{"member manages own items", member, ActionWriteItems, ""},
+		{"member cannot manage household", member, ActionManageHousehold, apperr.CodeForbidden},
+		{"member assigns shopping", member, ActionAssignShopping, ""},
+		{"solo cannot assign shopping", owner, ActionAssignShopping, apperr.CodeForbidden},
 		{"member reads shared items", member, ActionReadItemsShared, ""},
 		{"member answers ask", member, ActionAnswerAsk, ""},
 		{"owner cannot answer own ask", owner, ActionAnswerAsk, apperr.CodeForbidden},

@@ -190,6 +190,7 @@
 .lines { list-style: none; margin: var(--s3) 0; padding: 0; }
 .lines li { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--sky-line); }
 .lines .sub { font-size: var(--fs-xs); color: var(--ink-soft); }
+.lines li.lines__bad { outline: 2px solid var(--st-out); outline-offset: 4px; border-radius: 8px; }
 .check { font-size: var(--fs-sm); padding: var(--s3) 0; }
 .check.ok { color: var(--st-plenty); }
 .check.warn { color: var(--st-soon); }

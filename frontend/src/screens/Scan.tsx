@@ -2,14 +2,17 @@ import { t, uiLang } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Camera, ImagePlus, X } from "lucide-react";
-import { toSaveRequest, useReadReceipt, useSaveReceipt } from "../api/hooks";
+import { toSaveRequest, useDelegated, useReadReceipt, useSaveReceipt } from "../api/hooks";
+import { m1 } from "../i18n/m1";
+import { currentPlanId } from "../lib/currentPlan";
 import type { ReceiptDraft } from "../api/types";
 import { ApiError, OfflineError } from "../api/client";
 import { compressReceiptImage, grabFrame } from "../lib/image";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { MimiMark } from "../components/MimiMark";
+import { type EditLine, ReceiptLines, parseAmount } from "../components/ReceiptLines";
 
-const MAX_PHOTOS = 8;
+const MAX_PHOTOS = 10; // BUG-05 mục 6: tối đa 10 ảnh / hóa đơn, khớp giới hạn backend
 
 type Photo = { id: string; blob: Blob; url: string; from: "camera" | "library" };
 
@@ -37,6 +40,8 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // BUG-05 mục 8B: chụp lại riêng một ảnh lỗi, ảnh mới thay đúng vị trí (1-based).
+  const [replaceAt, setReplaceAt] = useState<number | null>(null);
   const [receiptId] = useState(() => crypto.randomUUID()); // khóa idempotent cho cả lần đọc và lần lưu
   const read = useReadReceipt();
   const urls = useRef<string[]>([]);
@@ -67,12 +72,23 @@ function ScanSession({ onNext }: { onNext: () => void }) {
       urls.current.push(url);
       return { id: crypto.randomUUID(), blob, url, from };
     });
+    if (replaceAt != null && added.length > 0) {
+      const [first, ...rest] = added;
+      setPhotos((p) => {
+        const next = [...p];
+        next.splice(replaceAt - 1, 1, first);
+        return [...next, ...rest].slice(0, MAX_PHOTOS);
+      });
+      setReplaceAt(null);
+      read.reset();
+      return;
+    }
     setPhotos((p) => [...p, ...added]);
   }
 
   async function addFiles(files: File[], from: Photo["from"]) {
     setNotice(null);
-    const room = MAX_PHOTOS - photos.length;
+    const room = replaceAt != null ? 1 : MAX_PHOTOS - photos.length;
     if (room <= 0) return setNotice(t.scan.maxPhotos(MAX_PHOTOS));
     const picked = files.filter((f) => f.type.startsWith("image/") || f.type === "");
     const take = picked.slice(0, room);
@@ -90,7 +106,7 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   }
 
   async function shoot() {
-    if (photos.length >= MAX_PHOTOS) return setNotice(t.scan.maxPhotos(MAX_PHOTOS));
+    if (photos.length >= MAX_PHOTOS && replaceAt == null) return setNotice(t.scan.maxPhotos(MAX_PHOTOS));
     if (!videoRef.current || !stream) return cameraRef.current?.click();
     push([await grabFrame(videoRef.current)], "camera");
   }
@@ -102,8 +118,21 @@ function ScanSession({ onNext }: { onNext: () => void }) {
 
   function finish() {
     stream?.getTracks().forEach((t) => t.stop());
-    // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện
-    read.mutate({ receiptId, images: photos.map((p) => p.blob), lang: uiLang });
+    // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện.
+    // Gửi lại sau khi chụp lại một ảnh: backend nhớ kết quả các ảnh đã đọc được (theo nội dung
+    // ảnh), nên chỉ ảnh mới được đọc lại (1.1).
+    read.mutate(
+      { receiptId, images: photos.map((p) => p.blob), lang: uiLang },
+      { onError: () => setStream(null) }, // camera đã tắt: chụp lại bằng camera hệ thống
+    );
+  }
+
+  // 1.1: lỗi gắn với một ảnh (unreadable_image, image_too_large, read_failed) chỉ ra đúng ảnh cần chụp lại.
+  const badImages = new Set<number>();
+  if (read.error instanceof ApiError) {
+    const f = read.error.fields;
+    if (Array.isArray(f.image_indexes)) f.image_indexes.forEach((i) => typeof i === "number" && badImages.add(i));
+    else if (typeof f.image_index === "number") badImages.add(f.image_index);
   }
 
   if (read.isPending) {
@@ -155,8 +184,9 @@ function ScanSession({ onNext }: { onNext: () => void }) {
       {photos.length > 0 && (
         <ul className="scan__thumbs" aria-label={t.scan.photosOfReceipt(photos.length)}>
           {photos.map((p, i) => (
-            <li key={p.id}>
+            <li key={p.id} style={badImages.has(i + 1) || replaceAt === i + 1 ? { outline: "3px solid var(--danger, #c0392b)", outlineOffset: 2 } : undefined}>
               <img src={p.url} alt={t.scan.photoAlt(i + 1, p.from === "library")} />
+              {badImages.has(i + 1) && <span className="sr-only">{m1.scan.badImage}</span>}
               <button type="button" className="thumb__remove" aria-label={t.scan.removePhoto(i + 1)} onClick={() => remove(p.id)}>
                 <X size={14} aria-hidden />
               </button>
@@ -168,10 +198,25 @@ function ScanSession({ onNext }: { onNext: () => void }) {
       <div aria-live="polite">
         {busy && <p className="scan__hint">{t.scan.preparing}</p>}
         {notice && <p className="scan__hint scan__notice">{notice}</p>}
-        {read.isError && (
-          <p className="scan__hint scan__notice" role="alert">
-            {read.error instanceof OfflineError ? t.scan.uploadOffline : read.error.message}
-          </p>
+        {read.isError && replaceAt == null && (
+          <>
+            <p className="scan__hint scan__notice" role="alert">
+              {read.error instanceof OfflineError ? t.scan.uploadOffline : read.error.message}
+            </p>
+            <div className="plan-form__row" style={{ justifyContent: "center" }}>
+              {[...badImages].filter((i) => i <= photos.length).map((i) => (
+                <button key={i} type="button" className="btn btn--quiet" onClick={() => setReplaceAt(i)}>
+                  {m1.scan.retakeImage(i)}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {replaceAt != null && (
+          <div className="plan-form__row" style={{ justifyContent: "center", alignItems: "center" }}>
+            <p className="scan__hint">{m1.scan.retakeNow(replaceAt)}</p>
+            <button type="button" className="btn btn--quiet" onClick={() => setReplaceAt(null)}>{m1.scan.cancelRetake}</button>
+          </div>
         )}
       </div>
 
@@ -233,11 +278,30 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
   const [usePrediction, setUsePrediction] = useState(true);
   const [purchasedOn, setPurchasedOn] = useState(draft.purchased_on || todayLocal());
   const save = useSaveReceipt();
-  const sum = draft.sum_vnd;
-  const matches = !!draft.total_printed && !draft.total_mismatch;
-  const submit = (confirmDuplicate: boolean) =>
-    !save.isPending &&
-    save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate }));
+  // 4.1: Buyer chọn hóa đơn này cho vòng mua hộ nào (hoặc của riêng mình).
+  const delegated = useDelegated();
+  const toMe = delegated.data?.to_me ?? [];
+  const [assignmentId, setAssignmentId] = useState("");
+  // Bản nháp người dùng sửa: lỗi lưu không làm mất chỉnh sửa (BUG-06 mục 10).
+  const [lines, setLines] = useState<EditLine[]>(draft.lines);
+  const [localError, setLocalError] = useState("");
+  const edited = lines !== draft.lines;
+  const kept = lines.filter((l) => !l.removed);
+  const review = kept.filter((l) => l.needs_review && !l.discount).length;
+  const sum = edited ? kept.reduce((a, l) => a + (l.amount_vnd ?? 0), 0) : draft.sum_vnd;
+  const printed = draft.total_printed ? parseAmount(draft.total_printed, draft.currency) : null;
+  // Tổng lệch chỉ là cảnh báo, không chặn lưu (BUG-06 mục 5.1).
+  const mismatch = edited && draft.currency === "VND" && printed != null ? Math.abs(printed - sum) > 1000 : draft.total_mismatch;
+  const matches = !!draft.total_printed && !mismatch;
+  const change = (id: string, patch: Partial<EditLine>) => {
+    setLocalError("");
+    setLines((ls) => ls.map((l) => (l.line_id === id ? { ...l, ...patch } : l)));
+  };
+  const submit = (confirmDuplicate: boolean) => {
+    if (save.isPending) return;
+    if (kept.length === 0) return setLocalError(m1.receiptEdit.keepOne);
+    save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate, planId: currentPlanId(), assignmentId }, kept));
+  };
 
   if (save.isSuccess) {
     return (
@@ -246,7 +310,12 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
           <div className="done__head">
             <MimiMark size={64} />
             <h1>{t.confirm.savedTitle}</h1>
-            <p>{t.confirm.savedBody(draft.lines.length, usePrediction)}</p>
+            <p>{t.confirm.savedBody(kept.length, usePrediction)}</p>
+            {save.data?.assignment && (
+              <p>{m1.scan.assignmentResult(save.data.assignment.done.length, save.data.assignment.returned.length)}</p>
+            )}
+            {!!save.data?.plan_done?.length && <p>{m1.scan.planDone(save.data.plan_done.length)}</p>}
+            {!!save.data?.recurring_matched?.length && <p>{m1.scan.recurringMatched}</p>}
           </div>
           <dl className="facts">
             <dt>{t.confirm.store}</dt>
@@ -270,17 +339,26 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
     );
   }
 
+  // BUG-06 mục 8: mỗi loại lỗi một cách báo; lỗi ngày tô ô ngày, lỗi một dòng tô đúng dòng đó.
   const err = save.error;
   const duplicate = err instanceof ApiError && err.code === "possible_duplicate";
-  const errorText = !err
+  const f = err instanceof ApiError ? err.fields : {};
+  const badLine = typeof f.line_id === "string" ? f.line_id : undefined;
+  const badDate = err instanceof ApiError && (err.code === "invalid_purchase_date" || f.field === "purchased_on");
+  const lineName = lines.find((l) => l.line_id === badLine)?.name ?? "";
+  const errorText = localError || (!err
     ? ""
     : err instanceof OfflineError
       ? `${t.confirm.saveFailed} ${t.confirm.checkConnection}`
       : duplicate
         ? t.confirm.duplicate
-        : err instanceof ApiError && err.code === "validation_failed"
-          ? `${t.confirm.saveFailed} ${t.confirm.checkDetails}`
-          : `${t.confirm.saveFailed} ${t.common.genericError}`;
+        : badDate
+          ? m1.receiptEdit.fixDate
+          : badLine
+            ? `${err.message} ${m1.receiptEdit.fixLine(lineName)}`
+            : err instanceof ApiError && err.status < 500 && !err.retryable
+              ? err.message
+              : m1.receiptEdit.serverError);
 
   return (
     <main className="frame">
@@ -293,25 +371,14 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
               type="date"
               value={purchasedOn}
               max={todayLocal()}
+              aria-invalid={badDate || undefined}
+              style={badDate ? { outline: "2px solid var(--st-out)" } : undefined}
               onChange={(e) => e.target.value && setPurchasedOn(e.target.value)}
             />
           </label>
         </div>
         {draft.unreadable_pages > 0 && <p className="check warn">{t.confirm.unreadablePages(draft.unreadable_pages)}</p>}
-        <ul className="lines">
-          {draft.lines.map((l) => (
-            <li key={l.line_id}>
-              <span>{l.name}</span>
-              <span className="num">{l.amount_vnd != null ? formatVnd(l.amount_vnd) : `${l.amount} ${draft.currency}`}</span>
-              <span className="sub">
-                {l.discount ? t.confirm.discountLine : t.confirm.qty(l.qty)}
-                {!l.discount && l.unit && ` ${l.unit}`}
-                {l.amount_vnd == null && ` · ${t.confirm.notConverted}`}
-              </span>
-              {!l.category_key && !l.discount && <button className="btn btn--quiet" style={{ minHeight: 36, gridColumn: 2 }}>{t.confirm.chooseGroup}</button>}
-            </li>
-          ))}
-        </ul>
+        <ReceiptLines lines={lines} currency={draft.currency} badLine={badLine} onChange={change} />
         <p className={`check ${matches ? "ok" : "warn"}`}>
           {!draft.total_printed
             ? t.confirm.noTotal(formatVnd(sum))
@@ -319,6 +386,20 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
               ? t.confirm.matches(formatVnd(sum))
               : t.confirm.mismatch(formatVnd(sum), draft.total_printed)}
         </p>
+        {review > 0 && <p className="check warn">{m1.scan.reviewHint(review)}</p>}
+        {toMe.length > 0 && (
+          <label className="field">
+            {m1.scan.forAssignment}
+            <select value={assignmentId} onChange={(e) => setAssignmentId(e.target.value)}>
+              <option value="">{m1.scan.personal}</option>
+              {toMe.map((a) => (
+                <option key={a.assignment_id} value={a.assignment_id}>
+                  {m1.delegated.from(a.owner_display_name || m1.assign.someone)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="switch-row">
           {t.confirm.usePrediction}
           <input type="checkbox" role="switch" {...{ switch: "" }} checked={usePrediction} onChange={(e) => setUsePrediction(e.target.checked)} />
