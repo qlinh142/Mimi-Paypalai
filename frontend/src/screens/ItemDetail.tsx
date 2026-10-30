@@ -8,6 +8,7 @@ import { TopBar, useUndo, MainFrame } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT, statusTone } from "../components/ItemRow";
 import { formatDayMonth, formatQty } from "../lib/text";
 import { LotsSection, PriceHistorySection } from "../components/ItemExtras";
+import { AddToPlanButton } from "../components/PlanExtras";
 import { m1 } from "../i18n/m1";
 
 const CONFIDENCE = t.detail.confidenceLevels;
@@ -82,6 +83,7 @@ export function ItemDetail() {
               ))}
             </div>
             <p className="hint">{t.detail.hint}</p>
+            <AddToPlanButton itemKey={item.key} />
             <StockSection item={item} onSaved={() => q.refetch()} />
             <LotsSection item={item} />
             <PriceHistorySection itemKey={item.key} />

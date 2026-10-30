@@ -78,6 +78,9 @@ func TestSaveReceiptEmulator(t *testing.T) {
 	if len(out.PlanDone) != 1 || out.PlanDone[0] != "sua-tuoi" {
 		t.Fatalf("plan done: %+v", out.PlanDone)
 	}
+	if rd := get(t, u)["plan_reconciled_on"]; rd != "2026-10-06" {
+		t.Fatalf("plan_reconciled_on %v", rd)
+	}
 	if len(out.Recurring) != 1 {
 		t.Fatalf("recurring matched: %+v", out.Recurring)
 	}

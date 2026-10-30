@@ -164,6 +164,10 @@ function mockCart(): Cart {
     estimate,
     missing_price: pr.missing_price.length,
     state: planState,
+    // Như backend (3.1 mục 18): reconciled khi có hóa đơn sau ngày mua, shopping từ ngày mua.
+    phase: planState.reconciled_on && (!planState.buy_date || planState.buy_date <= planState.reconciled_on)
+      ? "reconciled"
+      : planState.buy_date && planState.buy_date <= iso(today) ? "shopping" : "planning",
   };
 }
 
@@ -326,6 +330,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
     if (!replayed) {
       savedReceipts.add(body.receipt_id);
       receiptCount += 1;
+      if (!body.source_plan_id && !body.assignment_id) planState = { ...planState, reconciled_on: String(body.purchased_on) };
     }
     return json({ receipt_id: body.receipt_id, status: "saved", replayed }, replayed ? 200 : 201);
   }
@@ -374,7 +379,8 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
   if (method === "GET" && p === "/plan") return json(mockCart());
   if (method === "GET" && p === "/plan/prices") return json(mockPrices());
   if (method === "PUT" && p === "/plan/state") {
-    planState = JSON.parse(String(init.body)) as PlanState;
+    const next = JSON.parse(String(init.body)) as PlanState;
+    planState = { ...next, reconciled_on: planState.reconciled_on }; // reconciled_on chỉ do lưu hóa đơn ghi
     return json(planState);
   }
   const planItem = p.match(/^\/plan\/items\/([^/]+)$/);
@@ -618,12 +624,14 @@ const ME = "mock-uid";
 let household: { id: string; name: string; members: { uid: string; display_name: string; role: "owner" | "member"; joined_at: string }[]; invite?: { code: string; expires_at: string } } = {
   id: "", name: "", members: [{ uid: ME, display_name: "Lan", role: "owner", joined_at: iso(today) }],
 };
-type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string }[]; created_at: string; note?: string };
+type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string }[]; created_at: string; note?: string;
+  trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string } };
 const assignments: MockAssignment[] = [];
 // Một lời nhờ mẫu từ người nhà, để thấy luồng Buyer.
 const incoming: MockAssignment = {
   assignment_id: "trip-mau", owner_uid: "mock-minh", owner_display_name: "Minh", buyer_uid: ME, buyer_display_name: "Lan", plan_id: "default",
   status: "assigned", created_at: iso(today), items: [{ consumption_group_key: "banh-mi", name_display: L ? "Bread" : "Bánh mì", status: "assigned" }],
+  trip: { plan_name: L ? "Weekend shopping" : "Mua đồ cuối tuần", buy_date: iso(new Date(today.getTime() + 2 * 86_400_000)), buy_hour: 9, buy_minute: 30, trip_note: L ? "WinMart near home" : "WinMart gần nhà" },
 };
 
 function priceObs(key: string) {

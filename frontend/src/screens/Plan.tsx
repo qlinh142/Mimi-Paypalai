@@ -27,6 +27,8 @@ function stockText(i: Pick<Item, "status" | "days_left">): string {
 export function Plan() {
   const plan = usePlan();
   const needs = useItems({ tab: "soon", horizon: 7 });
+  const all = useItems({ tab: "active", horizon: 7 });
+  const [showStock, setShowStock] = useState(false);
   const cart = plan.data;
   const prices = usePlanPrices((cart?.item_count ?? 0) > 0);
   const edit = usePlanItem();
@@ -44,6 +46,8 @@ export function Plan() {
 
   const inCart = new Set(cart?.items.map((i) => i.key));
   const suggestions = (needs.data ?? []).filter((i) => !inCart.has(i.key));
+  // Check tồn (3.1 mục 13): đọc thẳng từ Đồ dùng, không có tồn kho riêng.
+  const stock = (all.data ?? []).filter((i) => !inCart.has(i.key));
   const names = new Map(cart?.items.map((i) => [i.key, i.name]));
 
   return (
@@ -60,6 +64,11 @@ export function Plan() {
 
         {/* 3.1: nhiều Kế hoạch; 4.1: món được nhờ mua và món mình đã nhờ */}
         <PlanSwitcher />
+        {cart?.phase && (
+          <p className="hint">
+            <strong>{m1.planMore.phase[cart.phase]}</strong> · {m1.planMore.phaseHint[cart.phase]}
+          </p>
+        )}
         <DelegatedPanel />
 
         {/* 1. Sắp hết: món chưa có trong giỏ */}
@@ -86,6 +95,36 @@ export function Plan() {
               </li>
             ))}
           </ul>
+        </section>
+
+        {/* Check tồn: thêm nhanh bằng nút +, cùng loại dòng Kế hoạch như từ chi tiết món */}
+        <section className="plan-sec" aria-labelledby="plan-stock">
+          <h2 id="plan-stock">{m1.planMore.checkTitle}</h2>
+          <button type="button" className="btn btn--quiet btn--block" aria-expanded={showStock} onClick={() => setShowStock(!showStock)}>
+            {showStock ? m1.planMore.checkHide : m1.planMore.checkShow(stock.length)}
+          </button>
+          {showStock && (
+            <ul className="list">
+              {stock.map((i) => (
+                <li key={i.key} className="plan-row">
+                  <CategoryIcon category={i.category_key} />
+                  <Link to={`/items/${encodeURIComponent(i.key)}`} className="plan-row__text">
+                    <span className="plan-row__name">{i.name}</span>
+                    <span className="plan-row__sub">{stockText(i)}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={t.plan.addLabel(i.name)}
+                    aria-disabled={busyKey === i.key || undefined}
+                    onClick={() => busyKey !== i.key && edit.mutate({ key: i.key, add: true })}
+                  >
+                    <Plus size={20} aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {cart && <AddAnything cart={cart} />}
@@ -176,6 +215,15 @@ function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRe
             <X size={20} aria-hidden />
           </button>
         </>
+      )}
+      {/* 3.1 mục 10.3: món từ dự báo không còn sắp hết thì gợi ý bỏ; món người dùng tự thêm thì chỉ hỏi lại */}
+      {!locked && item.status === "plenty" && (
+        <p className="hint" style={{ flexBasis: "100%", display: "flex", gap: "var(--s2)", alignItems: "center", flexWrap: "wrap" }}>
+          {item.source === "forecast" ? m1.planMore.forecastGone : m1.planMore.plentyKeep}
+          <button type="button" className="btn btn--quiet" aria-disabled={busy || undefined} onClick={() => !busy && onRemove()}>
+            {m1.planMore.removeCta}
+          </button>
+        </p>
       )}
       {editing && <LineEditor item={item} onDone={() => setEditing(false)} />}
     </li>
@@ -275,8 +323,6 @@ function WhereToBuy({ prices, names }: { prices: PlanPrices; names: Map<string, 
   );
 }
 
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
-
 function TripForm({ initial }: { initial: PlanState }) {
   const [st, setSt] = useState<PlanState>(initial);
   const [saved, setSaved] = useState<PlanState>(initial); // bản đã lưu gần nhất, để biết có thay đổi chưa
@@ -304,16 +350,15 @@ function TripForm({ initial }: { initial: PlanState }) {
             <input type="date" value={st.buy_date} onChange={(e) => setSt({ ...st, buy_date: e.target.value })} />
           </label>
           <label>
-            {t.plan.hour}
-            <select
-              value={st.buy_hour ?? ""}
-              onChange={(e) => setSt({ ...st, buy_hour: e.target.value === "" ? null : Number(e.target.value) })}
-            >
-              <option value="">{t.plan.anyTime}</option>
-              {HOURS.map((h) => (
-                <option key={h} value={h}>{`${String(h).padStart(2, "0")}:00`}</option>
-              ))}
-            </select>
+            {m1.planMore.time}
+            <input
+              type="time"
+              value={st.buy_hour == null ? "" : `${String(st.buy_hour).padStart(2, "0")}:${String(st.buy_minute ?? 0).padStart(2, "0")}`}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(":").map(Number);
+                setSt(e.target.value === "" ? { ...st, buy_hour: null, buy_minute: null } : { ...st, buy_hour: h, buy_minute: m });
+              }}
+            />
           </label>
         </div>
         <label>

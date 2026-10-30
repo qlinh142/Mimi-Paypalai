@@ -75,6 +75,18 @@ type Assignment struct {
 	CreatedAt        time.Time        `json:"created_at"`
 	ClosedAt         *time.Time       `json:"closed_at,omitempty"`
 	MatchedReceiptID string           `json:"matched_receipt_id,omitempty"`
+	// Trip: tên, thời gian, ghi chú của Plan gốc, đọc mới mỗi lần (3.1 mục 3B.4, 3B.5:
+	// người nhận luôn thấy bản mới nhất, không phải bản sao). Chỉ có ở danh sách to_me.
+	Trip *Trip `json:"trip,omitempty"`
+}
+
+// Trip là phần thông tin chuyến mua của Plan mà người được nhờ cần biết.
+type Trip struct {
+	PlanName  string `json:"plan_name"` // "" = Kế hoạch chính
+	BuyDate   string `json:"buy_date,omitempty"`
+	BuyHour   *int   `json:"buy_hour,omitempty"`
+	BuyMinute *int   `json:"buy_minute,omitempty"`
+	TripNote  string `json:"trip_note,omitempty"`
 }
 
 // Active: vòng còn mở, Buyer còn quét hóa đơn được.
@@ -105,6 +117,8 @@ type Store interface {
 // Plans là phần Kế hoạch mà vòng mua hộ cần: tên, số lượng của các dòng đang mở.
 type Plans interface {
 	OpenLineInfo(ctx context.Context, uid, planID string, keys []string) (map[string]AssignmentItem, error)
+	// PlanTrip đọc tên và chuyến mua của Plan; Plan đã xóa trả Trip rỗng, không lỗi.
+	PlanTrip(ctx context.Context, uid, planID string) (Trip, error)
 }
 
 type Service struct {
@@ -374,6 +388,11 @@ func (s *Service) Delegated(ctx context.Context, p authz.Principal) (Delegated, 
 	}
 	for _, a := range to {
 		if a.Active() {
+			trip, err := s.plans.PlanTrip(ctx, a.OwnerUID, a.PlanID)
+			if err != nil {
+				return out, err
+			}
+			a.Trip = &trip
 			out.ToMe = append(out.ToMe, a)
 		}
 	}

@@ -12,7 +12,8 @@ func TestHouseholdFlowEmulator(t *testing.T) {
 	s, c, id := emulator(t)
 	ctx := context.Background()
 	owner, buyer := "o"+id, "b"+id
-	mustSet(t, c.Collection("users").Doc(owner), map[string]any{"role": "owner"})
+	mustSet(t, c.Collection("users").Doc(owner), map[string]any{"role": "owner",
+		"plan_state": map[string]any{"buy_date": "2026-10-24", "buy_hour": int64(9), "buy_minute": int64(30), "trip_note": "WinMart gần nhà"}})
 	mustSet(t, c.Collection("users").Doc(buyer), map[string]any{"role": "owner"})
 	ou := c.Collection("users").Doc(owner)
 	for _, g := range []string{"sua-tuoi", "gao"} {
@@ -45,6 +46,10 @@ func TestHouseholdFlowEmulator(t *testing.T) {
 	d, err := svc.Delegated(ctx, bp)
 	if err != nil || len(d.ToMe) != 1 || d.ToMe[0].ID != a.ID {
 		t.Fatalf("delegated %+v %v", d, err)
+	}
+	// 3B.4: người nhận thấy thời gian và ghi chú của Plan gốc.
+	if tr := d.ToMe[0].Trip; tr == nil || tr.BuyDate != "2026-10-24" || tr.BuyMinute == nil || *tr.BuyMinute != 30 || tr.TripNote != "WinMart gần nhà" {
+		t.Fatalf("trip %+v", tr)
 	}
 	if _, err := svc.Cancel(ctx, bp, a.ID); err == nil {
 		t.Fatal("buyer must not cancel owner's assignment")

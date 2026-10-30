@@ -200,7 +200,8 @@ export type PlanSource = "forecast" | "check" | "meal" | "manual";
 /** PATCH /plan/items/{key}: chỉ gửi trường thay đổi. */
 export type PlanLinePatch = Partial<{ qty: number; unit: string; need_by: string; priority: PlanPriority; reason: string }>;
 
-export type PlanState = { buy_date: string; buy_hour: number | null; trip_note: string };
+export type PlanState = { buy_date: string; buy_hour: number | null; buy_minute?: number | null; trip_note: string; reconciled_on?: string };
+export type PlanPhase = "planning" | "shopping" | "reconciled";
 
 export type Cart = {
   plan_id?: string;
@@ -209,6 +210,7 @@ export type Cart = {
   estimate: number | null;     // theo phương án khuyên dùng; null khi chưa món nào có giá
   missing_price: number;
   state: PlanState;
+  phase?: PlanPhase;            // 3.1 mục 18
 };
 
 export type PlanStop = { store: string; groups: string[]; total: number };
@@ -380,6 +382,8 @@ export type Assignment = {
   assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string;
   plan_id: string; status: "assigned" | "shopping" | "completed" | "closed_partial" | "cancelled"; note?: string;
   items: AssignmentItem[]; created_at: string;
+  /** Tên, thời gian, ghi chú của Plan gốc, luôn là bản mới nhất (3.1 mục 3B.4). */
+  trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string };
 };
 export type Delegated = { to_me: Assignment[]; from_me: Assignment[] };
 

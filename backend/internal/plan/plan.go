@@ -65,9 +65,31 @@ type LinePatch struct {
 
 // State là thông tin chuyến mua: ngày, giờ, ghi chú.
 type State struct {
-	BuyDate  string `json:"buy_date"`  // YYYY-MM-DD hoặc "" (chưa chọn)
-	BuyHour  *int   `json:"buy_hour"`  // 0..23, null nếu chưa chọn
-	TripNote string `json:"trip_note"` // tối đa 120 ký tự
+	BuyDate   string `json:"buy_date"`             // YYYY-MM-DD hoặc "" (chưa chọn)
+	BuyHour   *int   `json:"buy_hour"`             // 0..23, null nếu chưa chọn
+	BuyMinute *int   `json:"buy_minute,omitempty"` // 0..59, đi cùng buy_hour (3.1 mục 3.2: "09:30")
+	TripNote  string `json:"trip_note"`            // tối đa 120 ký tự
+	// ReconciledOn: ngày của hóa đơn gần nhất đã đối chiếu Plan này. Chỉ transaction lưu
+	// hóa đơn ghi; client gửi lên bị bỏ qua.
+	ReconciledOn string `json:"reconciled_on,omitempty"`
+}
+
+// Giai đoạn của Plan (3.1 mục 18): planning trước ngày mua, shopping từ ngày mua, reconciled
+// khi đã có hóa đơn đối chiếu sau lần đặt ngày mua gần nhất. Món chưa khớp vẫn open.
+const (
+	PhasePlanning   = "planning"
+	PhaseShopping   = "shopping"
+	PhaseReconciled = "reconciled"
+)
+
+func (st State) phase(today domain.Date) string {
+	if st.ReconciledOn != "" && (st.BuyDate == "" || st.BuyDate <= st.ReconciledOn) {
+		return PhaseReconciled
+	}
+	if st.BuyDate != "" && st.BuyDate <= today.String() {
+		return PhaseShopping
+	}
+	return PhasePlanning
 }
 
 type Store interface {
@@ -126,6 +148,7 @@ type Cart struct {
 	Estimate     *int64     `json:"estimate"`      // tổng theo phương án khuyên dùng; null khi chưa món nào có giá
 	MissingPrice int        `json:"missing_price"` // số món chưa có giá, không cộng vào ước tính
 	State        State      `json:"state"`
+	Phase        string     `json:"phase"` // planning | shopping | reconciled
 }
 
 type Stop struct {
@@ -176,7 +199,8 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Cart, error) {
 	if err != nil {
 		return Cart{}, err
 	}
-	cart := Cart{PlanID: IDFrom(ctx), Items: []CartItem{}, State: state}
+	cart := Cart{PlanID: IDFrom(ctx), Items: []CartItem{}, State: state,
+		Phase: state.phase(domain.Today(s.now(), domain.Location(p.Timezone)))}
 	if len(lines) == 0 {
 		return cart, nil
 	}
@@ -413,6 +437,10 @@ func (s *Service) SetState(ctx context.Context, p authz.Principal, st State) (St
 		return State{}, err
 	}
 	st.TripNote = strings.TrimSpace(st.TripNote)
+	st.ReconciledOn = ""
+	if st.BuyHour == nil {
+		st.BuyMinute = nil
+	}
 	if err := st.validate(domain.Today(s.now(), domain.Location(p.Timezone))); err != nil {
 		return State{}, err
 	}
@@ -438,6 +466,9 @@ func (st State) validate(today domain.Date) error {
 	}
 	if st.BuyHour != nil && (*st.BuyHour < 0 || *st.BuyHour > 23) {
 		return bad("buy_hour", "Giờ mua từ 0 đến 23.")
+	}
+	if st.BuyMinute != nil && (*st.BuyMinute < 0 || *st.BuyMinute > 59) {
+		return bad("buy_minute", "Phút từ 0 đến 59.")
 	}
 	if utf8.RuneCountInString(st.TripNote) > maxTripNote {
 		return bad("trip_note", "Ghi chú tối đa 120 ký tự.")

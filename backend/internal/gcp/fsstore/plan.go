@@ -110,16 +110,24 @@ func (s *Store) State(ctx context.Context, uid string) (plan.State, error) {
 		hh := int(h)
 		st.BuyHour = &hh
 	}
+	if mm, ok := m["buy_minute"].(int64); ok && st.BuyHour != nil {
+		v := int(mm)
+		st.BuyMinute = &v
+	}
+	st.ReconciledOn, _ = snap.Data()["plan_reconciled_on"].(string)
 	return st, nil
 }
 
 func (s *Store) SetState(ctx context.Context, uid string, st plan.State) error {
-	var hour any // nil: chưa chọn giờ
+	var hour, minute any // nil: chưa chọn giờ
 	if st.BuyHour != nil {
 		hour = int64(*st.BuyHour)
+		if st.BuyMinute != nil {
+			minute = int64(*st.BuyMinute)
+		}
 	}
 	_, err := s.planStateDoc(ctx, uid).Update(ctx, []firestore.Update{{Path: "plan_state", Value: map[string]any{
-		"buy_date": st.BuyDate, "buy_hour": hour, "trip_note": st.TripNote, "updated_at": time.Now(),
+		"buy_date": st.BuyDate, "buy_hour": hour, "buy_minute": minute, "trip_note": st.TripNote, "updated_at": time.Now(),
 	}}})
 	if err != nil {
 		return fmt.Errorf("plan set state: %w", err)

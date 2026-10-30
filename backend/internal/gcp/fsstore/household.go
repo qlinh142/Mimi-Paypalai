@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
+	"github.com/smartlife-lab/mimi/backend/internal/plan"
 )
 
 var (
@@ -383,4 +384,36 @@ func (s *Store) Assignments(ctx context.Context, hid, field, uid string, limit i
 		out = append(out, decodeAssignment(d))
 	}
 	return out, nil
+}
+
+// PlanTrip: Plan mặc định giữ plan_state trên users/{uid}, Plan đặt tên trên plans/{id}.
+func (s *Store) PlanTrip(ctx context.Context, uid, planID string) (household.Trip, error) {
+	ref := s.user(uid)
+	named := planID != "" && planID != plan.DefaultPlanID
+	if named {
+		ref = s.user(uid).Collection("plans").Doc(planID)
+	}
+	snap, err := ref.Get(ctx)
+	if isNotFound(err) {
+		return household.Trip{}, nil
+	}
+	if err != nil {
+		return household.Trip{}, fmt.Errorf("plan trip: %w", err)
+	}
+	var t household.Trip
+	if named {
+		t.PlanName, _ = snap.Data()["name"].(string)
+	}
+	m, _ := snap.Data()["plan_state"].(map[string]any)
+	t.BuyDate, _ = m["buy_date"].(string)
+	t.TripNote, _ = m["trip_note"].(string)
+	if h, ok := m["buy_hour"].(int64); ok {
+		hh := int(h)
+		t.BuyHour = &hh
+		if mm, ok := m["buy_minute"].(int64); ok {
+			v := int(mm)
+			t.BuyMinute = &v
+		}
+	}
+	return t, nil
 }

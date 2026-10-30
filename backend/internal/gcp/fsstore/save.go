@@ -293,8 +293,12 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 
 		// Reconcile (3.1 mục 15, Mimi 2.0 mục 19): mua đủ số lượng thì dòng xong; mua thiếu
 		// (cùng chiều đo) thì giữ mở và ghi lượng đã mua. Dòng chưa nhập số lượng coi là đủ.
+		reconciled := map[string]*firestore.DocumentRef{} // doc Plan có món vừa đối chiếu
 		for _, owner := range sortedKeys(planTargets) {
 			for g, t := range planTargets[owner] {
+				if pd := t.ref.Parent.Parent; pd != nil {
+					reconciled[pd.Path] = pd
+				}
 				q, unit := lineQty(lines, g, owner, uid)
 				upd, done := reconcilePlanLine(t.doc, q, unit, r.ID, now)
 				if owner != uid {
@@ -311,6 +315,12 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 				if done && owner == uid {
 					out.PlanDone = append(out.PlanDone, g)
 				}
+			}
+		}
+		// Plan đã có hóa đơn đối chiếu → giai đoạn reconciled (3.1 mục 18).
+		for _, path := range sortedKeys(reconciled) {
+			if err := tx.Update(reconciled[path], []firestore.Update{{Path: "plan_reconciled_on", Value: r.PurchasedOn.String()}}); err != nil {
+				return err
 			}
 		}
 		if asg != nil {

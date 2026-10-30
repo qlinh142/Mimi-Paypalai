@@ -184,14 +184,15 @@ export function usePlanItem() {
   const qc = useQueryClient();
   return useMutation({
     // body: món chưa có trong Đồ dùng (nhóm taxonomy hoặc "custom-..."), 3.1 mục 3A.4.
-    mutationFn: async ({ key, add, body }: { key: string; add: boolean; body?: { name?: string; qty?: number; unit?: string } }): Promise<Cart | null> => {
-      const path = `/plan/items/${encodeURIComponent(key)}${planQuery(currentPlanId())}`;
+    // planId: thêm vào một Kế hoạch đích cụ thể (3.1 mục 3A.4), mặc định là Kế hoạch đang xem.
+    mutationFn: async ({ key, add, body, planId }: { key: string; add: boolean; body?: { name?: string; qty?: number; unit?: string }; planId?: string }): Promise<Cart | null> => {
+      const path = `/plan/items/${encodeURIComponent(key)}${planQuery(planId ?? currentPlanId())}`;
       if (add) return apiSend<Cart>("PUT", path, body);
       await apiSend<void>("DELETE", path);
       return null;
     },
     onSuccess: (data, v) => {
-      if (v.add && data) qc.setQueryData(qk.cart(currentPlanId()), data);
+      if (v.add && data) qc.setQueryData(qk.cart(v.planId ?? currentPlanId()), data);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: qk.plan });

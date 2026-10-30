@@ -6,9 +6,9 @@ import { ApiError } from "../api/client";
 import {
   useAssignments, useBasketPrices, useDelegated, useHousehold, useMe, usePlanItem, usePlanMeta, usePlans, useTaxonomySearch,
 } from "../api/hooks";
-import type { Cart } from "../api/types";
+import type { Assignment, Cart } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
-import { formatVnd, normalizeVi } from "../lib/text";
+import { formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : t.common.genericError;
@@ -21,10 +21,12 @@ export function PlanSwitcher() {
   const id = useCurrentPlanId();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null); // tên đang sửa của Kế hoạch đặt tên
   const list = plans.data ?? [];
   const current = list.find((p) => p.id === id);
   // Kế hoạch đã xóa ở máy khác: quay về Kế hoạch chính.
-  if (plans.data && !current && id !== DEFAULT_PLAN) setCurrentPlanId(DEFAULT_PLAN);
+  // Chờ danh sách tải xong: ngay sau khi tạo Kế hoạch mới, danh sách cũ chưa có nó.
+  if (plans.data && !plans.isFetching && !current && id !== DEFAULT_PLAN) setCurrentPlanId(DEFAULT_PLAN);
   return (
     <section className="plan-sec" aria-label={m1.plans.label}>
       <div className="chips" role="tablist" aria-label={m1.plans.label}>
@@ -68,8 +70,25 @@ export function PlanSwitcher() {
           {meta.create.isError && <p className="error" role="alert">{errText(meta.create.error)}</p>}
         </form>
       )}
+      {current && !current.default && renaming !== null && (
+        <form
+          className="plan-form__row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!renaming.trim() || meta.update.isPending) return;
+            meta.update.mutate({ id: current.id, name: renaming.trim() }, { onSuccess: () => setRenaming(null) });
+          }}
+        >
+          <input value={renaming} maxLength={40} aria-label={m1.planMore.rename} onChange={(e) => setRenaming(e.target.value)} />
+          <button type="submit" className="btn btn--primary" aria-disabled={!renaming.trim() || undefined}>{m1.planMore.saveName}</button>
+        </form>
+      )}
+      {meta.update.isError && <p className="error" role="alert">{errText(meta.update.error)}</p>}
       {current && !current.default && (
         <div className="plan-form__row">
+          <button type="button" className="btn btn--quiet" onClick={() => setRenaming(renaming === null ? current.name : null)}>
+            {m1.planMore.rename}
+          </button>
           <button
             type="button"
             className="btn btn--quiet"
@@ -205,6 +224,7 @@ export function DelegatedPanel() {
                 <span>{m1.delegated.from(a.owner_display_name || m1.assign.someone)}</span>
                 <span>{m1.assign.status[a.status]}</span>
               </div>
+              {a.trip && <TripLine trip={a.trip} />}
               <div className="plan-stop__items">
                 {a.items.filter((i) => i.status === "assigned").map((i) => i.name_display).join(", ")}
               </div>
@@ -273,5 +293,62 @@ export function BasketPricesPanel({ cart }: { cart: Cart }) {
       {d.no_history.length > 0 && <p className="hint">{m1.basketPrices.noHistory(label(d.no_history))}</p>}
       <p className="hint">{m1.basketPrices.disclaimer}</p>
     </section>
+  );
+}
+
+/** 3B.4: người được nhờ thấy tên, thời gian, ghi chú của Plan gốc (luôn là bản mới nhất). */
+function TripLine({ trip }: { trip: NonNullable<Assignment["trip"]> }) {
+  const time = trip.buy_hour != null ? `${String(trip.buy_hour).padStart(2, "0")}:${String(trip.buy_minute ?? 0).padStart(2, "0")}` : "";
+  const when = [trip.buy_date ? formatDayMonth(trip.buy_date) : "", time].filter(Boolean).join(" · ");
+  return (
+    <p className="hint">
+      {m1.planMore.tripFor(trip.plan_name || m1.plans.main)}
+      {when && ` · ${when}`}
+      {trip.trip_note && <><br />{trip.trip_note}</>}
+    </p>
+  );
+}
+
+/**
+ * Nút "Thêm vào Kế hoạch" ở chi tiết món (3.1 mục 13.1 cách 2). Có nhiều Kế hoạch đang dùng
+ * thì hỏi Kế hoạch đích (mục 3A.4); một Kế hoạch thì thêm thẳng.
+ */
+export function AddToPlanButton({ itemKey }: { itemKey: string }) {
+  const plans = usePlans();
+  const edit = usePlanItem();
+  const [picking, setPicking] = useState(false);
+  const [done, setDone] = useState("");
+  const active = (plans.data ?? []).filter((p) => p.status === "active");
+  const label = (p: { default: boolean; name: string }) => (p.default ? m1.plans.main : p.name);
+  const add = (planId: string, name: string) =>
+    edit.mutate({ key: itemKey, add: true, planId }, { onSuccess: () => { setDone(m1.planMore.addedTo(name)); setPicking(false); } });
+  return (
+    <div className="plan-form">
+      <button
+        type="button"
+        className="btn btn--primary btn--block"
+        aria-expanded={active.length > 1 ? picking : undefined}
+        aria-disabled={edit.isPending || undefined}
+        onClick={() => {
+          if (edit.isPending) return;
+          if (active.length > 1) setPicking(!picking);
+          else add(active[0]?.id ?? DEFAULT_PLAN, active[0] ? label(active[0]) : m1.plans.main);
+        }}
+      >
+        <Plus size={18} aria-hidden /> {m1.planMore.addToPlan}
+      </button>
+      {picking && (
+        <fieldset>
+          <legend>{m1.planMore.pickPlan}</legend>
+          {active.map((p) => (
+            <button key={p.id} type="button" className="btn btn--quiet btn--block" onClick={() => add(p.id, label(p))}>
+              {label(p)}
+            </button>
+          ))}
+        </fieldset>
+      )}
+      {done && <p className="hint" role="status">{done}</p>}
+      {edit.isError && <p className="error" role="alert">{errText(edit.error)}</p>}
+    </div>
   );
 }
