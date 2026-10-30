@@ -56,6 +56,9 @@ type Group struct {
 	Unit string `json:"unit"`
 	// CountUnit là count_unit_code (egg, piece, roll...) cho nhóm đếm; UI tự dịch.
 	CountUnit string `json:"count_unit,omitempty"`
+	// Active=false: nhóm đã ngừng dùng (0.2 mục 10). Vẫn tra được để đọc lịch sử, nhưng
+	// không nhận cho phân loại mới và không hiện trong gợi ý.
+	Active bool `json:"active"`
 }
 
 type Parent struct {
@@ -88,6 +91,7 @@ func init() {
 		Groups  []struct {
 			Group
 			CountUnit *string `json:"count_unit"`
+			Active    *bool   `json:"active"`
 		} `json:"groups"`
 	}
 	if err := json.Unmarshal(groupsJSON, &raw); err != nil {
@@ -99,12 +103,16 @@ func init() {
 		if g.CountUnit != nil {
 			gg.CountUnit = *g.CountUnit
 		}
+		gg.Active = g.Active == nil || *g.Active
 		data.Groups = append(data.Groups, gg)
 	}
 	byKey = make(map[string]*Group, len(data.Groups))
 	for i := range data.Groups {
 		g := &data.Groups[i]
 		byKey[g.Key] = g
+		if !g.Active {
+			continue
+		}
 		byNorm = append(byNorm, searchEntry{g: g, vi: domain.NormalizeVi(g.Labels.VI), en: domain.NormalizeVi(g.Labels.EN)})
 	}
 }
@@ -129,14 +137,16 @@ func Lookup(key string) (Group, bool) {
 	return *g, true
 }
 
-// Has báo khóa thuộc taxonomy đang dùng.
-func Has(key string) bool { _, ok := byKey[Normalize(key)]; return ok }
+// Has báo khóa thuộc taxonomy và đang dùng (active), tức nhận được cho phân loại mới.
+func Has(key string) bool { g, ok := byKey[Normalize(key)]; return ok && g.Active }
 
 // Keys trả mọi group_key, theo thứ tự trong tài liệu 0.2 (dùng làm enum cho Gemini).
 func Keys() []string {
-	out := make([]string, len(data.Groups))
-	for i, g := range data.Groups {
-		out[i] = g.Key
+	out := make([]string, 0, len(data.Groups))
+	for _, g := range data.Groups {
+		if g.Active {
+			out = append(out, g.Key)
+		}
 	}
 	return out
 }
@@ -217,4 +227,24 @@ func DefaultUnit(key string) (domain.Unit, bool) {
 		return domain.UnitItem, true
 	}
 	return "", false
+}
+
+// spendingByParent: danh mục chi tiêu mặc định theo nhóm cha. Nhờ vậy khi AI hoặc người
+// dùng đã chọn được nhóm sản phẩm thì dòng hóa đơn cũng có danh mục, không còn "Cần phân loại".
+var spendingByParent = map[string]string{
+	"staples-grains": "do-kho", "bread-noodles-starches": "do-kho", "milk-dairy": "sua",
+	"eggs-meat": "tuoi-song", "fish-seafood": "tuoi-song", "vegetables-roots": "rau-cu",
+	"cooking-vegetables": "rau-cu", "fruit": "trai-cay", "condiments-oils-sauces": "gia-vi",
+	"beverages": "do-uong", "biscuits-sweets-snacks": "banh-keo", "laundry": "hoa-pham",
+	"household-cleaning": "hoa-pham", "paper-disposables": "giay", "hair-care": "ve-sinh",
+	"bath-body-care": "ve-sinh", "oral-care-shaving": "ve-sinh", "skin-care-cosmetics": "my-pham",
+	"baby-maternity": "me-be", "personal-care-wellness": "ve-sinh",
+}
+
+// SpendingCategory trả danh mục chi tiêu mặc định của một nhóm; "" khi khóa ngoài taxonomy.
+func SpendingCategory(groupKey string) string {
+	if g, ok := byKey[Normalize(groupKey)]; ok {
+		return spendingByParent[g.Parent]
+	}
+	return ""
 }

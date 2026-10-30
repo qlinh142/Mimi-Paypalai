@@ -1,10 +1,11 @@
 import { uiLang } from "../i18n";
+import taxonomyGroups from "./taxonomy-groups.json";
 /**
  * Backend giả cho chế độ VITE_API_MODE=mock. Dữ liệu mẫu, không phải dữ liệu thật.
  * Quy tắc trạng thái ở đây chỉ mô phỏng; bản thật do API Go tính (internal/domain).
  */
 import type {
-  Basket, Cart, CartItem, HomeSummary, Item, Mandate, MandateReason, Me, Notification, Order, OrderLine, OrderState,
+  Basket, CanonicalUnit, Cart, CartItem, HomeSummary, Item, Mandate, MandateReason, Me, Notification, Order, OrderLine, OrderState,
   PlanLinePatch, PlanPrices, PlanState, PlanStop, ReceiptDraft, RefundReason, SpendingReport, StockStatus,
 } from "./types";
 
@@ -275,15 +276,22 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
     await delay(1400);
     const form = init.body as FormData;
     // Cùng dạng với Draft của API thật (api/openapi.yaml).
-    const line = (line_id: string, en: string, vi: string, qty: number, vnd: number, category_key?: string) => ({
+    type P = { brand?: string; product_name?: string; group_key?: string; canonical_quantity?: number; canonical_unit?: CanonicalUnit; raw_name: string };
+    const line = (line_id: string, en: string, vi: string, qty: number, vnd: number, category_key: string | undefined, p: P) => ({
       line_id, name: L ? en : vi, qty, amount: String(vnd), amount_vnd: vnd, habit: true,
       ...(category_key ? { category_key } : {}),
+      ...p,
+      detail_name: [p.brand, p.product_name].filter(Boolean).join(" ") || undefined,
     });
     const lines = [
-      line("l1", "Unsweetened fresh milk 1L", "Sữa tươi không đường 1L", 2, 64_000, "sua"),
-      line("l2", "Dish soap 750ml", "Nước rửa chén 750ml", 1, 38_000, "hoa-pham"),
-      line("l3", "Eggs, box of 10", "Trứng gà hộp 10", 1, 36_000, "tuoi-song"),
-      { ...line("l4", "Butter cookies", "Bánh quy bơ", 1, 74_000), needs_review: true, review_reasons: ["missing_category", "missing_group"] as ("missing_category" | "missing_group")[] },
+      line("l1", "Unsweetened fresh milk 1L", "Sữa tươi không đường 1L", 2, 64_000, "sua",
+        { raw_name: "VINAMILK SUA TUOI KHONG DUONG 1L", brand: "Vinamilk", product_name: L ? "Unsweetened" : "Không đường", group_key: "sua-tuoi", canonical_quantity: 2000, canonical_unit: "ml" }),
+      line("l2", "Dish soap 750ml", "Nước rửa chén 750ml", 1, 38_000, "hoa-pham",
+        { raw_name: "SUNLIGHT CHANH 750ML", brand: "Sunlight", product_name: L ? "Lemon" : "Chanh", group_key: "nuoc-rua-chen", canonical_quantity: 750, canonical_unit: "ml" }),
+      line("l3", "Eggs, box of 10", "Trứng gà hộp 10", 1, 36_000, "tuoi-song",
+        { raw_name: "TRUNG GA HOP 10", group_key: "trung-ga", canonical_quantity: 10, canonical_unit: "item" }),
+      { ...line("l4", "Butter cookies", "Bánh quy bơ", 1, 74_000, undefined, { raw_name: "BANH QUY BO" }),
+        needs_review: true, review_reasons: ["missing_category", "missing_group"] as ("missing_category" | "missing_group")[] },
     ];
     const draft: ReceiptDraft = {
       receipt_id: String(form.get("receipt_id")),
@@ -305,7 +313,8 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
     // Như backend: từ chối trường lạ (DisallowUnknownFields), để bản thử bắt được lỗi lệch hợp đồng.
     const body = JSON.parse(String(init.body)) as Record<string, unknown> & { receipt_id: string; lines?: Record<string, unknown>[] };
     const top = ["receipt_id", "store", "purchased_on", "currency", "discount_total", "lines", "use_for_prediction", "confirm_duplicate", "source_plan_id", "assignment_id"];
-    const lineKeys = ["line_id", "name", "qty", "unit", "amount", "category_key", "group_key", "habit"];
+    const lineKeys = ["line_id", "name", "qty", "unit", "amount", "category_key", "group_key", "habit",
+      "raw_name", "brand", "product_name", "source_language", "package_count", "package_size", "package_unit"];
     const unknown =
       Object.keys(body).some((k) => !top.includes(k)) ||
       (body.lines ?? []).some((l) => Object.keys(l).some((k) => !lineKeys.includes(k)));
@@ -559,12 +568,11 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
 
 // ================= Bộ spec Mimi 1.0 (bản thử) =================
 
-const TAXONOMY = [
-  ["sua-tuoi", "sua", "Sữa tươi", "Fresh milk"], ["sua-chua", "sua", "Sữa chua", "Yogurt"], ["banh-mi", "do-kho", "Bánh mì", "Bread"],
-  ["rau-la", "tuoi-song", "Rau lá", "Leafy greens"], ["thit-heo", "tuoi-song", "Thịt heo", "Pork"], ["ca-tuoi", "tuoi-song", "Cá tươi", "Fresh fish"],
-  ["nuoc-giat", "hoa-pham", "Nước giặt", "Laundry liquid"], ["sua-tam", "ve-sinh", "Sữa tắm", "Body wash"], ["mi-goi", "do-kho", "Mì gói", "Instant noodles"],
-  ["dau-an", "gia-vi", "Dầu ăn", "Cooking oil"], ["trai-cay", "tuoi-song", "Trái cây", "Fruit"], ["ta-giay", "me-be", "Tã giấy", "Diapers"],
-].map(([key, parent, vi, en]) => ({ key, parent, labels: { vi, en }, label: L ? en : vi, measurement: "count", unit: "item" }));
+// Bản sao của backend/internal/taxonomy/groups.json (0.2) để bản thử có đủ 300 nhóm.
+// Khi taxonomy đổi: chép lại file đó vào src/api/taxonomy-groups.json.
+const TAXONOMY = taxonomyGroups.groups.map((g) => ({
+  key: g.key, parent: g.parent, labels: g.labels, label: L ? g.labels.en : g.labels.vi, measurement: g.measurement, unit: g.unit,
+}));
 
 const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
 
@@ -633,7 +641,8 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
 
   if (method === "GET" && p === "/taxonomy") {
     const q = fold(url.searchParams.get("q") ?? "");
-    return json({ version: "1.2-mock", groups: TAXONOMY.filter((g) => !q || fold(g.labels.vi).includes(q) || g.labels.en.toLowerCase().includes(q)).slice(0, 8) });
+    const hits = TAXONOMY.filter((g) => !q || fold(g.labels.vi).includes(q) || g.labels.en.toLowerCase().includes(q));
+    return json({ version: taxonomyGroups.version, groups: q ? hits.slice(0, 8) : hits });
   }
 
   // Nhiều Kế hoạch

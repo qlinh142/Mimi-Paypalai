@@ -149,6 +149,13 @@ export type SaveReceiptRequest = {
     category_key: string;
     group_key: string;
     habit: boolean;
+    raw_name?: string;
+    brand?: string;
+    product_name?: string;
+    source_language?: string;
+    package_count?: number;
+    package_size?: number;
+    package_unit?: string;
   }[];
   use_for_prediction: boolean;
   confirm_duplicate: boolean;

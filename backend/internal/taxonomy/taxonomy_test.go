@@ -88,3 +88,23 @@ func TestBrand(t *testing.T) {
 		t.Fatal("unknown brand")
 	}
 }
+
+func TestSpendingCategoryCoversEveryParent(t *testing.T) {
+	for _, p := range All().Parents {
+		if spendingByParent[p.Key] == "" {
+			t.Errorf("parent %s has no spending category", p.Key)
+		}
+	}
+	if got := SpendingCategory("sua_tuoi"); got != "sua" {
+		t.Errorf("sua_tuoi → %q, want sua", got)
+	}
+	if got := SpendingCategory("khong-co"); got != "" {
+		t.Errorf("unknown key → %q", got)
+	}
+}
+
+func TestEveryGroupActiveByDefault(t *testing.T) {
+	if n := len(Keys()); n != 300 {
+		t.Fatalf("active keys = %d, want 300", n)
+	}
+}

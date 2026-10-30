@@ -1,0 +1,3447 @@
+{
+ "version": "1.2",
+ "parents": [
+  {
+   "key": "staples-grains",
+   "labels": {
+    "vi": "Lương thực – ngũ cốc",
+    "en": "Staples & grains"
+   }
+  },
+  {
+   "key": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh mì – mì – thực phẩm tinh bột",
+    "en": "Bread, noodles & starches"
+   }
+  },
+  {
+   "key": "milk-dairy",
+   "labels": {
+    "vi": "Sữa – sản phẩm từ sữa",
+    "en": "Milk & dairy"
+   }
+  },
+  {
+   "key": "eggs-meat",
+   "labels": {
+    "vi": "Trứng – thịt",
+    "en": "Eggs & meat"
+   }
+  },
+  {
+   "key": "fish-seafood",
+   "labels": {
+    "vi": "Cá – hải sản",
+    "en": "Fish & seafood"
+   }
+  },
+  {
+   "key": "vegetables-roots",
+   "labels": {
+    "vi": "Rau – củ",
+    "en": "Vegetables & roots"
+   }
+  },
+  {
+   "key": "cooking-vegetables",
+   "labels": {
+    "vi": "Rau quả dùng nấu ăn",
+    "en": "Cooking vegetables"
+   }
+  },
+  {
+   "key": "fruit",
+   "labels": {
+    "vi": "Trái cây",
+    "en": "Fruit"
+   }
+  },
+  {
+   "key": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Gia vị – dầu – nước chấm",
+    "en": "Condiments, oils & sauces"
+   }
+  },
+  {
+   "key": "beverages",
+   "labels": {
+    "vi": "Nước uống",
+    "en": "Beverages"
+   }
+  },
+  {
+   "key": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Bánh – kẹo – đồ ăn vặt",
+    "en": "Biscuits, sweets & snacks"
+   }
+  },
+  {
+   "key": "laundry",
+   "labels": {
+    "vi": "Giặt giũ",
+    "en": "Laundry"
+   }
+  },
+  {
+   "key": "household-cleaning",
+   "labels": {
+    "vi": "Vệ sinh nhà cửa",
+    "en": "Household cleaning"
+   }
+  },
+  {
+   "key": "paper-disposables",
+   "labels": {
+    "vi": "Giấy – đồ dùng tiêu hao",
+    "en": "Paper & disposables"
+   }
+  },
+  {
+   "key": "hair-care",
+   "labels": {
+    "vi": "Chăm sóc tóc",
+    "en": "Hair care"
+   }
+  },
+  {
+   "key": "bath-body-care",
+   "labels": {
+    "vi": "Tắm – chăm sóc cơ thể",
+    "en": "Bath & body care"
+   }
+  },
+  {
+   "key": "oral-care-shaving",
+   "labels": {
+    "vi": "Chăm sóc răng miệng – cạo râu",
+    "en": "Oral care & shaving"
+   }
+  },
+  {
+   "key": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Chăm sóc da – mỹ phẩm",
+    "en": "Skin care & cosmetics"
+   }
+  },
+  {
+   "key": "baby-maternity",
+   "labels": {
+    "vi": "Em bé – mẹ và bé",
+    "en": "Baby & maternity"
+   }
+  },
+  {
+   "key": "personal-care-wellness",
+   "labels": {
+    "vi": "Chăm sóc cá nhân – sức khỏe",
+    "en": "Personal care & wellness"
+   }
+  }
+ ],
+ "groups": [
+  {
+   "key": "gao",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Gạo",
+    "en": "Rice"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "gao-nep",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Gạo nếp",
+    "en": "Glutinous rice"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "yen-mach",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Yến mạch",
+    "en": "Oats"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ngu-coc",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Ngũ cốc",
+    "en": "Cereal"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-mi",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Bột mì",
+    "en": "Wheat flour"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-gao",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Bột gạo",
+    "en": "Rice flour"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-nang",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Bột năng",
+    "en": "Tapioca starch"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-bap",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Bột bắp",
+    "en": "Cornstarch"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-chien-gion",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Bột chiên giòn",
+    "en": "Crispy frying flour"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-chien-xu",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Bột chiên xù",
+    "en": "Breadcrumbs"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "duong",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Đường",
+    "en": "Sugar"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "duong-phen",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Đường phèn",
+    "en": "Rock sugar"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "muoi",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Muối",
+    "en": "Salt"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "hat-quinoa",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Hạt quinoa",
+    "en": "Quinoa"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "hat-chia",
+   "parent": "staples-grains",
+   "labels": {
+    "vi": "Hạt chia",
+    "en": "Chia seeds"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-mi",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh mì",
+    "en": "Bread"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "banh-mi-sandwich",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh mì sandwich",
+    "en": "Sandwich bread"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-mi-nguyen-cam",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh mì nguyên cám",
+    "en": "Whole wheat bread"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-mi-baguette",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh mì baguette",
+    "en": "Baguette"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "mi-an-lien",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Mì ăn liền",
+    "en": "Instant noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "mi-trung",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Mì trứng",
+    "en": "Egg noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "mi-y",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Mì Ý",
+    "en": "Pasta"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "pho-kho",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Phở khô",
+    "en": "Dried pho noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bun-kho",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bún khô",
+    "en": "Dried rice vermicelli"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "mien",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Miến",
+    "en": "Glass noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "hu-tieu-kho",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Hủ tiếu khô",
+    "en": "Dried hu tieu noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "nui",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Nui",
+    "en": "Macaroni"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-da",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh đa",
+    "en": "Dried rice crackers/noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-pho",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Bánh phở",
+    "en": "Fresh pho noodles"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "chao-an-lien",
+   "parent": "bread-noodles-starches",
+   "labels": {
+    "vi": "Cháo ăn liền",
+    "en": "Instant porridge"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "sua-tuoi",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa tươi",
+    "en": "Fresh milk"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-tiet-trung",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa tiệt trùng",
+    "en": "UHT milk"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-thanh-trung",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa thanh trùng",
+    "en": "Pasteurized milk"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-bot",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa bột",
+    "en": "Milk powder"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "sua-dac",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa đặc",
+    "en": "Condensed milk"
+   },
+   "measurement": "mass_or_volume",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sua-dau-nanh",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa đậu nành",
+    "en": "Soy milk"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-hat",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa hạt",
+    "en": "Nut milk"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-yen-mach",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa yến mạch",
+    "en": "Oat milk"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-chua",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa chua",
+    "en": "Yogurt"
+   },
+   "measurement": "mass_or_volume",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sua-chua-uong",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa chua uống",
+    "en": "Drinking yogurt"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "pho-mai",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Phô mai",
+    "en": "Cheese"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "bo-sua",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Bơ sữa",
+    "en": "Butter"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "kem-sua",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Kem sữa",
+    "en": "Dairy cream"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "whipping-cream",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Whipping cream",
+    "en": "Whipping cream"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-dinh-duong",
+   "parent": "milk-dairy",
+   "labels": {
+    "vi": "Sữa dinh dưỡng",
+    "en": "Nutritional milk"
+   },
+   "measurement": "volume_or_mass",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "trung",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Trứng",
+    "en": "Eggs"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "egg"
+  },
+  {
+   "key": "trung-ga",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Trứng gà",
+    "en": "Chicken eggs"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "egg"
+  },
+  {
+   "key": "trung-vit",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Trứng vịt",
+    "en": "Duck eggs"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "egg"
+  },
+  {
+   "key": "trung-cut",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Trứng cút",
+    "en": "Quail eggs"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "egg"
+  },
+  {
+   "key": "thit-heo",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt heo",
+    "en": "Pork"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thit-bo",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt bò",
+    "en": "Beef"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thit-ga",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt gà",
+    "en": "Chicken"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thit-vit",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt vịt",
+    "en": "Duck meat"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thit-de",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt dê",
+    "en": "Goat meat"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thit-cuu",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt cừu",
+    "en": "Lamb"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thit-xay",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Thịt xay",
+    "en": "Ground meat"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "suon",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Sườn",
+    "en": "Ribs"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "xuc-xich",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Xúc xích",
+    "en": "Sausage"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "gio",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Giò",
+    "en": "Vietnamese pork sausage"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "cha",
+   "parent": "eggs-meat",
+   "labels": {
+    "vi": "Chả",
+    "en": "Vietnamese meat loaf"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá",
+    "en": "Fish"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-hoi",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá hồi",
+    "en": "Salmon"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-basa",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá basa",
+    "en": "Basa fish"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-thu",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá thu",
+    "en": "Mackerel"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-ngu",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá ngừ",
+    "en": "Tuna"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-ro-phi",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá rô phi",
+    "en": "Tilapia"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-tram",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cá trắm",
+    "en": "Grass carp"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "tom",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Tôm",
+    "en": "Shrimp"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "tom-the",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Tôm thẻ",
+    "en": "Whiteleg shrimp"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "tom-su",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Tôm sú",
+    "en": "Tiger prawn"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "muc",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Mực",
+    "en": "Squid"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bach-tuoc",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Bạch tuộc",
+    "en": "Octopus"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "cua",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Cua",
+    "en": "Crab"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "ghe",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Ghẹ",
+    "en": "Swimming crab"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "ngao",
+   "parent": "fish-seafood",
+   "labels": {
+    "vi": "Ngao",
+    "en": "Clams"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "rau-cai",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Rau cải",
+    "en": "Leafy mustard greens"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "rau-muong",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Rau muống",
+    "en": "Water spinach"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "rau-ngot",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Rau ngót",
+    "en": "Sweet leaf"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "rau-mong-toi",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Rau mồng tơi",
+    "en": "Malabar spinach"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "xa-lach",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Xà lách",
+    "en": "Lettuce"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "cai-thao",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Cải thảo",
+    "en": "Napa cabbage"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bap-cai",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Bắp cải",
+    "en": "Cabbage"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "sup-lo",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Súp lơ",
+    "en": "Cauliflower"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-rot",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Cà rốt",
+    "en": "Carrots"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "khoai-tay",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Khoai tây",
+    "en": "Potatoes"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "khoai-lang",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Khoai lang",
+    "en": "Sweet potatoes"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "cu-cai",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Củ cải",
+    "en": "Radish"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "hanh-tay",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Hành tây",
+    "en": "Onions"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "hanh-la",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Hành lá",
+    "en": "Spring onions"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "toi",
+   "parent": "vegetables-roots",
+   "labels": {
+    "vi": "Tỏi",
+    "en": "Garlic"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-chua",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Cà chua",
+    "en": "Tomatoes"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dua-chuot",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Dưa chuột",
+    "en": "Cucumbers"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bi-do",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Bí đỏ",
+    "en": "Pumpkin"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bi-xanh",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Bí xanh",
+    "en": "Winter melon"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "muop",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Mướp",
+    "en": "Luffa"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bau",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Bầu",
+    "en": "Bottle gourd"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-tim",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Cà tím",
+    "en": "Eggplant"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dau-co-ve",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Đậu cô ve",
+    "en": "Green beans"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dau-ha-lan",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Đậu Hà Lan",
+    "en": "Peas"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ngo",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Ngô",
+    "en": "Corn"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nam",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Nấm",
+    "en": "Mushrooms"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ot",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Ớt",
+    "en": "Chili peppers"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "gung",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Gừng",
+    "en": "Ginger"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "sa",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Sả",
+    "en": "Lemongrass"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "rau-thom",
+   "parent": "cooking-vegetables",
+   "labels": {
+    "vi": "Rau thơm",
+    "en": "Fresh herbs"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "tao",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Táo",
+    "en": "Apples"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "cam",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Cam",
+    "en": "Oranges"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "quyt",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Quýt",
+    "en": "Mandarins"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "buoi",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Bưởi",
+    "en": "Pomelo"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "chuoi",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Chuối",
+    "en": "Bananas"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dua-hau",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Dưa hấu",
+    "en": "Watermelon"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "dua-luoi",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Dưa lưới",
+    "en": "Melon"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nho",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Nho",
+    "en": "Grapes"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "le",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Lê",
+    "en": "Pears"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "xoai",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Xoài",
+    "en": "Mangoes"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thanh-long",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Thanh long",
+    "en": "Dragon fruit"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dua",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Dứa",
+    "en": "Pineapple"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "qua-bo",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Quả bơ",
+    "en": "Avocado"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "kiwi",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Kiwi",
+    "en": "Kiwi"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dau-tay",
+   "parent": "fruit",
+   "labels": {
+    "vi": "Dâu tây",
+    "en": "Strawberries"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dau-an",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Dầu ăn",
+    "en": "Cooking oil"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-o-liu",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Dầu ô liu",
+    "en": "Olive oil"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-me",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Dầu mè",
+    "en": "Sesame oil"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-mam",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Nước mắm",
+    "en": "Fish sauce"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-tuong",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Nước tương",
+    "en": "Soy sauce"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-hao",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Dầu hào",
+    "en": "Oyster sauce"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "tuong-ot",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Tương ớt",
+    "en": "Chili sauce"
+   },
+   "measurement": "mass_or_volume",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "tuong-ca",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Tương cà",
+    "en": "Ketchup"
+   },
+   "measurement": "mass_or_volume",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "mayonnaise",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Mayonnaise",
+    "en": "Mayonnaise"
+   },
+   "measurement": "mass_or_volume",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "giam",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Giấm",
+    "en": "Vinegar"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "hat-nem",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Hạt nêm",
+    "en": "Seasoning granules"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-ngot",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Bột ngọt",
+    "en": "MSG"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "tieu",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Tiêu",
+    "en": "Pepper"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "sot-nau-an",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Sốt nấu ăn",
+    "en": "Cooking sauce"
+   },
+   "measurement": "mass_or_volume",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "gia-vi-nau-an",
+   "parent": "condiments-oils-sauces",
+   "labels": {
+    "vi": "Gia vị nấu ăn",
+    "en": "Cooking seasoning"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-loc",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước lọc",
+    "en": "Drinking water"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-khoang",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước khoáng",
+    "en": "Mineral water"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-ngot",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước ngọt",
+    "en": "Soft drinks"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-trai-cay",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước trái cây",
+    "en": "Fruit juice"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-dua",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước dừa",
+    "en": "Coconut water"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "tra-dong-chai",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Trà đóng chai",
+    "en": "Bottled tea"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "ca-phe-dong-chai",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Cà phê đóng chai",
+    "en": "Bottled coffee"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-tang-luc",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước tăng lực",
+    "en": "Energy drinks"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-dien-giai",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước điện giải",
+    "en": "Electrolyte drinks"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-yen",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Nước yến",
+    "en": "Bird's nest drink"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "tra",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Trà",
+    "en": "Tea"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "ca-phe",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Cà phê",
+    "en": "Coffee"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ca-phe-hoa-tan",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Cà phê hòa tan",
+    "en": "Instant coffee"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "bot-cacao",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Bột cacao",
+    "en": "Cocoa powder"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "bot-do-uong",
+   "parent": "beverages",
+   "labels": {
+    "vi": "Bột đồ uống",
+    "en": "Drink powder"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-quy",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Bánh quy",
+    "en": "Cookies"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-cracker",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Bánh cracker",
+    "en": "Crackers"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-xop",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Bánh xốp",
+    "en": "Wafer biscuits"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "banh-bong-lan",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Bánh bông lan",
+    "en": "Sponge cake"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "banh-gao",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Bánh gạo",
+    "en": "Rice crackers"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "snack",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Snack",
+    "en": "Snacks"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "khoai-tay-chien",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Khoai tây chiên",
+    "en": "Potato chips"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "rong-bien-an-lien",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Rong biển ăn liền",
+    "en": "Seaweed snacks"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "chocolate",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Chocolate",
+    "en": "Chocolate"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "keo",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Kẹo",
+    "en": "Candy"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "keo-cao-su",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Kẹo cao su",
+    "en": "Chewing gum"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "hat-dieu",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Hạt điều",
+    "en": "Cashews"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "hanh-nhan",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Hạnh nhân",
+    "en": "Almonds"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "dau-phong",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Đậu phộng",
+    "en": "Peanuts"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "trai-cay-say",
+   "parent": "biscuits-sweets-snacks",
+   "labels": {
+    "vi": "Trái cây sấy",
+    "en": "Dried fruit"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-giat",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Nước giặt",
+    "en": "Laundry detergent"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "bot-giat",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Bột giặt",
+    "en": "Laundry powder"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "vien-giat",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Viên giặt",
+    "en": "Laundry pods"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "nuoc-xa",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Nước xả",
+    "en": "Fabric softener"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-tay-quan-ao",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Nước tẩy quần áo",
+    "en": "Laundry bleach"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-giat-do-em-be",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Nước giặt đồ em bé",
+    "en": "Baby laundry detergent"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-giat-do-lot",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Nước giặt đồ lót",
+    "en": "Underwear detergent"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "chat-tay-vet-ban",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Chất tẩy vết bẩn",
+    "en": "Stain remover"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "xit-thom-quan-ao",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Xịt thơm quần áo",
+    "en": "Fabric refresher"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "tui-giat",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Túi giặt",
+    "en": "Laundry bag"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "giay-thom-quan-ao",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Giấy thơm quần áo",
+    "en": "Dryer sheets"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "sheet"
+  },
+  {
+   "key": "chat-lam-mem-vai",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Chất làm mềm vải",
+    "en": "Fabric conditioner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "chat-ve-sinh-may-giat",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Chất vệ sinh máy giặt",
+    "en": "Washing machine cleaner"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "tui-hut-am",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Túi hút ẩm",
+    "en": "Moisture absorber"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "bag"
+  },
+  {
+   "key": "tui-thom",
+   "parent": "laundry",
+   "labels": {
+    "vi": "Túi thơm",
+    "en": "Scent sachet"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "bag"
+  },
+  {
+   "key": "nuoc-rua-chen",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước rửa chén",
+    "en": "Dishwashing liquid"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "vien-rua-chen",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Viên rửa chén",
+    "en": "Dishwasher tablets"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "nuoc-lau-san",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước lau sàn",
+    "en": "Floor cleaner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-lau-kinh",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước lau kính",
+    "en": "Glass cleaner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-tay-toilet",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước tẩy toilet",
+    "en": "Toilet cleaner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-tay-da-nang",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước tẩy đa năng",
+    "en": "Multipurpose cleaner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-ve-sinh-bep",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước vệ sinh bếp",
+    "en": "Kitchen cleaner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-ve-sinh-phong-tam",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước vệ sinh phòng tắm",
+    "en": "Bathroom cleaner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "chat-thong-cong",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Chất thông cống",
+    "en": "Drain cleaner"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "xit-khu-mui",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Xịt khử mùi",
+    "en": "Deodorizing spray"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sap-thom",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Sáp thơm",
+    "en": "Air freshener gel"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-hoa-phong",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Nước hoa phòng",
+    "en": "Room fragrance"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "mieng-rua-chen",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Miếng rửa chén",
+    "en": "Dish sponge"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "khan-lau-bep",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Khăn lau bếp",
+    "en": "Kitchen cloth"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "gang-tay-ve-sinh",
+   "parent": "household-cleaning",
+   "labels": {
+    "vi": "Găng tay vệ sinh",
+    "en": "Cleaning gloves"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "pair"
+  },
+  {
+   "key": "giay-ve-sinh",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Giấy vệ sinh",
+    "en": "Toilet paper"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "roll"
+  },
+  {
+   "key": "khan-giay",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Khăn giấy",
+    "en": "Facial tissues"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "sheet"
+  },
+  {
+   "key": "khan-giay-bo-tui",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Khăn giấy bỏ túi",
+    "en": "Pocket tissues"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "pack"
+  },
+  {
+   "key": "khan-uot",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Khăn ướt",
+    "en": "Wet wipes"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "giay-an",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Giấy ăn",
+    "en": "Napkins"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "sheet"
+  },
+  {
+   "key": "giay-bep",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Giấy bếp",
+    "en": "Kitchen paper towels"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "roll"
+  },
+  {
+   "key": "tui-rac",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Túi rác",
+    "en": "Trash bags"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "bag"
+  },
+  {
+   "key": "tui-zip",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Túi zip",
+    "en": "Zip bags"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "bag"
+  },
+  {
+   "key": "tui-thuc-pham",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Túi thực phẩm",
+    "en": "Food storage bags"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "bag"
+  },
+  {
+   "key": "mang-boc-thuc-pham",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Màng bọc thực phẩm",
+    "en": "Plastic wrap"
+   },
+   "measurement": "length",
+   "unit": "m",
+   "count_unit": null
+  },
+  {
+   "key": "giay-bac",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Giấy bạc",
+    "en": "Aluminum foil"
+   },
+   "measurement": "length",
+   "unit": "m",
+   "count_unit": null
+  },
+  {
+   "key": "giay-nen",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Giấy nến",
+    "en": "Baking paper"
+   },
+   "measurement": "length_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "ong-hut",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Ống hút",
+    "en": "Straws"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "coc-dung-mot-lan",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Cốc dùng một lần",
+    "en": "Disposable cups"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "dia-dung-mot-lan",
+   "parent": "paper-disposables",
+   "labels": {
+    "vi": "Đĩa dùng một lần",
+    "en": "Disposable plates"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "dau-goi",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu gội",
+    "en": "Shampoo"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-goi-nam",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu gội nam",
+    "en": "Men's shampoo"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-goi-nu",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu gội nữ",
+    "en": "Women's shampoo"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-goi-tre-em",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu gội trẻ em",
+    "en": "Kids' shampoo"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-goi-tri-gau",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu gội trị gàu",
+    "en": "Anti-dandruff shampoo"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-xa",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu xả",
+    "en": "Conditioner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-xa-nam",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu xả nam",
+    "en": "Men's conditioner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-xa-nu",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu xả nữ",
+    "en": "Women's conditioner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "kem-u-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Kem ủ tóc",
+    "en": "Hair mask"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "dau-duong-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Dầu dưỡng tóc",
+    "en": "Hair oil"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "serum-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Serum tóc",
+    "en": "Hair serum"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "xit-duong-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Xịt dưỡng tóc",
+    "en": "Hair treatment spray"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "gel-vuot-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Gel vuốt tóc",
+    "en": "Hair gel"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sap-vuot-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Sáp vuốt tóc",
+    "en": "Hair wax"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "thuoc-nhuom-toc",
+   "parent": "hair-care",
+   "labels": {
+    "vi": "Thuốc nhuộm tóc",
+    "en": "Hair dye"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sua-tam",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Sữa tắm",
+    "en": "Body wash"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sua-tam-nam",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Sữa tắm nam",
+    "en": "Men's body wash"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sua-tam-nu",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Sữa tắm nữ",
+    "en": "Women's body wash"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "sua-tam-tre-em",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Sữa tắm trẻ em",
+    "en": "Kids' body wash"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "xa-phong",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Xà phòng",
+    "en": "Bar soap"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "xa-phong-nam",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Xà phòng nam",
+    "en": "Men's soap"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "xa-phong-nu",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Xà phòng nữ",
+    "en": "Women's soap"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-rua-tay",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Nước rửa tay",
+    "en": "Hand wash"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "gel-rua-tay",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Gel rửa tay",
+    "en": "Hand sanitizer gel"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "tay-te-bao-chet-co-the",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Tẩy tế bào chết cơ thể",
+    "en": "Body scrub"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "duong-the",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Dưỡng thể",
+    "en": "Body moisturizer"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "kem-duong-the",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Kem dưỡng thể",
+    "en": "Body lotion"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "xit-thom-co-the",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Xịt thơm cơ thể",
+    "en": "Body spray"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "khu-mui-nam",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Khử mùi nam",
+    "en": "Men's deodorant"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "khu-mui-nu",
+   "parent": "bath-body-care",
+   "labels": {
+    "vi": "Khử mùi nữ",
+    "en": "Women's deodorant"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "kem-danh-rang",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Kem đánh răng",
+    "en": "Toothpaste"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "kem-danh-rang-tre-em",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Kem đánh răng trẻ em",
+    "en": "Kids' toothpaste"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "ban-chai-danh-rang",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Bàn chải đánh răng",
+    "en": "Toothbrush"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "ban-chai-tre-em",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Bàn chải trẻ em",
+    "en": "Kids' toothbrush"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "nuoc-suc-mieng",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Nước súc miệng",
+    "en": "Mouthwash"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "chi-nha-khoa",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Chỉ nha khoa",
+    "en": "Dental floss"
+   },
+   "measurement": "length_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "tam-nuoc",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Tăm nước",
+    "en": "Water flosser"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "tam",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Tăm",
+    "en": "Toothpicks"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "mieng-lam-trang-rang",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Miếng làm trắng răng",
+    "en": "Teeth whitening strips"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "dao-cao-rau",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Dao cạo râu",
+    "en": "Razor"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "luoi-dao-cao",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Lưỡi dao cạo",
+    "en": "Razor blades"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "kem-cao-rau",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Kem cạo râu",
+    "en": "Shaving cream"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "gel-cao-rau",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Gel cạo râu",
+    "en": "Shaving gel"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-sau-cao-rau",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Nước sau cạo râu",
+    "en": "Aftershave"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-duong-rau",
+   "parent": "oral-care-shaving",
+   "labels": {
+    "vi": "Dầu dưỡng râu",
+    "en": "Beard oil"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "sua-rua-mat",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Sữa rửa mặt",
+    "en": "Facial cleanser"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-tay-trang",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Nước tẩy trang",
+    "en": "Micellar water"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "dau-tay-trang",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Dầu tẩy trang",
+    "en": "Cleansing oil"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "toner",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Toner",
+    "en": "Toner"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "serum",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Serum",
+    "en": "Serum"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "kem-duong",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Kem dưỡng",
+    "en": "Moisturizer"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "gel-duong",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Gel dưỡng",
+    "en": "Moisturizing gel"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "kem-chong-nang",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Kem chống nắng",
+    "en": "Sunscreen"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "mat-na",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Mặt nạ",
+    "en": "Face mask"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "tay-te-bao-chet-da-mat",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Tẩy tế bào chết da mặt",
+    "en": "Facial exfoliant"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "son-duong",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Son dưỡng",
+    "en": "Lip balm"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "son-moi",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Son môi",
+    "en": "Lipstick"
+   },
+   "measurement": "mass_or_count",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "phan-phu",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Phấn phủ",
+    "en": "Face powder"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "kem-nen",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Kem nền",
+    "en": "Foundation"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "kem-che-khuyet-diem",
+   "parent": "skin-care-cosmetics",
+   "labels": {
+    "vi": "Kem che khuyết điểm",
+    "en": "Concealer"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "ta-dan",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Tã dán",
+    "en": "Tape diapers"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "ta-quan",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Tã quần",
+    "en": "Pull-up diapers"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "bim-so-sinh",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Bỉm sơ sinh",
+    "en": "Newborn diapers"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "khan-uot-em-be",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Khăn ướt em bé",
+    "en": "Baby wipes"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "khan-kho-em-be",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Khăn khô em bé",
+    "en": "Dry baby wipes"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "sua-tam-em-be",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Sữa tắm em bé",
+    "en": "Baby body wash"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "dau-goi-em-be",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Dầu gội em bé",
+    "en": "Baby shampoo"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "phan-em-be",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Phấn em bé",
+    "en": "Baby powder"
+   },
+   "measurement": "mass",
+   "unit": "g",
+   "count_unit": null
+  },
+  {
+   "key": "kem-chong-ham",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Kem chống hăm",
+    "en": "Diaper rash cream"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-giat-em-be",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Nước giặt em bé",
+    "en": "Baby laundry detergent"
+   },
+   "measurement": "source_dimension",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "nuoc-rua-binh-sua",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Nước rửa bình sữa",
+    "en": "Baby bottle cleanser"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "tui-tru-sua",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Túi trữ sữa",
+    "en": "Breast milk storage bags"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "bag"
+  },
+  {
+   "key": "mieng-lot-tham-sua",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Miếng lót thấm sữa",
+    "en": "Breast pads"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "binh-sua",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Bình sữa",
+    "en": "Baby bottles"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "num-ti",
+   "parent": "baby-maternity",
+   "labels": {
+    "vi": "Núm ti",
+    "en": "Bottle nipples"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "bang-ve-sinh",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Băng vệ sinh",
+    "en": "Sanitary pads"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "bang-ve-sinh-hang-ngay",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Băng vệ sinh hàng ngày",
+    "en": "Panty liners"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "tampon",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Tampon",
+    "en": "Tampons"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "dung-dich-ve-sinh-nu",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Dung dịch vệ sinh nữ",
+    "en": "Feminine wash"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "bao-cao-su",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Bao cao su",
+    "en": "Condoms"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "khau-trang",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Khẩu trang",
+    "en": "Face masks"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "nuoc-muoi-sinh-ly",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Nước muối sinh lý",
+    "en": "Saline solution"
+   },
+   "measurement": "volume",
+   "unit": "ml",
+   "count_unit": null
+  },
+  {
+   "key": "vitamin-c",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Vitamin C",
+    "en": "Vitamin C"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "vitamin-tong-hop",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Vitamin tổng hợp",
+    "en": "Multivitamins"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "canxi",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Canxi",
+    "en": "Calcium supplements"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "dau-ca",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Dầu cá",
+    "en": "Fish oil"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "men-vi-sinh",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Men vi sinh",
+    "en": "Probiotics"
+   },
+   "measurement": "count_or_mass",
+   "unit": "source",
+   "count_unit": null
+  },
+  {
+   "key": "vien-sui",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Viên sủi",
+    "en": "Effervescent tablets"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "bong-tay-trang",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Bông tẩy trang",
+    "en": "Cotton pads"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  },
+  {
+   "key": "tam-bong",
+   "parent": "personal-care-wellness",
+   "labels": {
+    "vi": "Tăm bông",
+    "en": "Cotton swabs"
+   },
+   "measurement": "count",
+   "unit": "item",
+   "count_unit": "piece"
+  }
+ ]
+}

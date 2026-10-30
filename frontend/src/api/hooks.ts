@@ -5,7 +5,7 @@ import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
   Assignment, Basket, BasketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
   ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
-  QuickStock, ReceiptDraft, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
+  QuickStock, ReceiptDraft, ReceiptDraftLine, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
   SpendingReport, TaxonomyGroup,
 } from "./types";
 
@@ -132,6 +132,7 @@ export function useSaveReceipt() {
 export function toSaveRequest(
   draft: ReceiptDraft,
   opts: { purchasedOn: string; usePrediction: boolean; confirmDuplicate: boolean; planId?: string; assignmentId?: string },
+  lines: ReceiptDraftLine[] = draft.lines,
 ): SaveReceiptRequest {
   return {
     ...(opts.planId && opts.planId !== "default" ? { source_plan_id: opts.planId } : {}),
@@ -141,7 +142,7 @@ export function toSaveRequest(
     purchased_on: opts.purchasedOn,
     currency: draft.currency || "VND",
     discount_total: draft.discount_total ?? "",
-    lines: draft.lines.map((l) => ({
+    lines: lines.map((l) => ({
       line_id: l.line_id,
       name: l.name,
       qty: l.qty,
@@ -150,6 +151,14 @@ export function toSaveRequest(
       category_key: l.category_key ?? "",
       group_key: l.group_key ?? "",
       habit: l.habit,
+      // Kết quả chuẩn hóa một lần lúc đọc (1.1): gửi lại nguyên vẹn để server tính lượng canonical.
+      raw_name: l.raw_name,
+      brand: l.brand,
+      product_name: l.product_name,
+      source_language: l.source_language,
+      package_count: l.package_count,
+      package_size: l.package_size,
+      package_unit: l.package_unit,
     })),
     use_for_prediction: opts.usePrediction,
     confirm_duplicate: opts.confirmDuplicate,
@@ -302,6 +311,17 @@ export function useReadDelivery() {
 // ================= Bộ spec Mimi 1.0 =================
 
 /** 0.2: tìm nhóm sản phẩm theo nhãn (không dấu). */
+/** Cả bộ taxonomy 0.2 (300 nhóm): tra nhãn hiển thị theo group_key, không gọi AI (1.1). */
+export function useTaxonomyLabels() {
+  const q = useQuery({
+    queryKey: qk.taxonomy(`all:${uiLangParam()}`),
+    queryFn: async () => (await apiGet<{ groups: TaxonomyGroup[] }>(`/taxonomy?lang=${uiLangParam()}`)).groups,
+    staleTime: Infinity,
+  });
+  const map = new Map((q.data ?? []).map((g) => [g.key, g.label]));
+  return (key?: string | null) => (key ? map.get(key.replace(/_/g, "-")) ?? "" : "");
+}
+
 export const useTaxonomySearch = (q: string) =>
   useQuery({
     queryKey: qk.taxonomy(q),

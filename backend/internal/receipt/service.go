@@ -385,13 +385,10 @@ func (s *Service) draftLine(l PageLine) (DraftLine, bool) {
 	if raw == "" {
 		return DraftLine{}, false
 	}
-	cat := l.CategoryKey
-	if !s.taxonomy[cat] {
-		cat = "" // không nằm trong taxonomy chi tiêu: để người dùng "Chọn nhóm"
-	}
+	group := canonicalGroup(l.GroupKey)
 	dl := DraftLine{
 		Qty: l.Qty, Unit: domain.NormalizeUnit(l.Unit), Amount: l.Amount,
-		CategoryKey: cat, GroupKey: canonicalGroup(l.GroupKey), Habit: true,
+		CategoryKey: s.category(l.CategoryKey, group), GroupKey: group, Habit: true,
 	}
 	pn := domain.NormalizeProductName(raw, l.Brand, l.ProductName, taxonomy.Brand)
 	dl.Product = Product{
@@ -421,6 +418,18 @@ func displayName(pn domain.ProductName, raw string) string {
 
 // canonicalGroup: chỉ nhận group_key thuộc taxonomy 0.2; "khac" hoặc khóa lạ là chưa phân
 // nhóm (không tự tạo khóa mới, 0.2 mục 12).
+// category chọn danh mục chi tiêu: khóa AI / người dùng gửi nếu hợp lệ, nếu không thì
+// lấy theo nhóm sản phẩm (người dùng bấm "Chọn nhóm" chỉ chọn nhóm). "" = Cần phân loại.
+func (s *Service) category(key, group string) string {
+	if s.taxonomy[key] {
+		return key
+	}
+	if c := taxonomy.SpendingCategory(group); s.taxonomy[c] {
+		return c
+	}
+	return ""
+}
+
 func canonicalGroup(k string) string {
 	k = taxonomy.Normalize(k)
 	if taxonomy.Has(k) {
@@ -728,11 +737,8 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 		if !ok && currency == "VND" {
 			return Receipt{}, lineErr(apperr.CodeInvalidLineTotal, "amount", "Giá của món này chưa hợp lệ.")
 		}
-		cat := ""
-		if s.taxonomy[l.CategoryKey] {
-			cat = l.CategoryKey
-		}
 		group := canonicalGroup(l.GroupKey)
+		cat := s.category(l.CategoryKey, group)
 		unit := domain.NormalizeUnit(l.Unit)
 		pn := domain.NormalizeProductName(raw, l.Brand, l.ProductName, taxonomy.Brand)
 		pk, extra := measure(raw, l.Qty, unit, l.PackageCount, l.PackageSize, l.PackageUnit, group)

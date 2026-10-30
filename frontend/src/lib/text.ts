@@ -58,12 +58,12 @@ export function addMonths(ym: string, n: number): string {
 const qtyFmt = new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { maximumFractionDigits: 2 });
 
 /**
- * Số lượng theo đơn vị chuẩn của API (0.1): 2500 g → "2.5 kg", 1500 ml → "1.5 l", 3 item → "3 pcs".
+ * Số lượng theo đơn vị chuẩn của API (0.1): 2500 g → "2.5 kg", 1500 ml → "1.5 L" (0.1 mục 6.2), 3 item → "3 pcs".
  * "pc" là tên cũ của item.
  */
 export function formatQty(qty: number, unit: "g" | "ml" | "m" | "item" | "pc", pcLabel: string): string {
   if (unit === "g") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} kg` : `${qtyFmt.format(qty)} g`;
-  if (unit === "ml") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} l` : `${qtyFmt.format(qty)} ml`;
+  if (unit === "ml") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} L` : `${qtyFmt.format(qty)} ml`;
   if (unit === "m") return `${qtyFmt.format(qty)} m`;
   return `${qtyFmt.format(qty)} ${pcLabel}`;
 }

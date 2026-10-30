@@ -805,8 +805,15 @@ components:
               unit: { type: string }
               amount: { type: string }
               category_key: { type: string }
-              group_key: { type: string }
+              group_key: { type: string, description: "Nhóm 0.2; người dùng bấm Chọn nhóm thì danh mục chi tiêu lấy theo nhóm" }
               habit: { type: boolean, description: "Tại nhà (true) hay Chuyến đi (false)" }
+              raw_name: { type: string, description: "Kết quả chuẩn hóa lúc đọc (1.1), gửi lại nguyên vẹn" }
+              brand: { type: string }
+              product_name: { type: string }
+              source_language: { type: string }
+              package_count: { type: number }
+              package_size: { type: number }
+              package_unit: { type: string }
     SaveResult:
       type: object
       properties:

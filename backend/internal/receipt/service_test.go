@@ -138,6 +138,20 @@ func TestRead(t *testing.T) {
 		}
 	})
 
+	t.Run("category follows the product group when AI gives none", func(t *testing.T) {
+		pg := Page{Store: "X", PurchasedOn: "2026-10-15", Lines: []PageLine{
+			{RawName: "Nước rửa chén Sunlight 750ml", Qty: 1, Amount: "38000", GroupKey: "nuoc_rua_chen"},
+		}}
+		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
+		d, err := s.Read(context.Background(), owner, "r-cat", "vi", []Image{{jpeg, "image/jpeg"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if l := d.Lines[0]; l.CategoryKey != "hoa-pham" || l.NeedsReview {
+			t.Fatalf("category %q needs_review %v", l.CategoryKey, l.NeedsReview)
+		}
+	})
+
 	t.Run("replay returns cached draft without calling AI or quota", func(t *testing.T) {
 		r := &fakeReader{fn: func(int) (Page, error) { return page, nil }}
 		q := &fakeQuota{}
