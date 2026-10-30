@@ -9,7 +9,7 @@ Mới nhất ở trên cùng.
 
 - Nhánh: `feat/mimi1-specs` → `feat/mimi2-core-demo`
 - PR: https://github.com/qlinh142/Mimi-Test/pull/1
-- Commit: `647e216` (màn xác nhận hóa đơn), `d9593f0` (Kế hoạch), `f0bff5d` (chi tiết món, test)
+- Commit: `647e216` (màn xác nhận hóa đơn), `d9593f0` (Kế hoạch), `f0bff5d` (chi tiết món, test), `dcc1034` (ngưỡng To Buy)
 - Báo cáo đối chiếu: `doi-chieu-spec-mimi1.md` (trong Project files)
 
 ### Theo từng file spec
