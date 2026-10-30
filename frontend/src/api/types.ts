@@ -82,7 +82,7 @@ export type ItemDetail = Item & {
 
 export type ItemsQuery = {
   tab: "soon" | "active";
-  horizon: 3 | 7 | 14;
+  horizon: number;
 };
 
 /** Còn nhiều = 30 ngày, Sắp hết = 3 ngày, Đã hết = 0 (spec mục 4). */

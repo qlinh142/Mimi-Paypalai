@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Pencil, Plus, ShoppingBag, X } from "lucide-react";
 import { ApiError } from "../api/client";
-import { useItems, usePlan, usePlanItem, usePlanLine, usePlanPrices, useSavePlanState } from "../api/hooks";
+import { useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanPrices, useSavePlanState } from "../api/hooks";
 import type { CartItem, Item, PlanPriority, PlanPrices, PlanState } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT } from "../components/ItemRow";
@@ -26,8 +26,10 @@ function stockText(i: Pick<Item, "status" | "days_left">): string {
  */
 export function Plan() {
   const plan = usePlan();
-  const needs = useItems({ tab: "soon", horizon: 7 });
-  const all = useItems({ tab: "active", horizon: 7 });
+  // 3.1 mục 10: ngưỡng To Buy là số ngày "báo trước" trong Cài đặt, mặc định 7.
+  const horizon = useMe().data?.settings.lead_days ?? 7;
+  const needs = useItems({ tab: "soon", horizon });
+  const all = useItems({ tab: "active", horizon });
   const [showStock, setShowStock] = useState(false);
   const cart = plan.data;
   const prices = usePlanPrices((cart?.item_count ?? 0) > 0);
