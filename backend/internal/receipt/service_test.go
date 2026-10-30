@@ -102,6 +102,14 @@ func newSvc(t *testing.T, r Reader, q *fakeQuota, st *fakeStore) *Service {
 	return s
 }
 
+func fields(err error) map[string]any {
+	var ae *apperr.Error
+	if errors.As(err, &ae) {
+		return ae.Fields
+	}
+	return nil
+}
+
 func code(err error) apperr.Code {
 	var ae *apperr.Error
 	if errors.As(err, &ae) {
@@ -112,8 +120,8 @@ func code(err error) apperr.Code {
 
 func TestRead(t *testing.T) {
 	page := Page{Store: "Co.opmart", PurchasedOn: "2026-10-15", TotalPrinted: "102.000", Lines: []PageLine{
-		{Name: "Sữa tươi", Qty: 2, Amount: "64.000", CategoryKey: "sua"},
-		{Name: "Nước rửa chén", Qty: 1, Amount: "38,000", CategoryKey: "khong-co"},
+		{RawName: "Sữa tươi", Qty: 2, Amount: "64.000", CategoryKey: "sua"},
+		{RawName: "Nước rửa chén", Qty: 1, Amount: "38,000", CategoryKey: "khong-co"},
 	}}
 
 	t.Run("parses VND, checks total, drops unknown category", func(t *testing.T) {
@@ -161,16 +169,16 @@ func TestRead(t *testing.T) {
 		q := &fakeQuota{}
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return Page{}, ErrTransient }}, q, &fakeStore{})
 		_, err := s.Read(context.Background(), owner, "r-4", "vi", []Image{{jpeg, "image/jpeg"}})
-		if code(err) != apperr.CodeAIUnavailable || q.released != 1 || q.used != 0 {
+		if code(err) != apperr.CodeReadFailed || q.released != 1 || q.used != 0 {
 			t.Fatalf("err=%v released=%d used=%d", err, q.released, q.used)
 		}
 	})
 
-	t.Run("unreadable is 422 and frees quota", func(t *testing.T) {
+	t.Run("unreadable image names the image and frees quota", func(t *testing.T) {
 		q := &fakeQuota{}
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return Page{}, ErrUnreadable }}, q, &fakeStore{})
 		_, err := s.Read(context.Background(), owner, "r-5", "vi", []Image{{jpeg, "image/jpeg"}})
-		if code(err) != apperr.CodeReceiptUnreadable || q.used != 0 {
+		if code(err) != apperr.CodeUnreadableImage || q.used != 0 || fields(err)["image_index"] != 1 {
 			t.Fatalf("err=%v used=%d", err, q.used)
 		}
 	})
@@ -194,10 +202,10 @@ func TestRead(t *testing.T) {
 		}
 	})
 
-	t.Run("member cannot read receipts", func(t *testing.T) {
+	t.Run("signed out cannot read receipts", func(t *testing.T) {
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return page, nil }}, &fakeQuota{}, &fakeStore{})
-		_, err := s.Read(context.Background(), authz.Principal{UID: "m", Role: authz.RoleMember}, "r-8", "vi", []Image{{jpeg, "image/jpeg"}})
-		if code(err) != apperr.CodeForbidden {
+		_, err := s.Read(context.Background(), authz.Principal{}, "r-8", "vi", []Image{{jpeg, "image/jpeg"}})
+		if code(err) != apperr.CodeUnauthenticated {
 			t.Fatalf("err=%v", err)
 		}
 	})
@@ -272,19 +280,29 @@ func TestSave(t *testing.T) {
 
 	t.Run("validation", func(t *testing.T) {
 		s := newSvc(t, nil, &fakeQuota{}, &fakeStore{saved: map[string]Receipt{}})
-		bad := []func(*SaveRequest){
-			func(r *SaveRequest) { r.ReceiptID = "../x" },
-			func(r *SaveRequest) { r.PurchasedOn = "2027-01-01" }, // tương lai
-			func(r *SaveRequest) { r.Lines = nil },
-			func(r *SaveRequest) { r.Lines = []SaveLine{{Name: "x", Qty: 1, Amount: "-5"}} },
-			func(r *SaveRequest) { r.Lines = []SaveLine{{Name: "x", Qty: 0, Amount: "5"}} },
+		bad := []struct {
+			mut       func(*SaveRequest)
+			code      apperr.Code
+			field, id string
+		}{
+			{func(r *SaveRequest) { r.ReceiptID = "../x" }, apperr.CodeValidation, "receipt_id", ""},
+			{func(r *SaveRequest) { r.PurchasedOn = "2027-01-01" }, apperr.CodeInvalidPurchaseDate, "purchased_on", ""}, // tương lai
+			{func(r *SaveRequest) { r.PurchasedOn = "15/10/2026" }, apperr.CodeInvalidPurchaseDate, "purchased_on", ""},
+			{func(r *SaveRequest) { r.Lines = nil }, apperr.CodeValidation, "lines", ""},
+			{func(r *SaveRequest) { r.Lines = []SaveLine{{LineID: "l1", Name: "x", Qty: 1, Amount: "-5"}} }, apperr.CodeValidation, "lines", ""},
+			{func(r *SaveRequest) { r.Lines = []SaveLine{{LineID: "l3", Name: "x", Qty: 0, Amount: "5"}} }, apperr.CodeInvalidQuantity, "qty", "l3"},
+			{func(r *SaveRequest) {
+				r.Lines = []SaveLine{{LineID: "l3", Name: "Cá", Qty: 1, Amount: "₫1,330,000abc"}}
+			}, apperr.CodeInvalidLineTotal, "amount", "l3"},
 		}
-		for i, mut := range bad {
+		for i, c := range bad {
 			r := req
 			r.ReceiptID = fmt.Sprintf("r-v%d", i)
-			mut(&r)
-			if _, err := s.Save(context.Background(), owner, r); code(err) != apperr.CodeValidation {
-				t.Errorf("case %d: err=%v", i, err)
+			c.mut(&r)
+			_, err := s.Save(context.Background(), owner, r)
+			f := fields(err)
+			if code(err) != c.code || f["field"] != c.field || (c.id != "" && f["line_id"] != c.id) {
+				t.Errorf("case %d: err=%v fields=%v", i, err, f)
 			}
 		}
 	})
@@ -318,9 +336,9 @@ func TestToVND(t *testing.T) {
 func TestReadDiscounts(t *testing.T) {
 	t.Run("discount line is subtracted and total within tolerance matches", func(t *testing.T) {
 		pg := Page{Store: "WinMart", PurchasedOn: "2026-10-15", TotalPrinted: "90.500đ", Lines: []PageLine{
-			{Name: "Sữa tươi", Qty: 2, Unit: "Hộp", Amount: "64.000đ", GroupKey: "sua_tuoi"},
-			{Name: "Nước rửa chén", Qty: 1, Amount: "38.000đ"},
-			{Name: "Giảm giá KM", Qty: 1, Amount: "-12.000đ"},
+			{RawName: "Sữa tươi", Qty: 2, Unit: "Hộp", Amount: "64.000đ", GroupKey: "sua_tuoi"},
+			{RawName: "Nước rửa chén", Qty: 1, Amount: "38.000đ"},
+			{RawName: "Giảm giá KM", Qty: 1, Amount: "-12.000đ"},
 		}}
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
 		d, err := s.Read(context.Background(), owner, "r-d1", "vi", []Image{{jpeg, "image/jpeg"}})
@@ -340,7 +358,7 @@ func TestReadDiscounts(t *testing.T) {
 
 	t.Run("gross lines with printed discount total match", func(t *testing.T) {
 		pg := Page{TotalPrinted: "92.000", DiscountTotal: "-10.000", Lines: []PageLine{
-			{Name: "Sữa tươi", Qty: 2, Amount: "64.000"}, {Name: "Bánh", Qty: 1, Amount: "38.000"},
+			{RawName: "Sữa tươi", Qty: 2, Amount: "64.000"}, {RawName: "Bánh", Qty: 1, Amount: "38.000"},
 		}}
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
 		d, err := s.Read(context.Background(), owner, "r-d2", "vi", []Image{{jpeg, "image/jpeg"}})
@@ -350,7 +368,7 @@ func TestReadDiscounts(t *testing.T) {
 	})
 
 	t.Run("real mismatch is flagged", func(t *testing.T) {
-		pg := Page{TotalPrinted: "150.000", Lines: []PageLine{{Name: "Sữa tươi", Qty: 2, Amount: "64.000"}}}
+		pg := Page{TotalPrinted: "150.000", Lines: []PageLine{{RawName: "Sữa tươi", Qty: 2, Amount: "64.000"}}}
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
 		d, _ := s.Read(context.Background(), owner, "r-d3", "vi", []Image{{jpeg, "image/jpeg"}})
 		if !d.TotalMismatch {

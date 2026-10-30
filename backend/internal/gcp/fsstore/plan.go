@@ -8,8 +8,10 @@ import (
 
 	"cloud.google.com/go/firestore"
 
+	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
+	"github.com/smartlife-lab/mimi/backend/internal/pricing"
 )
 
 var _ plan.Store = (*Store)(nil)
@@ -24,7 +26,7 @@ const (
 )
 
 func (s *Store) OpenLines(ctx context.Context, uid string) ([]plan.Line, error) {
-	docs, err := s.user(uid).Collection("plan_items").Where("status", "==", "open").
+	docs, err := s.planItems(uid, plan.IDFrom(ctx)).Where("status", "in", []string{"open", "assigned"}).
 		Limit(maxPlanLines).Documents(ctx).GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("plan lines: %w", err)
@@ -42,6 +44,8 @@ func (s *Store) OpenLines(ctx context.Context, uid string) ([]plan.Line, error) 
 		l.Priority, _ = m["priority"].(string)
 		l.Source, _ = m["src"].(string)
 		l.Reason, _ = m["reason"].(string)
+		l.Status, _ = m["status"].(string)
+		l.AssignedTo, _ = m["assigned_to_uid"].(string)
 		out = append(out, l)
 	}
 	return out, nil
@@ -53,7 +57,7 @@ func (s *Store) AddLine(ctx context.Context, uid string, l plan.Line) error {
 	if src == "" {
 		src = plan.SourceManual
 	}
-	_, err := s.user(uid).Collection("plan_items").Doc(l.Key).Set(ctx, map[string]any{
+	_, err := s.planItems(uid, plan.IDFrom(ctx)).Doc(l.Key).Set(ctx, map[string]any{
 		"status": "open", "name": l.Name, "category_key": l.CategoryKey, "added_at": l.AddedAt, "src": src,
 		"qty": l.Qty, "unit": l.Unit, "need_by": l.NeedBy, "priority": l.Priority, "reason": l.Reason, "bought_qty": 0.0,
 	})
@@ -64,7 +68,7 @@ func (s *Store) AddLine(ctx context.Context, uid string, l plan.Line) error {
 }
 
 func (s *Store) UpdateLine(ctx context.Context, uid string, l plan.Line) error {
-	_, err := s.user(uid).Collection("plan_items").Doc(l.Key).Update(ctx, []firestore.Update{
+	_, err := s.planItems(uid, plan.IDFrom(ctx)).Doc(l.Key).Update(ctx, []firestore.Update{
 		{Path: "qty", Value: l.Qty}, {Path: "unit", Value: l.Unit}, {Path: "need_by", Value: l.NeedBy},
 		{Path: "priority", Value: l.Priority}, {Path: "reason", Value: l.Reason}, {Path: "updated_at", Value: time.Now()},
 	})
@@ -76,14 +80,22 @@ func (s *Store) UpdateLine(ctx context.Context, uid string, l plan.Line) error {
 
 // RemoveLine: xóa tài liệu không tồn tại không phải lỗi trong Firestore.
 func (s *Store) RemoveLine(ctx context.Context, uid, key string) error {
-	if _, err := s.user(uid).Collection("plan_items").Doc(key).Delete(ctx); err != nil {
+	if _, err := s.planItems(uid, plan.IDFrom(ctx)).Doc(key).Delete(ctx); err != nil {
 		return fmt.Errorf("plan remove: %w", err)
 	}
 	return nil
 }
 
+// planStateDoc: Plan mặc định giữ plan_state trên users/{uid}; Plan đặt tên giữ trên plans/{id}.
+func (s *Store) planStateDoc(ctx context.Context, uid string) *firestore.DocumentRef {
+	if id := plan.IDFrom(ctx); id != plan.DefaultPlanID {
+		return s.user(uid).Collection("plans").Doc(id)
+	}
+	return s.user(uid)
+}
+
 func (s *Store) State(ctx context.Context, uid string) (plan.State, error) {
-	snap, err := s.user(uid).Get(ctx)
+	snap, err := s.planStateDoc(ctx, uid).Get(ctx)
 	if isNotFound(err) {
 		return plan.State{}, nil
 	}
@@ -106,7 +118,7 @@ func (s *Store) SetState(ctx context.Context, uid string, st plan.State) error {
 	if st.BuyHour != nil {
 		hour = int64(*st.BuyHour)
 	}
-	_, err := s.user(uid).Update(ctx, []firestore.Update{{Path: "plan_state", Value: map[string]any{
+	_, err := s.planStateDoc(ctx, uid).Update(ctx, []firestore.Update{{Path: "plan_state", Value: map[string]any{
 		"buy_date": st.BuyDate, "buy_hour": hour, "trip_note": st.TripNote, "updated_at": time.Now(),
 	}}})
 	if err != nil {
@@ -156,4 +168,131 @@ func asFloat(v any) float64 {
 		return float64(n)
 	}
 	return 0
+}
+
+// ---------- Nhiều Kế hoạch (3.1 mục 3A) ----------
+
+var _ plan.PlansStore = (*Store)(nil)
+
+func decodePlanMeta(d *firestore.DocumentSnapshot) plan.Meta {
+	m := d.Data()
+	pm := plan.Meta{ID: d.Ref.ID, Status: "active"}
+	pm.Name, _ = m["name"].(string)
+	if st, _ := m["status"].(string); st != "" {
+		pm.Status = st
+	}
+	pm.CreatedAt, _ = m["created_at"].(time.Time)
+	if ps, ok := m["plan_state"].(map[string]any); ok {
+		pm.BuyDate, _ = ps["buy_date"].(string)
+	}
+	return pm
+}
+
+func (s *Store) ListPlans(ctx context.Context, uid string) ([]plan.Meta, error) {
+	docs, err := s.user(uid).Collection("plans").Limit(50).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("plans: %w", err)
+	}
+	out := make([]plan.Meta, 0, len(docs))
+	for _, d := range docs {
+		pm := decodePlanMeta(d)
+		n, err := s.planItems(uid, pm.ID).Where("status", "in", []string{"open", "assigned"}).Limit(maxPlanLines).Documents(ctx).GetAll()
+		if err != nil {
+			return nil, fmt.Errorf("plan count: %w", err)
+		}
+		pm.ItemCount = len(n)
+		out = append(out, pm)
+	}
+	return out, nil
+}
+
+func (s *Store) GetPlan(ctx context.Context, uid, id string) (plan.Meta, error) {
+	snap, err := s.user(uid).Collection("plans").Doc(id).Get(ctx)
+	if isNotFound(err) {
+		return plan.Meta{}, apperr.ErrNotFound
+	}
+	if err != nil {
+		return plan.Meta{}, fmt.Errorf("plan get: %w", err)
+	}
+	return decodePlanMeta(snap), nil
+}
+
+func (s *Store) CreatePlan(ctx context.Context, uid string, m plan.Meta) error {
+	_, err := s.user(uid).Collection("plans").Doc(m.ID).Create(ctx, map[string]any{
+		"name": m.Name, "status": m.Status, "created_at": m.CreatedAt,
+	})
+	if err != nil {
+		return fmt.Errorf("plan create: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) UpdatePlan(ctx context.Context, uid string, m plan.Meta) error {
+	_, err := s.user(uid).Collection("plans").Doc(m.ID).Update(ctx, []firestore.Update{
+		{Path: "name", Value: m.Name}, {Path: "status", Value: m.Status}, {Path: "updated_at", Value: time.Now()},
+	})
+	if err != nil {
+		return fmt.Errorf("plan update: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) DeletePlan(ctx context.Context, uid, id string) error {
+	return s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		items, err := tx.Documents(s.planItems(uid, id).Limit(maxPlanLines)).GetAll()
+		if err != nil {
+			return err
+		}
+		for _, d := range items {
+			if d.Data()["status"] == "assigned" {
+				return apperr.New(apperr.CodeInvalidState, "Kế hoạch có món đang được nhờ mua.").With("key", d.Ref.ID)
+			}
+		}
+		for _, d := range items {
+			if err := tx.Delete(d.Ref); err != nil {
+				return err
+			}
+		}
+		return tx.Delete(s.user(uid).Collection("plans").Doc(id))
+	})
+}
+
+// ---------- Lịch sử giá (8.1) ----------
+
+var _ pricing.Store = (*Store)(nil)
+
+// pricesPerHistory: số lần mua gần nhất đọc cho mỗi nhóm khi tính lịch sử giá.
+const pricesPerHistory = 30
+
+// PriceObservations đọc purchases của từng nhóm (index group_key + habit + purchased_on DESC).
+// Purchase trước 0.1 chưa có canonical_quantity thì quy từ số lượng và đơn vị in cạnh số lượng.
+// Dòng cần xem lại (needs_review) không dùng để so giá.
+func (s *Store) PriceObservations(ctx context.Context, uid string, groups []string) (map[string][]pricing.Observation, error) {
+	out := map[string][]pricing.Observation{}
+	for _, g := range groups {
+		docs, err := s.user(uid).Collection("purchases").
+			Where("group_key", "==", g).Where("habit", "==", true).
+			OrderBy("purchased_on", firestore.Desc).Limit(pricesPerHistory).Documents(ctx).GetAll()
+		if err != nil {
+			return nil, fmt.Errorf("price history %s: %w", g, err)
+		}
+		for _, d := range docs {
+			m := d.Data()
+			if rev, _ := m["needs_review"].(bool); rev {
+				continue
+			}
+			total, ok := m["line_total_vnd"].(int64)
+			if !ok || total <= 0 {
+				continue
+			}
+			q, unit := purchaseQty(m)
+			on, _ := domain.ParseDate(fmt.Sprint(m["purchased_on"]))
+			o := pricing.Observation{GroupKey: g, PaidVND: total, On: on, CanonicalQty: q, CanonicalUnit: unit}
+			o.Store, _ = m["store"].(string)
+			o.StoreKey, _ = m["store_key"].(string)
+			o.DetailName, _ = m["detail_name"].(string)
+			out[g] = append(out[g], o)
+		}
+	}
+	return out, nil
 }

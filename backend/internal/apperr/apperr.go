@@ -35,32 +35,59 @@ const (
 	CodePaymentFailed      Code = "payment_failed"      // PayPal từ chối hoặc chưa hoàn tất
 	CodePaymentNotEnabled  Code = "payment_not_enabled" // chưa cấu hình PayPal
 	CodePaymentUnavailable Code = "payment_unavailable" // PayPal lỗi tạm thời, thử lại được
+
+	// Mã lỗi đọc / lưu hóa đơn theo BUG-05 và BUG-06: tách theo nguyên nhân để client
+	// hiện đúng hướng dẫn và không bao giờ gộp mọi lỗi thành "kiểm tra kết nối".
+	CodeTooManyImages       Code = "too_many_images"       // fields.limit
+	CodeImageTooLarge       Code = "image_too_large"       // fields.image_index (đếm từ 1)
+	CodeUnreadableImage     Code = "unreadable_image"      // fields.image_index, fields.image_indexes
+	CodeNoItems             Code = "no_items"              // ảnh đọc được nhưng không thấy món nào
+	CodeReadFailed          Code = "read_failed"           // Gemini timeout / lỗi tạm thời, thử lại được
+	CodeInvalidPurchaseDate Code = "invalid_purchase_date" // fields.field
+	CodeInvalidLineTotal    Code = "invalid_line_total"    // fields.line_id, fields.field
+	CodeInvalidQuantity     Code = "invalid_quantity"      // fields.line_id, fields.field
+	CodeTransactionConflict Code = "transaction_conflict"  // ghi đồng thời, thử lại được
 )
 
 var statusByCode = map[Code]int{
-	CodeBadRequest:         http.StatusBadRequest,
-	CodeValidation:         http.StatusUnprocessableEntity,
-	CodeUnauthenticated:    http.StatusUnauthorized,
-	CodeAppCheck:           http.StatusUnauthorized,
-	CodeForbidden:          http.StatusForbidden,
-	CodeNotFound:           http.StatusNotFound,
-	CodeConflict:           http.StatusConflict,
-	CodeReceiptConflict:    http.StatusConflict,
-	CodePossibleDuplicate:  http.StatusConflict,
-	CodePayloadTooLarge:    http.StatusRequestEntityTooLarge,
-	CodeUnsupportedMedia:   http.StatusUnsupportedMediaType,
-	CodeQuotaExceeded:      http.StatusTooManyRequests,
-	CodeRateLimited:        http.StatusTooManyRequests,
-	CodeReceiptUnreadable:  http.StatusUnprocessableEntity,
-	CodeAIUnavailable:      http.StatusServiceUnavailable,
-	CodeNotImplemented:     http.StatusNotImplemented,
-	CodeInternal:           http.StatusInternalServerError,
-	CodeMandateBlocked:     http.StatusForbidden,
-	CodeApprovalRequired:   http.StatusConflict,
-	CodeInvalidState:       http.StatusConflict,
-	CodePaymentFailed:      http.StatusPaymentRequired,
-	CodePaymentNotEnabled:  http.StatusServiceUnavailable,
-	CodePaymentUnavailable: http.StatusServiceUnavailable,
+	CodeBadRequest:          http.StatusBadRequest,
+	CodeValidation:          http.StatusUnprocessableEntity,
+	CodeUnauthenticated:     http.StatusUnauthorized,
+	CodeAppCheck:            http.StatusUnauthorized,
+	CodeForbidden:           http.StatusForbidden,
+	CodeNotFound:            http.StatusNotFound,
+	CodeConflict:            http.StatusConflict,
+	CodeReceiptConflict:     http.StatusConflict,
+	CodePossibleDuplicate:   http.StatusConflict,
+	CodePayloadTooLarge:     http.StatusRequestEntityTooLarge,
+	CodeUnsupportedMedia:    http.StatusUnsupportedMediaType,
+	CodeQuotaExceeded:       http.StatusTooManyRequests,
+	CodeRateLimited:         http.StatusTooManyRequests,
+	CodeReceiptUnreadable:   http.StatusUnprocessableEntity,
+	CodeAIUnavailable:       http.StatusServiceUnavailable,
+	CodeNotImplemented:      http.StatusNotImplemented,
+	CodeInternal:            http.StatusInternalServerError,
+	CodeMandateBlocked:      http.StatusForbidden,
+	CodeApprovalRequired:    http.StatusConflict,
+	CodeInvalidState:        http.StatusConflict,
+	CodePaymentFailed:       http.StatusPaymentRequired,
+	CodePaymentNotEnabled:   http.StatusServiceUnavailable,
+	CodePaymentUnavailable:  http.StatusServiceUnavailable,
+	CodeTooManyImages:       http.StatusUnprocessableEntity,
+	CodeImageTooLarge:       http.StatusRequestEntityTooLarge,
+	CodeUnreadableImage:     http.StatusUnprocessableEntity,
+	CodeNoItems:             http.StatusUnprocessableEntity,
+	CodeReadFailed:          http.StatusServiceUnavailable,
+	CodeInvalidPurchaseDate: http.StatusUnprocessableEntity,
+	CodeInvalidLineTotal:    http.StatusUnprocessableEntity,
+	CodeInvalidQuantity:     http.StatusUnprocessableEntity,
+	CodeTransactionConflict: http.StatusConflict,
+}
+
+// retryable: lỗi tạm thời, gửi lại đúng request đó là được (client giữ nguyên dữ liệu).
+var retryable = map[Code]bool{
+	CodeInternal: true, CodeAIUnavailable: true, CodeReadFailed: true, CodeTransactionConflict: true,
+	CodeRateLimited: true, CodePaymentUnavailable: true,
 }
 
 // Error là lỗi có thể trả thẳng cho client.
@@ -79,6 +106,9 @@ func (e *Error) Error() string {
 }
 
 func (e *Error) Unwrap() error { return e.Err }
+
+// Retryable báo client có thể thử lại nguyên request (BUG-06 mục 8, trường retryable).
+func (e *Error) Retryable() bool { return retryable[e.Code] }
 
 // Status trả về mã HTTP tương ứng.
 func (e *Error) Status() int {

@@ -251,6 +251,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPlan(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	cart, err := s.plan.Get(r.Context(), principalFrom(r.Context()))
 	if err != nil {
 		s.writeError(w, r, err)
@@ -259,9 +260,18 @@ func (s *Server) getPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, cart)
 }
 
-// addPlanItem: PUT không có thân; khóa nhóm nằm trên đường dẫn. Trả giỏ sau khi thêm.
+// addPlanItem: khóa nhóm nằm trên đường dẫn; thân tùy chọn {name, qty, unit, category_key}
+// cho món từ taxonomy hoặc tự nhập (3.1). Trả giỏ sau khi thêm.
 func (s *Server) addPlanItem(w http.ResponseWriter, r *http.Request) {
-	cart, err := s.plan.Add(r.Context(), principalFrom(r.Context()), r.PathValue("key"))
+	r = withPlan(r)
+	var req plan.AddRequest
+	if r.ContentLength > 0 {
+		if err := decodeJSON(w, r, &req, maxJSONBody); err != nil {
+			s.writeError(w, r, err)
+			return
+		}
+	}
+	cart, err := s.plan.AddWith(r.Context(), principalFrom(r.Context()), r.PathValue("key"), req)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -271,6 +281,7 @@ func (s *Server) addPlanItem(w http.ResponseWriter, r *http.Request) {
 
 // patchPlanItem: sửa số lượng, đơn vị, need-by, ưu tiên, lý do của một dòng giỏ.
 func (s *Server) patchPlanItem(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	var patch plan.LinePatch
 	if err := decodeJSON(w, r, &patch, maxJSONBody); err != nil {
 		s.writeError(w, r, err)
@@ -285,6 +296,7 @@ func (s *Server) patchPlanItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) removePlanItem(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	if err := s.plan.Remove(r.Context(), principalFrom(r.Context()), r.PathValue("key")); err != nil {
 		s.writeError(w, r, err)
 		return
@@ -293,6 +305,7 @@ func (s *Server) removePlanItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) putPlanState(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	var st plan.State
 	if err := decodeJSON(w, r, &st, maxJSONBody); err != nil {
 		s.writeError(w, r, err)
@@ -307,6 +320,7 @@ func (s *Server) putPlanState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPlanPrices(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	pr, err := s.plan.Prices(r.Context(), principalFrom(r.Context()))
 	if err != nil {
 		s.writeError(w, r, err)

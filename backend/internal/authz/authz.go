@@ -55,15 +55,24 @@ const (
 	ActionManageHousehold
 	ActionJoinHousehold
 	ActionLeaveHousehold
-	ActionManageMandate // Household Mandate (Mimi 2.0 mục 13)
-	ActionBuyOnline     // giỏ online, PayPal, verify, refund
+	ActionManageMandate  // Household Mandate (Mimi 2.0 mục 13)
+	ActionBuyOnline      // giỏ online, PayPal, verify, refund
+	ActionAssignShopping // giao Kế hoạch cho một thành viên đi mua hộ (4.1 / 3B)
+	ActionInviteMember
 )
 
 var ownerOnly = map[Action]bool{
+	ActionSendAsk: true, ActionManageHousehold: true, ActionManageMandate: true, ActionBuyOnline: true,
+	ActionInviteMember: true,
+}
+
+// personal: dữ liệu riêng của chính người gọi (4.1 mục 4): mỗi thành viên có hóa đơn, tồn kho,
+// Kế hoạch, Sổ chi tiêu và khoản định kỳ của mình. Đường dẫn luôn ghép từ Principal.UID nên
+// không ai đọc được dữ liệu riêng của người khác qua các action này.
+var personal = map[Action]bool{
 	ActionReadReceipts: true, ActionWriteReceipts: true, ActionReadSpending: true,
 	ActionReadItemsFull: true, ActionWriteItems: true, ActionReadPlan: true,
-	ActionWritePlan: true, ActionManageRecurring: true, ActionSendAsk: true,
-	ActionManageHousehold: true, ActionManageMandate: true, ActionBuyOnline: true,
+	ActionWritePlan: true, ActionManageRecurring: true,
 }
 
 var anyone = map[Action]bool{
@@ -84,6 +93,10 @@ func Can(p Principal, a Action) error {
 	case anyone[a]:
 		return nil
 	case ownerOnly[a] && p.Role == RoleOwner:
+		return nil
+	case personal[a] && p.Role != RoleUnknown:
+		return nil
+	case a == ActionAssignShopping && p.HouseholdID != "" && p.Role != RoleUnknown:
 		return nil
 	case memberOnly[a] && p.Role == RoleMember:
 		return nil

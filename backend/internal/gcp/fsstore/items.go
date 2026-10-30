@@ -79,7 +79,7 @@ func decodeBaseline(v any) domain.Baseline {
 	b := domain.Baseline{Qty: asFloat(m["qty"])}
 	u, _ := m["unit"].(string)
 	src, _ := m["source"].(string)
-	b.Unit, b.Source = domain.Unit(u), domain.BaselineSource(src)
+	b.Unit, b.Source = domain.ParseUnit(u), domain.BaselineSource(src)
 	if s, _ := m["on"].(string); s != "" {
 		b.On, _ = domain.ParseDate(s)
 	}
@@ -114,7 +114,36 @@ func decodeRecord(snap *firestore.DocumentSnapshot) item.Record {
 	r.Baseline = decodeBaseline(d["stock"])
 	r.RatePerDay = asFloat(d["rate_per_day"])
 	r.Consumed = decodeConsumed(d["consumed"])
+	r.Extra = decodeExtra(d["extra_stock"])
 	return r
+}
+
+// extra_stock: {unit: {qty, unit, on, source, rate_per_day}} cho các chiều đo phụ.
+func decodeExtra(v any) map[domain.Unit]item.Stream {
+	m, _ := v.(map[string]any)
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[domain.Unit]item.Stream, len(m))
+	for k, x := range m {
+		xm, _ := x.(map[string]any)
+		u := domain.ParseUnit(k)
+		if u == "" || xm == nil {
+			continue
+		}
+		out[u] = item.Stream{Baseline: decodeBaseline(xm), RatePerDay: asFloat(xm["rate_per_day"])}
+	}
+	return out
+}
+
+func extraDoc(m map[domain.Unit]item.Stream) map[string]any {
+	out := make(map[string]any, len(m))
+	for u, x := range m {
+		d := baselineDoc(x.Baseline)
+		d["rate_per_day"] = x.RatePerDay
+		out[string(u)] = d
+	}
+	return out
 }
 
 // ListItems đọc toàn bộ items của một người: mỗi nhà chỉ vài trăm món, lọc và tìm
@@ -248,4 +277,41 @@ func (s *Store) OwnerOf(ctx context.Context, householdID string) (string, error)
 		return "", apperr.ErrNotFound
 	}
 	return owner, nil
+}
+
+var _ item.LotReader = (*Store)(nil)
+
+// Lots: mỗi purchase đã xác nhận của nhóm là một lot (0.1 mục 11). Purchase cần xem lại
+// hoặc chưa có lượng canonical không phải lot.
+func (s *Store) Lots(ctx context.Context, uid, key string, limit int) ([]domain.Lot, error) {
+	docs, err := s.user(uid).Collection("purchases").
+		Where("group_key", "==", key).Where("habit", "==", true).
+		OrderBy("purchased_on", firestore.Desc).Limit(limit).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("lots: %w", err)
+	}
+	out := make([]domain.Lot, 0, len(docs))
+	for _, d := range docs {
+		m := d.Data()
+		if rev, _ := m["needs_review"].(bool); rev {
+			continue
+		}
+		q, unit := purchaseQty(m)
+		if q <= 0 {
+			continue
+		}
+		on, _ := domain.ParseDate(fmt.Sprint(m["purchased_on"]))
+		l := domain.Lot{ID: d.Ref.ID, On: on, Initial: q, Unit: unit, Source: "receipt"}
+		l.DetailName, _ = m["detail_name"].(string)
+		if l.DetailName == "" {
+			l.DetailName, _ = m["name"].(string)
+		}
+		l.Brand, _ = m["brand"].(string)
+		l.Store, _ = m["store"].(string)
+		if src, _ := m["source"].(string); src == "delivery" {
+			l.Source = "delivery"
+		}
+		out = append(out, l)
+	}
+	return out, nil
 }

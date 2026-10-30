@@ -62,8 +62,8 @@ func New(store Store, needs NeedsCounter, plan PlanSummary, now func() time.Time
 	return &Service{store: store, needs: needs, plan: plan, now: now}
 }
 
-// Get trả số phụ Trang chủ. Thành viên nhà không thấy chi tiêu hay giỏ của chủ nhà
-// (spec mục 2): hai trường đó luôn rỗng với vai trò member.
+// Get trả số phụ Trang chủ. Mỗi thành viên thấy chi tiêu và Kế hoạch của chính mình
+// (4.1 mục 4); không ai thấy số của người khác vì mọi đường dẫn ghép từ p.UID.
 func (s *Service) Get(ctx context.Context, p authz.Principal) (Summary, error) {
 	if err := authz.Can(p, authz.ActionReadSelf); err != nil {
 		return Summary{}, err

@@ -175,7 +175,7 @@ func TestQuantity(t *testing.T) {
 	if q, u := ToBase(2, "Kg"); q != 2000 || u != UnitGram {
 		t.Fatalf("kg: %v %v", q, u)
 	}
-	if q, u := ToBase(3, "Hộp"); q != 3 || u != UnitPiece {
+	if q, u := ToBase(3, "Hộp"); q != 3 || u != UnitItem {
 		t.Fatalf("hop: %v %v", q, u)
 	}
 	if q, u := ToBase(1.5, "L"); q != 1500 || u != UnitML {
@@ -193,7 +193,7 @@ func TestQuantity(t *testing.T) {
 	if nb.Qty != 2500 || !nb.On.Equal(d("2026-10-11")) {
 		t.Fatalf("after purchase %+v", nb)
 	}
-	if nb := AfterPurchase(b, 50, nil, 3, UnitPiece, d("2026-10-11"), BaselineReceipt); nb.Qty != 3 {
+	if nb := AfterPurchase(b, 50, nil, 3, UnitItem, d("2026-10-11"), BaselineReceipt); nb.Qty != 3 {
 		t.Fatalf("unit change keeps only new qty: %+v", nb)
 	}
 	if r := ConsumptionRate([]float64{1000, 2000}, 10); r != 150 {

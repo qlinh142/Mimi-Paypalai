@@ -194,11 +194,11 @@ func TestRules(t *testing.T) {
 	if _, err := svc.Add(ctx, owner, "../x"); !errors.Is(err, apperr.ErrNotFound) {
 		t.Fatalf("invalid key err=%v", err)
 	}
-	if _, err := svc.Get(ctx, member); !errors.Is(err, apperr.ErrForbidden) {
-		t.Fatalf("member read err=%v", err)
+	if _, err := svc.Get(ctx, member); err != nil {
+		t.Fatalf("member reads own plan err=%v", err)
 	}
-	if _, err := svc.Add(ctx, member, "sua"); !errors.Is(err, apperr.ErrForbidden) {
-		t.Fatalf("member write err=%v", err)
+	if _, err := svc.Add(ctx, authz.Principal{UID: "x"}, "sua"); !errors.Is(err, apperr.ErrForbidden) {
+		t.Fatalf("unknown role write err=%v", err)
 	}
 	for i := 0; i < MaxCartLines; i++ {
 		st.lines[string(rune('a'+i%26))+strings.Repeat("x", i/26+1)] = Line{}

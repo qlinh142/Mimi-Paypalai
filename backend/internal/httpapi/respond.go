@@ -10,9 +10,10 @@ import (
 )
 
 type errorBody struct {
-	Code    apperr.Code    `json:"code"`
-	Message string         `json:"message"`
-	Fields  map[string]any `json:"fields,omitempty"`
+	Code      apperr.Code    `json:"code"`
+	Message   string         `json:"message"`
+	Fields    map[string]any `json:"fields,omitempty"`
+	Retryable bool           `json:"retryable"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -37,7 +38,7 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	if status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable {
 		w.Header().Set("Retry-After", "30")
 	}
-	writeJSON(w, status, errorBody{Code: ae.Code, Message: ae.Message, Fields: ae.Fields})
+	writeJSON(w, status, errorBody{Code: ae.Code, Message: ae.Message, Fields: ae.Fields, Retryable: ae.Retryable()})
 }
 
 // decodeJSON đọc đúng một object JSON, từ chối trường lạ (chống ghi đè trường không

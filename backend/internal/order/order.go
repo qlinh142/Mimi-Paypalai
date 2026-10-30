@@ -228,9 +228,15 @@ func (s *Service) Basket(ctx context.Context, p authz.Principal, keys []string) 
 	if err := authz.Can(p, authz.ActionBuyOnline); err != nil {
 		return Basket{}, err
 	}
-	lines, err := s.plans.OpenLines(ctx, p.UID)
+	all, err := s.plans.OpenLines(ctx, p.UID)
 	if err != nil {
 		return Basket{}, err
+	}
+	lines := make([]plan.Line, 0, len(all))
+	for _, l := range all {
+		if !l.Assigned() { // dòng đang nhờ người khác mua không vào giỏ online
+			lines = append(lines, l)
+		}
 	}
 	today := domain.Today(s.now(), domain.Location(p.Timezone))
 	b := buildBasket(s.catalog, lines, keys, today)
@@ -348,12 +354,15 @@ func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutR
 	if err != nil {
 		return Order{}, err
 	}
+	// Mandate chặn trước: món ngoài Kế hoạch không có giá nên giỏ có thể rỗng tiền, nhưng lý
+	// do người dùng cần thấy là vi phạm ủy quyền.
+	if b.Decision.Result == Block {
+		return Order{}, apperr.New(apperr.CodeMandateBlocked, "Đơn vi phạm phạm vi ủy quyền.").With("reasons", b.Decision.Reasons)
+	}
 	if len(b.Lines) == 0 || b.TotalVND <= 0 {
 		return Order{}, apperr.New(apperr.CodeValidation, "Giỏ online chưa có món nào merchant bán.").With("missing", b.Missing)
 	}
 	switch b.Decision.Result {
-	case Block:
-		return Order{}, apperr.New(apperr.CodeMandateBlocked, "Đơn vi phạm phạm vi ủy quyền.").With("reasons", b.Decision.Reasons)
 	case Ask:
 		if !req.Approve {
 			return Order{}, apperr.New(apperr.CodeApprovalRequired, "Đơn cần bạn duyệt.").With("reasons", b.Decision.Reasons)

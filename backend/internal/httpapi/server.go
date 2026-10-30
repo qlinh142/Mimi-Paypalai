@@ -8,15 +8,19 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
+	"github.com/smartlife-lab/mimi/backend/internal/household"
 	"github.com/smartlife-lab/mimi/backend/internal/inbox"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
 	"github.com/smartlife-lab/mimi/backend/internal/order"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
+	"github.com/smartlife-lab/mimi/backend/internal/pricing"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
+	"github.com/smartlife-lab/mimi/backend/internal/recurring"
 	"github.com/smartlife-lab/mimi/backend/internal/spending"
 	"github.com/smartlife-lab/mimi/backend/internal/user"
 )
@@ -60,6 +64,38 @@ type (
 		Remove(ctx context.Context, p authz.Principal, key string) error
 		SetState(ctx context.Context, p authz.Principal, st plan.State) (plan.State, error)
 		Prices(ctx context.Context, p authz.Principal) (plan.Prices, error)
+		AddWith(ctx context.Context, p authz.Principal, key string, req plan.AddRequest) (plan.Cart, error)
+		Plans(ctx context.Context, p authz.Principal) ([]plan.Meta, error)
+		CreatePlan(ctx context.Context, p authz.Principal, in plan.PlanInput) (plan.Meta, error)
+		UpdatePlan(ctx context.Context, p authz.Principal, id string, in plan.PlanInput) (plan.Meta, error)
+		DeletePlan(ctx context.Context, p authz.Principal, id string) error
+	}
+	// Recurring là khoản định kỳ và Dự báo 30 ngày (2.1).
+	Recurring interface {
+		List(ctx context.Context, p authz.Principal) (recurring.List, error)
+		Create(ctx context.Context, p authz.Principal, in recurring.Input) (recurring.View, error)
+		Update(ctx context.Context, p authz.Principal, id string, in recurring.Input) (recurring.View, error)
+		Delete(ctx context.Context, p authz.Principal, id string) error
+		Pay(ctx context.Context, p authz.Principal, occurrenceID string, req recurring.SettleRequest) (recurring.Occurrence, error)
+		Skip(ctx context.Context, p authz.Principal, occurrenceID string) (recurring.Occurrence, error)
+		Forecast(ctx context.Context, p authz.Principal) (recurring.Forecast, error)
+	}
+	// Households là Nhà và Gửi kế hoạch mua hộ (4.1).
+	Households interface {
+		Get(ctx context.Context, p authz.Principal, me household.Member) (household.Household, error)
+		Rename(ctx context.Context, p authz.Principal, me household.Member, patch household.Patch) (household.Household, error)
+		Invite(ctx context.Context, p authz.Principal, me household.Member) (household.Invite, error)
+		Join(ctx context.Context, p authz.Principal, me household.Member, req household.JoinRequest) (household.Household, error)
+		Leave(ctx context.Context, p authz.Principal) error
+		RemoveMember(ctx context.Context, p authz.Principal, uid string) error
+		Assign(ctx context.Context, p authz.Principal, req household.AssignRequest) (household.Assignment, error)
+		Cancel(ctx context.Context, p authz.Principal, id string) (household.Assignment, error)
+		Delegated(ctx context.Context, p authz.Principal) (household.Delegated, error)
+	}
+	// Pricing là lịch sử giá dùng chung cho Đồ dùng và Kế hoạch (8.1).
+	Pricing interface {
+		Item(ctx context.Context, p authz.Principal, key string) (pricing.ItemHistory, error)
+		Basket(ctx context.Context, p authz.Principal) (pricing.Basket, error)
 	}
 	Notifications interface {
 		List(ctx context.Context, p authz.Principal) (inbox.List, error)
@@ -103,7 +139,10 @@ type Deps struct {
 	Settings   Settings
 	Plan       Plan
 	Notes      Notifications
-	Orders     Orders // nil: các route Mimi Online trả 501
+	Orders     Orders     // nil: các route Mimi Online trả 501
+	Recurring  Recurring  // nil: các route khoản định kỳ trả 501
+	Households Households // nil: các route nhà trả 501
+	Pricing    Pricing    // nil: các route lịch sử giá trả 501
 	Ready      ReadinessChecker
 	Metrics    Metrics // nil: không ghi metric
 }
@@ -122,6 +161,9 @@ type Server struct {
 	plan       Plan
 	notes      Notifications
 	orders     Orders
+	recurring  Recurring
+	households Households
+	pricing    Pricing
 	ready      ReadinessChecker
 	metrics    Metrics
 	limiter    *windowLimiter
@@ -151,6 +193,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		log: d.Log, tokens: d.Tokens, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
+		recurring: d.Recurring, households: d.Households, pricing: d.Pricing,
 		limiter: newWindowLimiter(60), readTimeout: 55 * time.Second, defaultTimeout: 10 * time.Second,
 	}
 	if s.metrics == nil {
@@ -183,6 +226,7 @@ func (s *Server) Handler() http.Handler {
 	}
 
 	public("GET /healthz", s.healthz)
+	public("GET /health", s.healthz)
 	public("GET /readyz", s.readyz)
 
 	private("GET /me", s.defaultTimeout, s.getMe)
@@ -204,6 +248,36 @@ func (s *Server) Handler() http.Handler {
 	private("PUT /plan/state", s.defaultTimeout, s.putPlanState)
 	private("GET /plan/prices", s.defaultTimeout, s.getPlanPrices)
 	private("GET /notifications", s.defaultTimeout, s.getNotifications)
+	private("GET /taxonomy", s.defaultTimeout, s.getTaxonomy)
+	private("GET /plans", s.defaultTimeout, s.listPlans)
+	private("POST /plans", s.defaultTimeout, s.createPlan)
+	private("PATCH /plans/{id}", s.defaultTimeout, s.patchPlan)
+	private("DELETE /plans/{id}", s.defaultTimeout, s.deletePlan)
+
+	if s.recurring != nil {
+		private("GET /recurring", s.defaultTimeout, s.listRecurring)
+		private("POST /recurring", s.defaultTimeout, s.createRecurring)
+		private("PATCH /recurring/{id}", s.defaultTimeout, s.patchRecurring)
+		private("DELETE /recurring/{id}", s.defaultTimeout, s.deleteRecurring)
+		private("POST /recurring/occurrences/{id}/pay", s.defaultTimeout, s.payOccurrence)
+		private("POST /recurring/occurrences/{id}/skip", s.defaultTimeout, s.skipOccurrence)
+		private("GET /forecast", s.defaultTimeout, s.getForecast)
+	}
+	if s.households != nil {
+		private("GET /households", s.defaultTimeout, s.getHousehold)
+		private("PATCH /households", s.defaultTimeout, s.patchHousehold)
+		private("POST /households/invites", s.defaultTimeout, s.postInvite)
+		private("POST /households/join", s.defaultTimeout, s.postJoin)
+		private("POST /households/leave", s.defaultTimeout, s.postLeave)
+		private("DELETE /households/members/{uid}", s.defaultTimeout, s.deleteMember)
+		private("POST /households/shopping-assignments", s.defaultTimeout, s.postAssignment)
+		private("POST /households/shopping-assignments/{id}/cancel", s.defaultTimeout, s.cancelAssignment)
+		private("GET /plan/delegated", s.defaultTimeout, s.getDelegated)
+	}
+	if s.pricing != nil {
+		private("GET /items/{key}/price-history", s.defaultTimeout, s.getItemPriceHistory)
+		private("GET /plan/price-history", s.defaultTimeout, s.getPlanPriceHistory)
+	}
 
 	if s.orders != nil {
 		private("GET /mandate", s.defaultTimeout, s.getMandate)
@@ -221,6 +295,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Các endpoint còn lại đã có trong api/openapi.yaml nhưng chưa dựng ở khung này.
 	for _, p := range notYetImplemented {
+		if s.implemented(p) {
+			continue
+		}
 		private(p, s.defaultTimeout, s.notImplemented)
 	}
 
@@ -228,6 +305,17 @@ func (s *Server) Handler() http.Handler {
 	root.Handle("/api/", http.StripPrefix("/api", mux))
 	root.Handle("/", mux)
 	return root
+}
+
+// implemented: route trong notYetImplemented đã có handler khi phụ thuộc tương ứng được nối.
+func (s *Server) implemented(p string) bool {
+	switch {
+	case strings.Contains(p, "/recurring") || p == "GET /forecast":
+		return s.recurring != nil && p != "POST /recurring/scan"
+	case strings.Contains(p, "/households") && !strings.Contains(p, "/asks"):
+		return s.households != nil
+	}
+	return false
 }
 
 var notYetImplemented = []string{

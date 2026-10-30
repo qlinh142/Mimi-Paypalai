@@ -8,6 +8,7 @@ package plan
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -34,7 +35,14 @@ type Line struct {
 	Source      string  // forecast | check | meal | manual
 	Reason      string
 	BoughtQty   float64 // đã mua theo hóa đơn/giao hàng, cùng đơn vị gốc với Qty; > 0 và < Qty: mua thiếu
+	// Status: open, hoặc assigned khi dòng đang giao cho một thành viên mua hộ (4.1 mục 8.1).
+	// Dòng assigned hiện trong Giỏ để Owner thấy, nhưng không sửa được và không vào ước tính.
+	Status     string
+	AssignedTo string
 }
+
+// Assigned báo dòng đang nằm trong một vòng mua hộ.
+func (l Line) Assigned() bool { return l.Status == "assigned" }
 
 // Nguồn của một dòng Kế hoạch (Mimi 2.0 mục 6).
 const (
@@ -87,6 +95,9 @@ const MaxCartLines = 100
 
 const maxTripNote = 120
 
+// DefaultPlanID là Plan mặc định của mỗi người, giữ ở đường dẫn cũ plan_items / plan_state.
+const DefaultPlanID = "default"
+
 // CartItem là một món trong Giỏ, kèm tồn hiện tại và giá rẻ nhất đã biết.
 type CartItem struct {
 	Key         string        `json:"key"`
@@ -103,10 +114,13 @@ type CartItem struct {
 	Source      string        `json:"source"`
 	Reason      string        `json:"reason,omitempty"`
 	BoughtQty   float64       `json:"bought_qty,omitempty"` // > 0: đã mua một phần
+	LineStatus  string        `json:"line_status"`          // open | assigned
+	AssignedTo  string        `json:"assigned_to_uid,omitempty"`
 }
 
 // Cart là phản hồi GET /plan.
 type Cart struct {
+	PlanID       string     `json:"plan_id"`
 	Items        []CartItem `json:"items"`
 	ItemCount    int        `json:"item_count"`
 	Estimate     *int64     `json:"estimate"`      // tổng theo phương án khuyên dùng; null khi chưa món nào có giá
@@ -135,6 +149,7 @@ type Prices struct {
 type Service struct {
 	store Store
 	items Items
+	plans PlansStore // nil: chỉ Plan mặc định
 	now   func() time.Time
 }
 
@@ -150,6 +165,9 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Cart, error) {
 	if err := authz.Can(p, authz.ActionReadPlan); err != nil {
 		return Cart{}, err
 	}
+	if err := s.checkPlan(ctx, p.UID, false); err != nil {
+		return Cart{}, err
+	}
 	lines, err := s.store.OpenLines(ctx, p.UID)
 	if err != nil {
 		return Cart{}, err
@@ -158,7 +176,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Cart, error) {
 	if err != nil {
 		return Cart{}, err
 	}
-	cart := Cart{Items: []CartItem{}, State: state}
+	cart := Cart{PlanID: IDFrom(ctx), Items: []CartItem{}, State: state}
 	if len(lines) == 0 {
 		return cart, nil
 	}
@@ -170,7 +188,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Cart, error) {
 	for _, r := range recs {
 		byKey[r.GroupKey] = r
 	}
-	sp, prices, err := s.plan(ctx, p.UID, lines)
+	sp, prices, err := s.plan(ctx, p.UID, openOnly(lines))
 	if err != nil {
 		return Cart{}, err
 	}
@@ -180,6 +198,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Cart, error) {
 			Key: l.Key, Name: l.Name, CategoryKey: l.CategoryKey, Status: domain.StatusWaiting,
 			Qty: l.Qty, Unit: l.Unit, NeedBy: l.NeedBy, Priority: orDefault(l.Priority, "normal"),
 			Source: orDefault(l.Source, SourceManual), Reason: l.Reason, BoughtQty: l.BoughtQty,
+			LineStatus: orDefault(l.Status, "open"), AssignedTo: l.AssignedTo,
 		}
 		if r, ok := byKey[l.Key]; ok {
 			v := domain.ViewAt(r.Prediction, today, leadDays(p))
@@ -205,6 +224,7 @@ func (s *Service) Summary(ctx context.Context, p authz.Principal) (count int, es
 		return 0, nil, 0, err
 	}
 	lines, err := s.store.OpenLines(ctx, p.UID)
+	lines = openOnly(lines)
 	if err != nil || len(lines) == 0 {
 		return 0, nil, 0, err
 	}
@@ -218,15 +238,31 @@ func (s *Service) Summary(ctx context.Context, p authz.Principal) (count int, es
 
 // Add cho một món trong Đồ dùng vào giỏ. Gọi lại nhiều lần vẫn chỉ có một dòng.
 func (s *Service) Add(ctx context.Context, p authz.Principal, key string) (Cart, error) {
+	return s.AddWith(ctx, p, key, AddRequest{})
+}
+
+// AddWith như Add, và nhận món chưa có trong Đồ dùng: nhóm taxonomy hoặc món tự nhập.
+func (s *Service) AddWith(ctx context.Context, p authz.Principal, key string, req AddRequest) (Cart, error) {
 	if err := authz.Can(p, authz.ActionWritePlan); err != nil {
 		return Cart{}, err
 	}
 	if !item.ValidKey(key) {
 		return Cart{}, apperr.ErrNotFound
 	}
+	if err := s.checkPlan(ctx, p.UID, true); err != nil {
+		return Cart{}, err
+	}
 	rec, err := s.items.GetItem(ctx, p.UID, key)
+	var fresh *Line
+	if errors.Is(err, apperr.ErrNotFound) {
+		l, lerr := s.lineFor(key, req)
+		if lerr != nil {
+			return Cart{}, lerr // apperr.ErrNotFound khi không phải món đã biết, nhóm taxonomy hay món tự nhập
+		}
+		fresh, key, err = &l, l.Key, nil
+	}
 	if err != nil {
-		return Cart{}, err // apperr.ErrNotFound khi món không có trong Đồ dùng
+		return Cart{}, err
 	}
 	lines, err := s.store.OpenLines(ctx, p.UID)
 	if err != nil {
@@ -242,7 +278,11 @@ func (s *Service) Add(ctx context.Context, p authz.Principal, key string) (Cart,
 	if !already && len(lines) >= MaxCartLines {
 		return Cart{}, apperr.New(apperr.CodeValidation, "Giỏ đã đủ 100 món.").With("limit", MaxCartLines)
 	}
-	if !already {
+	if !already && fresh != nil {
+		if err := s.store.AddLine(ctx, p.UID, *fresh); err != nil {
+			return Cart{}, err
+		}
+	} else if !already {
 		l := Line{Key: key, Name: rec.Name, CategoryKey: rec.CategoryKey, AddedAt: s.now(), Qty: 1, Priority: "normal", Source: SourceCheck}
 		today := domain.Today(s.now(), domain.Location(p.Timezone))
 		if v := domain.ViewAt(rec.Prediction, today, leadDays(p)); domain.InNeeds(v, item.NeedsHorizonDays) {
@@ -269,6 +309,9 @@ func (s *Service) UpdateLine(ctx context.Context, p authz.Principal, key string,
 	if !item.ValidKey(key) {
 		return Cart{}, apperr.ErrNotFound
 	}
+	if err := s.checkPlan(ctx, p.UID, true); err != nil {
+		return Cart{}, err
+	}
 	lines, err := s.store.OpenLines(ctx, p.UID)
 	if err != nil {
 		return Cart{}, err
@@ -282,6 +325,9 @@ func (s *Service) UpdateLine(ctx context.Context, p authz.Principal, key string,
 	}
 	if l == nil {
 		return Cart{}, apperr.ErrNotFound
+	}
+	if l.Assigned() {
+		return Cart{}, apperr.New(apperr.CodeInvalidState, "Món này đang được nhờ mua. Hủy vòng mua hộ trước khi sửa.").With("key", key)
 	}
 	bad := func(field, msg string) error {
 		return apperr.New(apperr.CodeValidation, msg).With("field", field)
@@ -343,12 +389,27 @@ func (s *Service) Remove(ctx context.Context, p authz.Principal, key string) err
 	if !item.ValidKey(key) {
 		return apperr.ErrNotFound
 	}
+	if err := s.checkPlan(ctx, p.UID, true); err != nil {
+		return err
+	}
+	lines, err := s.store.OpenLines(ctx, p.UID)
+	if err != nil {
+		return err
+	}
+	for _, l := range lines {
+		if l.Key == key && l.Assigned() {
+			return apperr.New(apperr.CodeInvalidState, "Món này đang được nhờ mua. Hủy vòng mua hộ trước khi xóa.").With("key", key)
+		}
+	}
 	return s.store.RemoveLine(ctx, p.UID, key)
 }
 
 // SetState lưu ngày, giờ và ghi chú cho chuyến mua.
 func (s *Service) SetState(ctx context.Context, p authz.Principal, st State) (State, error) {
 	if err := authz.Can(p, authz.ActionWritePlan); err != nil {
+		return State{}, err
+	}
+	if err := s.checkPlan(ctx, p.UID, true); err != nil {
 		return State{}, err
 	}
 	st.TripNote = strings.TrimSpace(st.TripNote)
@@ -392,11 +453,14 @@ func (s *Service) Prices(ctx context.Context, p authz.Principal) (Prices, error)
 	if err := authz.Can(p, authz.ActionReadPlan); err != nil {
 		return Prices{}, err
 	}
+	if err := s.checkPlan(ctx, p.UID, false); err != nil {
+		return Prices{}, err
+	}
 	lines, err := s.store.OpenLines(ctx, p.UID)
 	if err != nil {
 		return Prices{}, err
 	}
-	sp, _, err := s.plan(ctx, p.UID, lines)
+	sp, _, err := s.plan(ctx, p.UID, openOnly(lines))
 	if err != nil {
 		return Prices{}, err
 	}
@@ -470,6 +534,17 @@ func cheapest(m map[string]domain.VND) (string, domain.VND, bool) {
 		}
 	}
 	return best, price, price >= 0
+}
+
+// openOnly bỏ các dòng đang giao cho người khác mua: không vào ước tính và Nơi mua.
+func openOnly(lines []Line) []Line {
+	out := make([]Line, 0, len(lines))
+	for _, l := range lines {
+		if !l.Assigned() {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 func nonNil(xs []string) []string {
