@@ -81,10 +81,33 @@ const MOCK_PRICES: Record<string, Record<string, number>> = {
   "giay-ve-sinh": { "Co.opmart": 78_000, "Bách Hóa Xanh": 72_000 },
   "bot-giat": { "Bách Hóa Xanh": 155_000, "Co.opmart": 189_000 },
 };
-const cart = new Set<string>(["sua-tuoi", "nuoc-rua-chen", "trung-ga"]);
+let cart = new Set<string>(["sua-tuoi", "nuoc-rua-chen", "trung-ga"]);
 /** Chi tiết dòng Kế hoạch (số lượng, ngày cần, ưu tiên); vắng: mặc định như backend. */
-const planLines = new Map<string, PlanLinePatch & { source?: CartItem["source"]; bought_qty?: number }>();
+type MockLine = PlanLinePatch & { source?: CartItem["source"]; bought_qty?: number; line_status?: "open" | "assigned"; assigned_to_uid?: string };
+let planLines = new Map<string, MockLine>();
 let planState: PlanState = { buy_date: "", buy_hour: null, trip_note: "" };
+/** Món chưa có trong Đồ dùng: nhóm taxonomy hoặc món tự nhập (3.1). */
+const extraNames = new Map<string, string>();
+
+/** Nhiều Kế hoạch (3.1): mỗi Kế hoạch đặt tên có giỏ riêng; "default" dùng các biến ở trên. */
+type MockPlan = { name: string; status: "active" | "archived"; created: number; cart: Set<string>; lines: Map<string, MockLine>; state: PlanState };
+const namedPlans = new Map<string, MockPlan>();
+
+/** Chạy fn trên Kế hoạch plan_id của request bằng cách đổi tạm các biến giỏ. */
+function inPlan<T>(id: string | null, fn: () => T): T {
+  const p = id && id !== "default" ? namedPlans.get(id) : undefined;
+  if (!p) return fn();
+  const saved = { cart, planLines, planState };
+  cart = p.cart;
+  planLines = p.lines;
+  planState = p.state;
+  try {
+    return fn();
+  } finally {
+    p.state = planState;
+    ({ cart, planLines, planState } = saved);
+  }
+}
 
 /** Cùng quy tắc với domain.PlanShopping: tách nơi khi tiết kiệm từ 10.000đ. */
 function mockPrices(): PlanPrices {
@@ -116,7 +139,9 @@ function mockPrices(): PlanPrices {
 
 function mockCart(): Cart {
   const pr = mockPrices();
-  const lines = [...cart].map((k) => items.find((i) => i.key === k)).filter((i): i is Item => !!i);
+  const lines = [...cart]
+    .map((k) => items.find((i) => i.key === k) ?? (extraNames.has(k) ? extraItem(k) : undefined))
+    .filter((i): i is Item => !!i);
   const estimate = !lines.some((i) => MOCK_PRICES[i.key])
     ? null
     : pr.recommend === "single" && pr.single_store
@@ -130,6 +155,7 @@ function mockCart(): Cart {
         unit_price: best ? best[1] : null, ...(best ? { best_store: best[0] } : {}),
         qty: 1, priority: "normal", source: isSoon(i, 7) ? "forecast" : "check",
         ...(i.predicted_out_on && isSoon(i, 7) ? { need_by: i.predicted_out_on } : {}),
+        line_status: "open",
         ...planLines.get(i.key),
       } satisfies CartItem;
     }),
@@ -140,10 +166,25 @@ function mockCart(): Cart {
   };
 }
 
+function extraItem(key: string): Item {
+  return {
+    key, name: extraNames.get(key) ?? key, category_key: "khac", category_label: "", status: "waiting",
+    days_left: null, purchase_count: 0, source: "predicted",
+  };
+}
+
 export async function mockFetch(path: string, init: RequestInit): Promise<Response> {
   await delay();
   const url = new URL(path, "http://mock");
   const method = (init.method ?? "GET").toUpperCase();
+  const p = url.pathname;
+  const extra = mockM1(method, url, init);
+  if (extra) return extra;
+  if (p.startsWith("/plan")) return inPlan(url.searchParams.get("plan_id"), () => mockCore(method, url, init));
+  return mockCore(method, url, init);
+}
+
+async function mockCore(method: string, url: URL, init: RequestInit): Promise<Response> {
   const p = url.pathname;
 
   if (method === "GET" && p === "/me") {
@@ -189,7 +230,7 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
         store: "Co.opmart",
         amount_vnd: 32_000,
       }));
-      return json({ ...it, history });
+      return json({ ...it, history, lots: mockLots(it) });
     }
     if (method === "PATCH" && sub === "/stock") {
       const body = JSON.parse(String(init.body ?? "{}")) as { quick?: "plenty" | "soon" | "out" };
@@ -203,8 +244,14 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
       return json(items.find((x) => x.key === key));
     }
     if (method === "PUT" && sub === "/quantity") {
-      const body = JSON.parse(String(init.body ?? "{}")) as { qty: number; unit: string };
-      const [qty, unit] = toBase(body.qty, body.unit);
+      const body = JSON.parse(String(init.body ?? "{}")) as { qty: number; unit: string; action?: string };
+      let [qty, unit] = toBase(body.qty, body.unit);
+      // 0.1 mục 14: increase / decrease theo tồn hiện tại, mark_out về 0.
+      if (body.action === "mark_out") [qty, unit] = [0, it.stock?.unit === "pc" || !it.stock ? "pc" : (it.stock.unit as "g" | "ml")];
+      else if (body.action === "increase" || body.action === "decrease") {
+        if (!it.stock) return json({ code: "invalid_state", message: L ? "Set a quantity first." : "Hãy nhập số lượng hiện có trước." }, 409);
+        qty = Math.max(0, it.stock.estimated + (body.action === "increase" ? qty : -qty));
+      }
       if (!(qty >= 0)) return json({ code: "validation_failed", message: "qty" }, 422);
       const on = iso(today);
       items = items.map((x) =>
@@ -236,7 +283,7 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
       line("l1", "Unsweetened fresh milk 1L", "Sữa tươi không đường 1L", 2, 64_000, "sua"),
       line("l2", "Dish soap 750ml", "Nước rửa chén 750ml", 1, 38_000, "hoa-pham"),
       line("l3", "Eggs, box of 10", "Trứng gà hộp 10", 1, 36_000, "tuoi-song"),
-      line("l4", "Butter cookies", "Bánh quy bơ", 1, 74_000),
+      { ...line("l4", "Butter cookies", "Bánh quy bơ", 1, 74_000), needs_review: true, review_reasons: ["missing_category", "missing_group"] as ("missing_category" | "missing_group")[] },
     ];
     const draft: ReceiptDraft = {
       receipt_id: String(form.get("receipt_id")),
@@ -257,7 +304,7 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
   if (method === "POST" && p === "/receipts") {
     // Như backend: từ chối trường lạ (DisallowUnknownFields), để bản thử bắt được lỗi lệch hợp đồng.
     const body = JSON.parse(String(init.body)) as Record<string, unknown> & { receipt_id: string; lines?: Record<string, unknown>[] };
-    const top = ["receipt_id", "store", "purchased_on", "currency", "discount_total", "lines", "use_for_prediction", "confirm_duplicate"];
+    const top = ["receipt_id", "store", "purchased_on", "currency", "discount_total", "lines", "use_for_prediction", "confirm_duplicate", "source_plan_id", "assignment_id"];
     const lineKeys = ["line_id", "name", "qty", "unit", "amount", "category_key", "group_key", "habit"];
     const unknown =
       Object.keys(body).some((k) => !top.includes(k)) ||
@@ -325,7 +372,12 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
   if (planItem) {
     const key = decodeURIComponent(planItem[1]);
     if (method === "PUT") {
-      if (!items.some((i) => i.key === key)) return json({ code: "not_found", message: "Not found" }, 404);
+      if (!items.some((i) => i.key === key)) {
+        const body = init.body ? (JSON.parse(String(init.body)) as { name?: string }) : {};
+        const tax = TAXONOMY.find((g) => g.key === key);
+        if (!tax && !(key.startsWith("custom-") && body.name)) return json({ code: "not_found", message: "Not found" }, 404);
+        extraNames.set(key, body.name || (tax ? tax.labels[L ? "en" : "vi"] : key));
+      }
       cart.add(key);
       return json(mockCart());
     }
@@ -501,6 +553,264 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
       const r = { id: `FAKEREF-${o.refunds.length + 1}`, ref: `${o.id}-r${o.refunds.length + 1}`, amount_vnd: amount, amount_usd: usd(amount), reason: b.reason, status: "COMPLETED", at: now() };
       return set({ ...o, refunds: [...o.refunds, r], refunded_vnd: o.refunded_vnd + amount, net_vnd: o.net_vnd - amount, suggested_refund_vnd: Math.max(0, o.suggested_refund_vnd - amount) });
     }
+  }
+  return null;
+}
+
+// ================= Bộ spec Mimi 1.0 (bản thử) =================
+
+const TAXONOMY = [
+  ["sua-tuoi", "sua", "Sữa tươi", "Fresh milk"], ["sua-chua", "sua", "Sữa chua", "Yogurt"], ["banh-mi", "do-kho", "Bánh mì", "Bread"],
+  ["rau-la", "tuoi-song", "Rau lá", "Leafy greens"], ["thit-heo", "tuoi-song", "Thịt heo", "Pork"], ["ca-tuoi", "tuoi-song", "Cá tươi", "Fresh fish"],
+  ["nuoc-giat", "hoa-pham", "Nước giặt", "Laundry liquid"], ["sua-tam", "ve-sinh", "Sữa tắm", "Body wash"], ["mi-goi", "do-kho", "Mì gói", "Instant noodles"],
+  ["dau-an", "gia-vi", "Dầu ăn", "Cooking oil"], ["trai-cay", "tuoi-song", "Trái cây", "Fruit"], ["ta-giay", "me-be", "Tã giấy", "Diapers"],
+].map(([key, parent, vi, en]) => ({ key, parent, labels: { vi, en }, label: L ? en : vi, measurement: "count", unit: "item" }));
+
+const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
+
+function mockLots(it: Item) {
+  if (!it.stock || it.purchase_count === 0) return [];
+  let left = it.stock.estimated;
+  const unit = it.stock.unit === "pc" ? "item" : it.stock.unit;
+  return Array.from({ length: Math.min(3, it.purchase_count) }, (_, n) => {
+    const initial = unit === "item" ? 10 : 1000;
+    const remaining = Math.max(0, Math.min(initial, left));
+    left -= remaining;
+    return {
+      lot_id: `${it.key}-${n}`, detail_name: it.name, store: "Co.opmart", purchased_at: iso(new Date(today.getTime() - n * 12 * 86_400_000)),
+      initial_quantity: initial, canonical_unit: unit, remaining_quantity: remaining, inventory_source: "receipt",
+    };
+  });
+}
+
+type MockRecurring = { id: string; name: string; amount: number; cycle: "weekly" | "monthly" | "quarterly" | "yearly"; next_due_at: string; active: boolean };
+let recurring: MockRecurring[] = [
+  { id: "netflix", name: "Netflix", amount: 104_499, cycle: "monthly", next_due_at: iso(new Date(today.getTime() + 3 * 86_400_000)), active: true },
+  { id: "internet", name: "Internet Viettel", amount: 250_000, cycle: "monthly", next_due_at: iso(new Date(today.getTime() + 12 * 86_400_000)), active: true },
+];
+const occHistory: { id: string; recurring_id: string; name: string; due_at: string; amount: number; status: "paid" | "skipped" | "matched"; paid_at?: string }[] = [];
+const occId = (r: MockRecurring) => `${r.id}_${r.next_due_at}`;
+const addPeriod = (d: string, c: MockRecurring["cycle"]) => {
+  const x = new Date(`${d}T12:00:00Z`);
+  if (c === "weekly") x.setUTCDate(x.getUTCDate() + 7);
+  else x.setUTCMonth(x.getUTCMonth() + (c === "monthly" ? 1 : c === "quarterly" ? 3 : 12));
+  return x.toISOString().slice(0, 10);
+};
+function recurringView(r: MockRecurring) {
+  const days = Math.round((new Date(`${r.next_due_at}T12:00:00Z`).getTime() - today.getTime()) / 86_400_000);
+  const display = !r.active ? "paused" : days < 0 ? "overdue" : days === 0 ? "due_today" : days <= 7 ? "due_soon" : "upcoming";
+  return {
+    ...r, currency: "VND", display,
+    current: r.active ? { id: occId(r), recurring_id: r.id, name: r.name, due_at: r.next_due_at, amount: r.amount, status: "pending" } : undefined,
+    history: occHistory.filter((o) => o.recurring_id === r.id).reverse(),
+  };
+}
+
+const ME = "mock-uid";
+let household: { id: string; name: string; members: { uid: string; display_name: string; role: "owner" | "member"; joined_at: string }[]; invite?: { code: string; expires_at: string } } = {
+  id: "", name: "", members: [{ uid: ME, display_name: "Lan", role: "owner", joined_at: iso(today) }],
+};
+type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string }[]; created_at: string; note?: string };
+const assignments: MockAssignment[] = [];
+// Một lời nhờ mẫu từ người nhà, để thấy luồng Buyer.
+const incoming: MockAssignment = {
+  assignment_id: "trip-mau", owner_uid: "mock-minh", owner_display_name: "Minh", buyer_uid: ME, buyer_display_name: "Lan", plan_id: "default",
+  status: "assigned", created_at: iso(today), items: [{ consumption_group_key: "banh-mi", name_display: L ? "Bread" : "Bánh mì", status: "assigned" }],
+};
+
+function priceObs(key: string) {
+  const prices = MOCK_PRICES[key];
+  if (!prices) return [];
+  return Object.entries(prices).flatMap(([store, price], n) => [
+    { store_name: store, paid_price: price, purchased_at: iso(new Date(today.getTime() - (n * 9 + 3) * 86_400_000)), canonical_quantity: 1000, canonical_unit: "ml", unit_price: price / 1000 },
+  ]);
+}
+
+function mockM1(method: string, url: URL, init: RequestInit): Response | null {
+  const p = url.pathname;
+  const body = () => (init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {});
+  const notFound = () => json({ code: "not_found", message: L ? "Not found." : "Không tìm thấy." }, 404);
+
+  if (method === "GET" && p === "/taxonomy") {
+    const q = fold(url.searchParams.get("q") ?? "");
+    return json({ version: "1.2-mock", groups: TAXONOMY.filter((g) => !q || fold(g.labels.vi).includes(q) || g.labels.en.toLowerCase().includes(q)).slice(0, 8) });
+  }
+
+  // Nhiều Kế hoạch
+  if (p === "/plans" && method === "GET") {
+    const main = { id: "default", name: "", status: "active", default: true, item_count: cart.size, buy_date: planState.buy_date };
+    const named = [...namedPlans.entries()].map(([id, x]) => ({ id, name: x.name, status: x.status, default: false, item_count: x.cart.size, created: x.created }))
+      .sort((a, b) => b.created - a.created);
+    return json({ plans: [main, ...named] });
+  }
+  if (p === "/plans" && method === "POST") {
+    const name = String(body().name ?? "").trim();
+    if (!name) return json({ code: "validation_failed", message: "name" }, 422);
+    const id = `p-${Date.now()}`;
+    namedPlans.set(id, { name, status: "active", created: Date.now(), cart: new Set(), lines: new Map(), state: { buy_date: "", buy_hour: null, trip_note: "" } });
+    return json({ id, name, status: "active", default: false, item_count: 0 }, 201);
+  }
+  const planM = p.match(/^\/plans\/([^/]+)$/);
+  if (planM) {
+    const x = namedPlans.get(planM[1]);
+    if (!x) return notFound();
+    if (method === "PATCH") {
+      const b = body() as { name?: string; status?: "active" | "archived" };
+      if (b.name) x.name = b.name;
+      if (b.status) x.status = b.status;
+      return json({ id: planM[1], name: x.name, status: x.status, default: false, item_count: x.cart.size });
+    }
+    if (method === "DELETE") {
+      namedPlans.delete(planM[1]);
+      return json(undefined, 204);
+    }
+  }
+
+  // Lịch sử giá
+  const ph = p.match(/^\/items\/([^/]+)\/price-history$/);
+  if (ph && method === "GET") {
+    const key = decodeURIComponent(ph[1]);
+    const hist = priceObs(key);
+    const sorted = [...hist].sort((a, b) => a.unit_price - b.unit_price);
+    return json({
+      group_key: key, purchase_count: hist.length, canonical_unit: hist.length ? "ml" : undefined,
+      last_purchase: hist[0] ?? null, lowest_historical: hist.length > 1 ? sorted[0] : null,
+      average_unit_price: hist.length > 1 ? Math.round((hist.reduce((a, o) => a + o.unit_price, 0) / hist.length) * 100) / 100 : null,
+      other_dimension_count: 0, history: hist, window_days: 90,
+    });
+  }
+  if (p === "/plan/price-history" && method === "GET") {
+    return inPlan(url.searchParams.get("plan_id"), () => {
+      const keys = [...cart].filter((k) => planLines.get(k)?.line_status !== "assigned");
+      const stores = new Map<string, { covered: number; total: number; missing: string[] }>();
+      for (const k of keys) for (const s of Object.keys(MOCK_PRICES[k] ?? {})) if (!stores.has(s)) stores.set(s, { covered: 0, total: 0, missing: [] });
+      for (const [s, agg] of stores) for (const k of keys) {
+        const v = MOCK_PRICES[k]?.[s];
+        if (v == null) agg.missing.push(k);
+        else {
+          agg.covered++;
+          agg.total += v;
+        }
+      }
+      const pr = mockPrices();
+      const options = [...stores.entries()].map(([s, a]) => ({
+        store_name: s, store_key: fold(s).replace(/[^a-z0-9]+/g, "-"), covered_items: a.covered, total_items: keys.length,
+        estimated_total: a.covered === keys.length ? a.total : null, covered_subtotal: a.total, missing_keys: a.missing,
+      })).sort((a, b) => b.covered_items - a.covered_items || (a.estimated_total ?? 0) - (b.estimated_total ?? 0));
+      return json({
+        basket_item_count: keys.length, store_options: options,
+        split_store_option: pr.split.length ? { estimated_total: pr.split_total, stores: pr.split.map((s) => ({ store_name: s.store, keys: s.groups, total: s.total })), covered_items: keys.length - pr.missing_price.length } : null,
+        recommend: pr.recommend, no_history: pr.missing_price, window_days: 90,
+      });
+    });
+  }
+
+  // Khoản định kỳ và Dự báo
+  if (p === "/recurring" && method === "GET") {
+    const items = recurring.map(recurringView);
+    const monthly = recurring.filter((r) => r.active).reduce((a, r) => a + (r.cycle === "weekly" ? Math.round((r.amount * 52) / 12) : r.cycle === "quarterly" ? Math.round(r.amount / 3) : r.cycle === "yearly" ? Math.round(r.amount / 12) : r.amount), 0);
+    return json({ items, monthly_total: monthly });
+  }
+  if (p === "/recurring" && method === "POST") {
+    const b = body() as Partial<MockRecurring>;
+    if (!b.name || !b.amount || !b.next_due_at) return json({ code: "validation_failed", message: "name" }, 422);
+    const r: MockRecurring = { id: `r-${Date.now()}`, name: b.name, amount: b.amount, cycle: b.cycle ?? "monthly", next_due_at: b.next_due_at, active: true };
+    recurring.push(r);
+    return json(recurringView(r), 201);
+  }
+  const recM = p.match(/^\/recurring\/([^/]+)$/);
+  if (recM) {
+    const r = recurring.find((x) => x.id === recM[1]);
+    if (!r) return notFound();
+    if (method === "PATCH") {
+      Object.assign(r, body());
+      return json(recurringView(r));
+    }
+    if (method === "DELETE") {
+      recurring = recurring.filter((x) => x !== r);
+      return json(undefined, 204);
+    }
+  }
+  const occM = p.match(/^\/recurring\/occurrences\/([^/]+)\/(pay|skip)$/);
+  if (occM && method === "POST") {
+    const r = recurring.find((x) => occId(x) === decodeURIComponent(occM[1]));
+    if (!r) return notFound();
+    const o = { id: occId(r), recurring_id: r.id, name: r.name, due_at: r.next_due_at, amount: r.amount, status: occM[2] === "pay" ? "paid" as const : "skipped" as const, paid_at: occM[2] === "pay" ? iso(today) : undefined };
+    occHistory.push(o);
+    r.next_due_at = addPeriod(r.next_due_at, r.cycle);
+    return json(o);
+  }
+  if (p === "/forecast" && method === "GET") {
+    const to = iso(new Date(today.getTime() + 30 * 86_400_000));
+    const occ = recurring.filter((r) => r.active && r.next_due_at <= to).map((r) => recurringView(r).current!);
+    const shopping = items.filter((i) => i.predicted_out_on && i.predicted_out_on <= to).map((i) => {
+      const prices = Object.values(MOCK_PRICES[i.key] ?? {});
+      return { key: i.key, name: i.name, out_on: i.predicted_out_on!, amount: prices.length ? Math.min(...prices) : null };
+    });
+    const recurringTotal = occ.reduce((a, o) => a + o.amount, 0);
+    const shoppingTotal = shopping.reduce((a, s) => a + (s.amount ?? 0), 0);
+    return json({
+      from: iso(today), to, total: recurringTotal + shoppingTotal, recurring_total: recurringTotal, shopping_total: shoppingTotal,
+      recurring: occ, shopping, missing_prices: shopping.filter((s) => s.amount == null).length,
+    });
+  }
+
+  // Nhà và mua hộ
+  if (p === "/households" && method === "GET") return json({ ...household, owner_uid: ME, my_role: "owner" });
+  if (p === "/households" && method === "PATCH") {
+    household.name = String(body().name ?? "");
+    household.id ||= `h-${ME}`;
+    return json({ ...household, owner_uid: ME, my_role: "owner" });
+  }
+  if (p === "/households/invites" && method === "POST") {
+    household.id ||= `h-${ME}`;
+    household.invite = { code: Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, "X"), expires_at: new Date(Date.now() + 48 * 3_600_000).toISOString() };
+    // Bản thử: có mã là có ngay một người nhà mẫu để thử gửi Kế hoạch.
+    if (household.members.length === 1) household.members.push({ uid: "mock-minh", display_name: "Minh", role: "member", joined_at: iso(today) });
+    return json(household.invite, 201);
+  }
+  if (p === "/households/join" && method === "POST") return json({ code: "not_found", message: L ? "That invite code is wrong." : "Mã mời không đúng." }, 404);
+  if (p === "/households/leave" && method === "POST") return json({ code: "invalid_state", message: "owner" }, 409);
+  const memM = p.match(/^\/households\/members\/([^/]+)$/);
+  if (memM && method === "DELETE") {
+    household.members = household.members.filter((m) => m.uid !== decodeURIComponent(memM[1]));
+    return json(undefined, 204);
+  }
+  if (p === "/households/shopping-assignments" && method === "POST") {
+    const b = body() as { buyer_uid: string; keys: string[]; plan_id?: string };
+    const buyer = household.members.find((m) => m.uid === b.buyer_uid);
+    if (!buyer || buyer.uid === ME) return json({ code: "forbidden", message: "buyer" }, 403);
+    return inPlan(b.plan_id ?? null, () => {
+      const a: MockAssignment = {
+        assignment_id: `trip-${Date.now()}`, owner_uid: ME, owner_display_name: "Lan", buyer_uid: buyer.uid, buyer_display_name: buyer.display_name,
+        plan_id: b.plan_id ?? "default", status: "assigned", created_at: new Date().toISOString(),
+        items: b.keys.map((k) => ({ consumption_group_key: k, name_display: items.find((i) => i.key === k)?.name ?? extraNames.get(k) ?? k, status: "assigned" })),
+      };
+      for (const k of b.keys) planLines.set(k, { ...planLines.get(k), line_status: "assigned", assigned_to_uid: buyer.uid });
+      assignments.unshift(a);
+      return json(a, 201);
+    });
+  }
+  const asgM = p.match(/^\/households\/shopping-assignments\/([^/]+)\/cancel$/);
+  if (asgM && method === "POST") {
+    const a = assignments.find((x) => x.assignment_id === decodeURIComponent(asgM[1]));
+    if (!a) return notFound();
+    a.status = "cancelled";
+    inPlan(a.plan_id, () => {
+      for (const it of a.items) {
+        const l = planLines.get(it.consumption_group_key);
+        if (l) planLines.set(it.consumption_group_key, { ...l, line_status: "open", assigned_to_uid: undefined });
+        it.status = "returned";
+      }
+    });
+    return json(a);
+  }
+  if (p === "/plan/delegated" && method === "GET") {
+    return json({ to_me: incoming.status === "assigned" ? [incoming] : [], from_me: assignments });
+  }
+  if (method === "POST" && p === "/receipts") {
+    const b = body() as { assignment_id?: string };
+    if (b.assignment_id === incoming.assignment_id) incoming.status = "closed_partial";
   }
   return null;
 }

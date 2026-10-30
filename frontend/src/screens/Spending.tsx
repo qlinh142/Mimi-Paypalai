@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import { useSpending } from "../api/hooks";
 import type { ReceiptSummary, SpendingReport } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
+import { ForecastCard, RecurringPanel } from "../components/Recurring";
 import { addMonths, currentMonth, formatDayMonth, formatMonth, formatVnd } from "../lib/text";
 
 /**
@@ -56,6 +57,9 @@ export function Spending() {
           </div>
         )}
         {r && (r.receipt_count === 0 && !r.online_orders ? <EmptyMonth month={month} /> : <Report r={r} month={month} />)}
+        {/* 2.1: Dự báo 30 ngày và khoản định kỳ luôn theo hôm nay, không theo tháng đang xem. */}
+        {isCurrent && <ForecastCard />}
+        <RecurringPanel />
       </div>
     </MainFrame>
   );

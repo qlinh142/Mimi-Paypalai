@@ -249,3 +249,10 @@ func (s *Server) reply(w http.ResponseWriter, r *http.Request, status int, v any
 	}
 	writeJSON(w, status, v)
 }
+
+func nonNilStrings(xs []string) []string {
+	if xs == nil {
+		return []string{}
+	}
+	return xs
+}

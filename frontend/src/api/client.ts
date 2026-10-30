@@ -12,7 +12,15 @@ import type { ApiErrorBody } from "./types";
  *   Idempotency-Key: <uuid> cho thao tác ghi
  */
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    /** Chi tiết theo mã lỗi, ví dụ image_index của ảnh cần chụp lại (1.1). */
+    public fields: Record<string, unknown> = {},
+    /** true: gửi lại đúng yêu cầu này có thể thành công. */
+    public retryable = false,
+  ) {
     super(message);
   }
 }
@@ -65,7 +73,7 @@ async function parse<T>(res: Response): Promise<T> {
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
-    throw new ApiError(res.status, body?.code ?? "unknown", body?.message ?? t.common.genericError);
+    throw new ApiError(res.status, body?.code ?? "unknown", body?.message ?? t.common.genericError, body?.fields ?? {}, !!body?.retryable);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

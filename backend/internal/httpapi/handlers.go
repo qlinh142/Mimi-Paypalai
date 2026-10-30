@@ -132,7 +132,12 @@ func (s *Server) saveReceipt(w http.ResponseWriter, r *http.Request) {
 	if out.Replayed {
 		status = http.StatusOK
 	}
-	writeJSON(w, status, map[string]any{"receipt_id": out.ReceiptID, "status": "saved", "replayed": out.Replayed})
+	body := map[string]any{"receipt_id": out.ReceiptID, "status": "saved", "replayed": out.Replayed,
+		"plan_done": nonNilStrings(out.PlanDone), "recurring_matched": nonNilStrings(out.Recurring)}
+	if out.Assignment != nil {
+		body["assignment"] = out.Assignment
+	}
+	writeJSON(w, status, body)
 }
 
 func (s *Server) listItems(w http.ResponseWriter, r *http.Request) {

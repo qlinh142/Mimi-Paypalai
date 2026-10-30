@@ -2,7 +2,9 @@ import { t, uiLang } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Camera, ImagePlus, X } from "lucide-react";
-import { toSaveRequest, useReadReceipt, useSaveReceipt } from "../api/hooks";
+import { toSaveRequest, useDelegated, useReadReceipt, useSaveReceipt } from "../api/hooks";
+import { m1 } from "../i18n/m1";
+import { currentPlanId } from "../lib/currentPlan";
 import type { ReceiptDraft } from "../api/types";
 import { ApiError, OfflineError } from "../api/client";
 import { compressReceiptImage, grabFrame } from "../lib/image";
@@ -102,8 +104,21 @@ function ScanSession({ onNext }: { onNext: () => void }) {
 
   function finish() {
     stream?.getTracks().forEach((t) => t.stop());
-    // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện
-    read.mutate({ receiptId, images: photos.map((p) => p.blob), lang: uiLang });
+    // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện.
+    // Gửi lại sau khi chụp lại một ảnh: backend nhớ kết quả các ảnh đã đọc được (theo nội dung
+    // ảnh), nên chỉ ảnh mới được đọc lại (1.1).
+    read.mutate(
+      { receiptId, images: photos.map((p) => p.blob), lang: uiLang },
+      { onError: () => setStream(null) }, // camera đã tắt: chụp lại bằng camera hệ thống
+    );
+  }
+
+  // 1.1: lỗi gắn với một ảnh (unreadable_image, image_too_large, read_failed) chỉ ra đúng ảnh cần chụp lại.
+  const badImages = new Set<number>();
+  if (read.error instanceof ApiError) {
+    const f = read.error.fields;
+    if (Array.isArray(f.image_indexes)) f.image_indexes.forEach((i) => typeof i === "number" && badImages.add(i));
+    else if (typeof f.image_index === "number") badImages.add(f.image_index);
   }
 
   if (read.isPending) {
@@ -155,8 +170,9 @@ function ScanSession({ onNext }: { onNext: () => void }) {
       {photos.length > 0 && (
         <ul className="scan__thumbs" aria-label={t.scan.photosOfReceipt(photos.length)}>
           {photos.map((p, i) => (
-            <li key={p.id}>
+            <li key={p.id} style={badImages.has(i + 1) ? { outline: "3px solid var(--danger, #c0392b)", outlineOffset: 2 } : undefined}>
               <img src={p.url} alt={t.scan.photoAlt(i + 1, p.from === "library")} />
+              {badImages.has(i + 1) && <span className="sr-only">{m1.scan.badImage}</span>}
               <button type="button" className="thumb__remove" aria-label={t.scan.removePhoto(i + 1)} onClick={() => remove(p.id)}>
                 <X size={14} aria-hidden />
               </button>
@@ -171,6 +187,7 @@ function ScanSession({ onNext }: { onNext: () => void }) {
         {read.isError && (
           <p className="scan__hint scan__notice" role="alert">
             {read.error instanceof OfflineError ? t.scan.uploadOffline : read.error.message}
+            {[...badImages].map((i) => ` ${m1.scan.retakeImage(i)}.`).join("")}
           </p>
         )}
       </div>
@@ -233,11 +250,16 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
   const [usePrediction, setUsePrediction] = useState(true);
   const [purchasedOn, setPurchasedOn] = useState(draft.purchased_on || todayLocal());
   const save = useSaveReceipt();
+  // 4.1: Buyer chọn hóa đơn này cho vòng mua hộ nào (hoặc của riêng mình).
+  const delegated = useDelegated();
+  const toMe = delegated.data?.to_me ?? [];
+  const [assignmentId, setAssignmentId] = useState("");
+  const review = draft.lines.filter((l) => l.needs_review && !l.discount).length;
   const sum = draft.sum_vnd;
   const matches = !!draft.total_printed && !draft.total_mismatch;
   const submit = (confirmDuplicate: boolean) =>
     !save.isPending &&
-    save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate }));
+    save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate, planId: currentPlanId(), assignmentId }));
 
   if (save.isSuccess) {
     return (
@@ -247,6 +269,11 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
             <MimiMark size={64} />
             <h1>{t.confirm.savedTitle}</h1>
             <p>{t.confirm.savedBody(draft.lines.length, usePrediction)}</p>
+            {save.data?.assignment && (
+              <p>{m1.scan.assignmentResult(save.data.assignment.done.length, save.data.assignment.returned.length)}</p>
+            )}
+            {!!save.data?.plan_done?.length && <p>{m1.scan.planDone(save.data.plan_done.length)}</p>}
+            {!!save.data?.recurring_matched?.length && <p>{m1.scan.recurringMatched}</p>}
           </div>
           <dl className="facts">
             <dt>{t.confirm.store}</dt>
@@ -307,6 +334,8 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
                 {l.discount ? t.confirm.discountLine : t.confirm.qty(l.qty)}
                 {!l.discount && l.unit && ` ${l.unit}`}
                 {l.amount_vnd == null && ` · ${t.confirm.notConverted}`}
+                {!l.discount && l.canonical_quantity ? ` · ${l.canonical_quantity} ${l.canonical_unit === "item" ? t.stock.units.pc : l.canonical_unit}` : ""}
+                {l.needs_review && !l.discount && ` · ${(l.review_reasons ?? []).map((r) => m1.scan.reviewReasons[r]).join(", ") || m1.scan.needsReview}`}
               </span>
               {!l.category_key && !l.discount && <button className="btn btn--quiet" style={{ minHeight: 36, gridColumn: 2 }}>{t.confirm.chooseGroup}</button>}
             </li>
@@ -319,6 +348,20 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
               ? t.confirm.matches(formatVnd(sum))
               : t.confirm.mismatch(formatVnd(sum), draft.total_printed)}
         </p>
+        {review > 0 && <p className="check warn">{m1.scan.reviewHint(review)}</p>}
+        {toMe.length > 0 && (
+          <label className="field">
+            {m1.scan.forAssignment}
+            <select value={assignmentId} onChange={(e) => setAssignmentId(e.target.value)}>
+              <option value="">{m1.scan.personal}</option>
+              {toMe.map((a) => (
+                <option key={a.assignment_id} value={a.assignment_id}>
+                  {m1.delegated.from(a.owner_display_name || m1.assign.someone)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="switch-row">
           {t.confirm.usePrediction}
           <input type="checkbox" role="switch" {...{ switch: "" }} checked={usePrediction} onChange={(e) => setUsePrediction(e.target.checked)} />

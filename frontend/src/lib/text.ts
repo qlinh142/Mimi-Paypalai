@@ -57,9 +57,19 @@ export function addMonths(ym: string, n: number): string {
 
 const qtyFmt = new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { maximumFractionDigits: 2 });
 
-/** Số lượng tồn theo đơn vị gốc của API: 2500 g → "2.5 kg", 1500 ml → "1.5 l", 3 pc → "3 pcs". */
-export function formatQty(qty: number, unit: "g" | "ml" | "pc", pcLabel: string): string {
+/**
+ * Số lượng theo đơn vị chuẩn của API (0.1): 2500 g → "2.5 kg", 1500 ml → "1.5 l", 3 item → "3 pcs".
+ * "pc" là tên cũ của item.
+ */
+export function formatQty(qty: number, unit: "g" | "ml" | "m" | "item" | "pc", pcLabel: string): string {
   if (unit === "g") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} kg` : `${qtyFmt.format(qty)} g`;
   if (unit === "ml") return qty >= 1000 ? `${qtyFmt.format(qty / 1000)} l` : `${qtyFmt.format(qty)} ml`;
+  if (unit === "m") return `${qtyFmt.format(qty)} m`;
   return `${qtyFmt.format(qty)} ${pcLabel}`;
+}
+
+/** Đơn giá chuẩn hóa (8.1): 35 đ/ml, 120 đ/g, 3.400 đ/cái. */
+export function formatUnitPrice(price: number, unit: string, pcLabel: string): string {
+  const u = unit === "item" || unit === "pc" ? pcLabel : unit;
+  return `${new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { maximumFractionDigits: 2 }).format(price)} ${uiLang === "en" ? "VND" : "đ"}/${u}`;
 }

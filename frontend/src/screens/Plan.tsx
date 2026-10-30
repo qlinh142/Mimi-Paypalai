@@ -8,6 +8,9 @@ import type { CartItem, Item, PlanPriority, PlanPrices, PlanState } from "../api
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT } from "../components/ItemRow";
 import { formatDayMonth, formatVnd } from "../lib/text";
+import { AddAnything, AssignPanel, BasketPricesPanel, DelegatedPanel, PlanSwitcher } from "../components/PlanExtras";
+import { m1 } from "../i18n/m1";
+import { DEFAULT_PLAN, useCurrentPlanId } from "../lib/currentPlan";
 
 /** Dòng phụ dưới tên món: tồn hiện tại, cùng cách nói với màn Đồ dùng. */
 function stockText(i: Pick<Item, "status" | "days_left">): string {
@@ -28,6 +31,7 @@ export function Plan() {
   const prices = usePlanPrices((cart?.item_count ?? 0) > 0);
   const edit = usePlanItem();
   const busyKey = edit.isPending ? edit.variables?.key : undefined;
+  const planId = useCurrentPlanId();
 
   if (plan.error instanceof ApiError && plan.error.status === 403) {
     return (
@@ -53,6 +57,10 @@ export function Plan() {
           </div>
         )}
         {plan.isPending && <p className="hint">{t.common.loading}</p>}
+
+        {/* 3.1: nhiều Kế hoạch; 4.1: món được nhờ mua và món mình đã nhờ */}
+        <PlanSwitcher />
+        <DelegatedPanel />
 
         {/* 1. Sắp hết: món chưa có trong giỏ */}
         <section className="plan-sec" aria-labelledby="plan-needs">
@@ -80,6 +88,8 @@ export function Plan() {
           </ul>
         </section>
 
+        {cart && <AddAnything cart={cart} />}
+
         {/* 2. Giỏ */}
         {cart && (
           <section className="plan-sec" aria-labelledby="plan-cart">
@@ -97,10 +107,16 @@ export function Plan() {
                   <span className="num">{cart.estimate != null ? formatVnd(cart.estimate) : "–"}</span>
                 </p>
                 {cart.missing_price > 0 && <p className="hint">{t.plan.missing(cart.missing_price)}</p>}
-                <Link to="/plan/online" className="btn btn--primary btn--block">
-                  <ShoppingBag size={18} aria-hidden /> {t.online.cta}
-                </Link>
-                <p className="hint">{t.online.ctaHint}</p>
+                {planId === DEFAULT_PLAN ? (
+                  <>
+                    <Link to="/plan/online" className="btn btn--primary btn--block">
+                      <ShoppingBag size={18} aria-hidden /> {t.online.cta}
+                    </Link>
+                    <p className="hint">{t.online.ctaHint}</p>
+                  </>
+                ) : (
+                  <p className="hint">{m1.plans.onlineMainOnly}</p>
+                )}
               </>
             )}
           </section>
@@ -108,9 +124,11 @@ export function Plan() {
 
         {/* 3. Nơi mua tối ưu */}
         {cart && cart.item_count > 0 && prices.data && <WhereToBuy prices={prices.data} names={names} />}
+        {cart && cart.item_count > 0 && <BasketPricesPanel cart={cart} />}
+        {cart && cart.item_count > 0 && <AssignPanel cart={cart} />}
 
         {/* 4. Thời gian mua. Form dựng một lần khi có dữ liệu; sau đó trạng thái nằm trong form. */}
-        {cart && <TripForm initial={cart.state} />}
+        {cart && <TripForm key={planId} initial={cart.state} />}
 
         <p className="hint plan-tip">{t.plan.tip}</p>
       </div>
@@ -120,6 +138,8 @@ export function Plan() {
 
 function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRemove: () => void }) {
   const [editing, setEditing] = useState(false);
+  // 4.1: dòng đang nhờ người nhà mua không sửa / xóa được cho tới khi hủy lời nhờ hoặc có hóa đơn.
+  const locked = item.line_status === "assigned";
   const qtyText = `${item.qty || 1}${item.unit ? ` ${item.unit}` : ""}`;
   return (
     <li className="plan-row" style={{ flexWrap: "wrap" }}>
@@ -133,6 +153,7 @@ function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRe
           {` · ${t.planLine.sources[item.source]}`}
         </span>
         {item.bought_qty ? <span className="plan-row__sub">{t.planLine.bought(item.bought_qty, item.qty)}</span> : null}
+        {locked && <span className="plan-row__sub badge">{m1.assign.locked}</span>}
         <span className="plan-row__sub">
           {stockText(item)} ·{" "}
           {item.unit_price != null && item.best_store
@@ -140,18 +161,22 @@ function CartRow({ item, busy, onRemove }: { item: CartItem; busy: boolean; onRe
             : t.plan.noPrice}
         </span>
       </span>
-      <button type="button" className="icon-btn" aria-label={t.planLine.edit(item.name)} aria-expanded={editing} onClick={() => setEditing(!editing)}>
-        <Pencil size={18} aria-hidden />
-      </button>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-label={t.plan.remove(item.name)}
-        aria-disabled={busy || undefined}
-        onClick={() => !busy && onRemove()}
-      >
-        <X size={20} aria-hidden />
-      </button>
+      {!locked && (
+        <>
+          <button type="button" className="icon-btn" aria-label={t.planLine.edit(item.name)} aria-expanded={editing} onClick={() => setEditing(!editing)}>
+            <Pencil size={18} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label={t.plan.remove(item.name)}
+            aria-disabled={busy || undefined}
+            onClick={() => !busy && onRemove()}
+          >
+            <X size={20} aria-hidden />
+          </button>
+        </>
+      )}
       {editing && <LineEditor item={item} onDone={() => setEditing(false)} />}
     </li>
   );

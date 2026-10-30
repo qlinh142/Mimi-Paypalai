@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
 import type { Mandate, MandateCategory, Me, SettingsPatch } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
+import { HouseholdPanel } from "../components/Household";
 
 const LEAD_DAYS = [1, 2, 3, 5, 7, 10, 14, 21, 30];
 const TIMEZONES = [
@@ -61,6 +62,8 @@ export function Settings() {
         )}
         {me.data && <SettingsForm me={me.data} />}
 
+        <HouseholdPanel />
+
         <MandateSection />
 
         <section className="plan-sec">
@@ -69,7 +72,6 @@ export function Settings() {
             <span>{t.settings.accountLink}</span>
             <ChevronRight size={20} aria-hidden />
           </Link>
-          <p className="hint" style={{ marginTop: "var(--s3)" }}>{t.settings.household}</p>
         </section>
       </div>
     </MainFrame>

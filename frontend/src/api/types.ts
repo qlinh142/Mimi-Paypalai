@@ -48,17 +48,36 @@ export type Item = {
 /** Mimi 2.0 mục 4: Confirmed Inventory (có bằng chứng) tách khỏi Estimated Inventory (Mimi ước tính). */
 export type Stock = {
   estimated: number;
-  unit: "g" | "ml" | "pc";
+  unit: CanonicalUnit;
   confirmed: number;
   confirmed_on: string;        // YYYY-MM-DD
   confirmed_source: "receipt" | "delivery" | "manual";
   rate_per_day?: number;
   days_of_stock?: number;
+  /** Chiều đo khác của cùng nhóm (800 g và 900 ml): hiện riêng, không cộng (0.1 mục 20). */
+  parts?: { estimated: number; unit: CanonicalUnit; confirmed: number; confirmed_on: string; days_of_stock?: number }[];
+};
+
+/** Đơn vị chuẩn (0.1). "pc" là tên cũ của item. */
+export type CanonicalUnit = "g" | "ml" | "m" | "item" | "pc";
+
+/** Purchase lot (0.1 mục 11): phần còn lại chia FIFO từ tồn ước tính. */
+export type Lot = {
+  lot_id: string;
+  detail_name?: string;
+  brand?: string;
+  store?: string;
+  purchased_at: string;
+  initial_quantity: number;
+  canonical_unit: CanonicalUnit;
+  remaining_quantity: number;
+  inventory_source: "receipt" | "delivery";
 };
 
 /** GET /items/{key}: mọi trường của Item kèm tối đa 10 lần mua gần nhất. */
 export type ItemDetail = Item & {
   history: { on: string; store?: string; amount_vnd: number | null; receipt_id?: string }[];
+  lots?: Lot[];
 };
 
 export type ItemsQuery = {
@@ -81,6 +100,21 @@ export type ReceiptDraftLine = {
   category_key?: string;        // vắng: hiện nút "Chọn nhóm"
   group_key?: string;
   habit: boolean;
+  // Chuẩn hóa sản phẩm (0.1, 1.1, 7.1): tên gốc, brand, quy cách, lượng canonical.
+  raw_name?: string;
+  brand?: string;
+  product_name?: string;
+  detail_name?: string;
+  product_key?: string;
+  source_language?: string;
+  package_count?: number;
+  package_size?: number;
+  package_unit?: string;
+  canonical_quantity?: number;
+  canonical_unit?: CanonicalUnit;
+  /** Lưu được nhưng chưa dùng cho tồn kho / dự đoán (6.1 mục 5.3). */
+  needs_review?: boolean;
+  review_reasons?: ("missing_category" | "missing_group" | "unknown_quantity" | "count_for_measured_group")[];
 };
 
 /** Bản nháp hóa đơn (Draft). Mọi con số do backend tính; client chỉ hiển thị. */
@@ -118,9 +152,20 @@ export type SaveReceiptRequest = {
   }[];
   use_for_prediction: boolean;
   confirm_duplicate: boolean;
+  /** Quét từ trong một Plan: chỉ đối chiếu Plan đó (3.1). */
+  source_plan_id?: string;
+  /** Buyer quét hóa đơn cho một vòng mua hộ (4.1). */
+  assignment_id?: string;
 };
 
-export type SaveReceiptResult = { receipt_id: string; status: "saved"; replayed: boolean };
+export type SaveReceiptResult = {
+  receipt_id: string;
+  status: "saved";
+  replayed: boolean;
+  plan_done?: string[];
+  assignment?: { assignment_id: string; status: "completed" | "closed_partial"; done: string[]; returned: string[] };
+  recurring_matched?: string[];
+};
 
 /** Kế hoạch mua sắm (GET /plan). Giá là giá mỗi đơn vị người dùng từng trả, lấy từ hóa đơn đã lưu. */
 export type CartItem = {
@@ -138,6 +183,8 @@ export type CartItem = {
   source: PlanSource;
   reason?: string;
   bought_qty?: number;         // > 0: đã mua một phần
+  line_status?: "open" | "assigned"; // assigned: đang nhờ người nhà mua (4.1)
+  assigned_to_uid?: string;
 };
 
 export type PlanPriority = "high" | "normal" | "low";
@@ -149,6 +196,7 @@ export type PlanLinePatch = Partial<{ qty: number; unit: string; need_by: string
 export type PlanState = { buy_date: string; buy_hour: number | null; trip_note: string };
 
 export type Cart = {
+  plan_id?: string;
   items: CartItem[];
   item_count: number;
   estimate: number | null;     // theo phương án khuyên dùng; null khi chưa món nào có giá
@@ -201,7 +249,7 @@ export type SettingsPatch = Partial<{
   lang: "vi" | "en";
 }>;
 
-export type ApiErrorBody = { code: string; message: string };
+export type ApiErrorBody = { code: string; message: string; fields?: Record<string, unknown>; retryable?: boolean };
 
 // ================= Mimi Online (Mimi 2.0 mục 12 đến 19) =================
 
@@ -282,3 +330,66 @@ export type Order = {
 };
 
 export type DeliveryObservation = { key: string; qty: number; confidence: "low" | "mid" | "high" };
+
+// ================= Bộ spec Mimi 1.0 =================
+
+/** 0.2: nhóm sản phẩm dùng chung. */
+export type TaxonomyGroup = {
+  key: string; parent: string; label: string; labels: { vi: string; en: string };
+  measurement: string; unit: string;
+};
+
+/** 3.1: một Kế hoạch trong danh sách. */
+export type PlanMeta = {
+  id: string; name: string; status: "active" | "archived"; default: boolean; item_count: number; buy_date?: string;
+};
+
+/** 2.1: khoản định kỳ và kỳ thanh toán. */
+export type RecurringCycle = "weekly" | "monthly" | "quarterly" | "yearly";
+export type Occurrence = {
+  id: string; recurring_id: string; name: string; due_at: string; amount: number;
+  status: "pending" | "paid" | "matched" | "skipped"; paid_at?: string; source_type?: "manual" | "receipt"; source_id?: string;
+};
+export type Recurring = {
+  id: string; name: string; amount: number; currency: "VND"; cycle: RecurringCycle; next_due_at: string;
+  active: boolean; category_key?: string;
+  display: "overdue" | "due_today" | "due_soon" | "upcoming" | "paused";
+  current?: Occurrence; history: Occurrence[];
+};
+export type RecurringInput = Partial<{ name: string; amount: number; cycle: RecurringCycle; next_due_at: string; category_key: string; active: boolean }>;
+export type Forecast = {
+  from: string; to: string; total: number; recurring_total: number; shopping_total: number;
+  recurring: Occurrence[]; shopping: { key: string; name: string; out_on: string; amount: number | null }[]; missing_prices: number;
+};
+
+/** 4.1: nhà và vòng mua hộ. */
+export type HouseholdMember = { uid: string; display_name: string; role: "owner" | "member"; joined_at: string };
+export type Household = {
+  id: string; name: string; owner_uid: string; my_role: "owner" | "member";
+  members: HouseholdMember[]; invite?: { code: string; expires_at: string };
+};
+export type AssignmentItem = { consumption_group_key: string; name_display: string; qty?: number; unit?: string; status: "assigned" | "done" | "returned" };
+export type Assignment = {
+  assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string;
+  plan_id: string; status: "assigned" | "shopping" | "completed" | "closed_partial" | "cancelled"; note?: string;
+  items: AssignmentItem[]; created_at: string;
+};
+export type Delegated = { to_me: Assignment[]; from_me: Assignment[] };
+
+/** 8.1: lịch sử giá theo đơn giá chuẩn hóa. */
+export type PriceObservation = {
+  store_name: string; paid_price: number; purchased_at: string; canonical_quantity: number; canonical_unit: CanonicalUnit; unit_price: number;
+};
+export type ItemPriceHistory = {
+  group_key: string; purchase_count: number; canonical_unit?: CanonicalUnit;
+  last_purchase: PriceObservation | null; lowest_historical: PriceObservation | null; average_unit_price: number | null;
+  other_dimension_count: number; history: PriceObservation[]; window_days: number;
+};
+export type BasketPrices = {
+  basket_item_count: number;
+  store_options: { store_name: string; store_key: string; covered_items: number; total_items: number; estimated_total: number | null; covered_subtotal: number; missing_keys: string[] }[];
+  split_store_option: { estimated_total: number; stores: { store_name: string; keys: string[]; total: number }[]; covered_items: number } | null;
+  recommend: "single" | "split" | "none";
+  no_history: string[];
+  window_days: number;
+};

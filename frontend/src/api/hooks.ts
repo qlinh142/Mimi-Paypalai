@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryLabel } from "../i18n";
 import { apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
+import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
-  Basket, Cart, DeliveryObservation, HomeSummary, Item, ItemDetail, ItemsQuery, Mandate, Me, Notification, Order,
-  PlanLinePatch, PlanPrices, PlanState, QuickStock, ReceiptDraft, RefundReason, SaveReceiptRequest, SaveReceiptResult,
-  SettingsPatch, SpendingReport,
+  Assignment, Basket, BasketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
+  ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
+  QuickStock, ReceiptDraft, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
+  SpendingReport, TaxonomyGroup,
 } from "./types";
 
 /** API chỉ trả category_key; nhãn hiển thị lấy theo ngôn ngữ giao diện. */
@@ -19,9 +21,17 @@ export const qk = {
   items: (q?: ItemsQuery) => (q ? (["items", q] as const) : (["items"] as const)),
   item: (key: string) => ["item", key] as const,
   plan: ["plan"] as const,
+  cart: (planId: string) => ["plan", "cart", planId] as const,
   spending: (month: string) => ["spending", month] as const,
   notifications: ["notifications"] as const,
   planPrices: ["plan", "prices"] as const,
+  plans: ["plans"] as const,
+  recurring: ["recurring"] as const,
+  forecast: ["forecast"] as const,
+  household: ["household"] as const,
+  delegated: ["plan", "delegated"] as const,
+  priceHistory: (key: string) => ["item", key, "prices"] as const,
+  taxonomy: (q: string) => ["taxonomy", q] as const,
   mandate: ["mandate"] as const,
   orders: ["orders"] as const,
   order: (id: string) => ["orders", id] as const,
@@ -89,8 +99,9 @@ export function useUndoStock() {
 export function useSetQuantity() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { key: string; qty: number; unit: string }) =>
-      apiSend<Item>("PUT", `${itemPath(v.key)}/quantity`, { qty: v.qty, unit: v.unit }),
+    // action (0.1 mục 14): set (mặc định), increase / decrease (cộng / trừ vào tồn ước tính), mark_out.
+    mutationFn: (v: { key: string; qty: number; unit: string; action?: "set" | "increase" | "decrease" | "mark_out" }) =>
+      apiSend<Item>("PUT", `${itemPath(v.key)}/quantity`, { qty: v.qty, unit: v.unit, ...(v.action ? { action: v.action } : {}) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: qk.items() });
       qc.invalidateQueries({ queryKey: qk.item(v.key) });
@@ -120,9 +131,11 @@ export function useSaveReceipt() {
  */
 export function toSaveRequest(
   draft: ReceiptDraft,
-  opts: { purchasedOn: string; usePrediction: boolean; confirmDuplicate: boolean },
+  opts: { purchasedOn: string; usePrediction: boolean; confirmDuplicate: boolean; planId?: string; assignmentId?: string },
 ): SaveReceiptRequest {
   return {
+    ...(opts.planId && opts.planId !== "default" ? { source_plan_id: opts.planId } : {}),
+    ...(opts.assignmentId ? { assignment_id: opts.assignmentId } : {}),
     receipt_id: draft.receipt_id,
     store: draft.store ?? "",
     purchased_on: opts.purchasedOn,
@@ -145,23 +158,31 @@ export function toSaveRequest(
 
 // ================= Kế hoạch mua sắm =================
 
-export const usePlan = () => useQuery({ queryKey: qk.plan, queryFn: () => apiGet<Cart>("/plan") });
+// Mọi route /plan/... đi theo Kế hoạch đang xem (lib/currentPlan); Kế hoạch chính không gửi plan_id.
 
-export const usePlanPrices = (enabled: boolean) =>
-  useQuery({ queryKey: qk.planPrices, queryFn: () => apiGet<PlanPrices>("/plan/prices"), enabled });
+export function usePlan() {
+  const id = useCurrentPlanId();
+  return useQuery({ queryKey: qk.cart(id), queryFn: () => apiGet<Cart>(`/plan${planQuery(id)}`) });
+}
+
+export function usePlanPrices(enabled: boolean) {
+  const id = useCurrentPlanId();
+  return useQuery({ queryKey: [...qk.planPrices, id], queryFn: () => apiGet<PlanPrices>(`/plan/prices${planQuery(id)}`), enabled });
+}
 
 /** Thêm hoặc bỏ món khỏi giỏ. Gửi trực tiếp (không xếp hàng) vì cần giá và ước tính mới ngay. */
 export function usePlanItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ key, add }: { key: string; add: boolean }): Promise<Cart | null> => {
-      const path = `/plan/items/${encodeURIComponent(key)}`;
-      if (add) return apiSend<Cart>("PUT", path);
+    // body: món chưa có trong Đồ dùng (nhóm taxonomy hoặc "custom-..."), 3.1 mục 3A.4.
+    mutationFn: async ({ key, add, body }: { key: string; add: boolean; body?: { name?: string; qty?: number; unit?: string } }): Promise<Cart | null> => {
+      const path = `/plan/items/${encodeURIComponent(key)}${planQuery(currentPlanId())}`;
+      if (add) return apiSend<Cart>("PUT", path, body);
       await apiSend<void>("DELETE", path);
       return null;
     },
     onSuccess: (data, v) => {
-      if (v.add && data) qc.setQueryData(qk.plan, data);
+      if (v.add && data) qc.setQueryData(qk.cart(currentPlanId()), data);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: qk.plan });
@@ -175,8 +196,8 @@ export function usePlanLine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { key: string; patch: PlanLinePatch }) =>
-      apiSend<Cart>("PATCH", `/plan/items/${encodeURIComponent(v.key)}`, v.patch),
-    onSuccess: (data) => qc.setQueryData(qk.plan, data),
+      apiSend<Cart>("PATCH", `/plan/items/${encodeURIComponent(v.key)}${planQuery(currentPlanId())}`, v.patch),
+    onSuccess: (data) => qc.setQueryData(qk.cart(currentPlanId()), data),
     onSettled: () => qc.invalidateQueries({ queryKey: qk.plan }),
   });
 }
@@ -184,8 +205,11 @@ export function usePlanLine() {
 export function useSavePlanState() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (st: PlanState) => apiSend<PlanState>("PUT", "/plan/state", st),
-    onSuccess: (st) => qc.setQueryData<Cart>(qk.plan, (c) => (c ? { ...c, state: st } : c)),
+    mutationFn: (st: PlanState) => apiSend<PlanState>("PUT", `/plan/state${planQuery(currentPlanId())}`, st),
+    onSuccess: (st) => {
+      qc.setQueryData<Cart>(qk.cart(currentPlanId()), (c) => (c ? { ...c, state: st } : c));
+      qc.invalidateQueries({ queryKey: qk.plans });
+    },
   });
 }
 
@@ -273,4 +297,132 @@ export function useReadDelivery() {
     mutationFn: async (v: { id: string; images: Blob[] }) =>
       (await apiUploadImages<{ items: DeliveryObservation[] }>(`${orderPath(v.id)}/delivery/read`, v.images)).items,
   });
+}
+
+// ================= Bộ spec Mimi 1.0 =================
+
+/** 0.2: tìm nhóm sản phẩm theo nhãn (không dấu). */
+export const useTaxonomySearch = (q: string) =>
+  useQuery({
+    queryKey: qk.taxonomy(q),
+    queryFn: async () =>
+      (await apiGet<{ groups: TaxonomyGroup[] }>(`/taxonomy?q=${encodeURIComponent(q)}&limit=8&lang=${uiLangParam()}`)).groups,
+    enabled: q.trim().length >= 2,
+    staleTime: 3_600_000,
+  });
+
+function uiLangParam() {
+  return document.documentElement.lang === "vi" ? "vi" : "en";
+}
+
+/** 3.1: danh sách Kế hoạch. */
+export const usePlans = () =>
+  useQuery({ queryKey: qk.plans, queryFn: async () => (await apiGet<{ plans: PlanMeta[] }>("/plans")).plans });
+
+export function usePlanMeta() {
+  const qc = useQueryClient();
+  const done = () => {
+    qc.invalidateQueries({ queryKey: qk.plans });
+    qc.invalidateQueries({ queryKey: qk.plan });
+  };
+  return {
+    create: useMutation({ mutationFn: (name: string) => apiSend<PlanMeta>("POST", "/plans", { name }), onSettled: done }),
+    update: useMutation({
+      mutationFn: (v: { id: string; name?: string; status?: PlanMeta["status"] }) =>
+        apiSend<PlanMeta>("PATCH", `/plans/${encodeURIComponent(v.id)}`, { name: v.name, status: v.status }),
+      onSettled: done,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => apiSend<void>("DELETE", `/plans/${encodeURIComponent(id)}`), onSettled: done }),
+  };
+}
+
+/** 8.1: ước tính giỏ theo lịch sử giá, độ phủ từng nơi. */
+export function useBasketPrices(enabled: boolean) {
+  const id = useCurrentPlanId();
+  return useQuery({
+    queryKey: ["plan", "price-history", id],
+    queryFn: () => apiGet<BasketPrices>(`/plan/price-history${planQuery(id)}`),
+    enabled,
+  });
+}
+
+export const useItemPriceHistory = (key: string) =>
+  useQuery({
+    queryKey: qk.priceHistory(key),
+    queryFn: () => apiGet<ItemPriceHistory>(`${itemPath(key)}/price-history`),
+    enabled: key !== "",
+  });
+
+/** 2.1: khoản định kỳ và Dự báo 30 ngày. */
+export const useRecurring = () =>
+  useQuery({ queryKey: qk.recurring, queryFn: () => apiGet<{ items: Recurring[]; monthly_total: number }>("/recurring") });
+
+export const useForecast = () => useQuery({ queryKey: qk.forecast, queryFn: () => apiGet<Forecast>("/forecast") });
+
+export function useRecurringActions() {
+  const qc = useQueryClient();
+  // Trả / bỏ qua một kỳ đổi cả Spending, Forecast và Trang chủ (2.1 mục 9).
+  const done = () => {
+    qc.invalidateQueries({ queryKey: qk.recurring });
+    qc.invalidateQueries({ queryKey: qk.forecast });
+    qc.invalidateQueries({ queryKey: ["spending"] });
+    qc.invalidateQueries({ queryKey: qk.home });
+  };
+  return {
+    create: useMutation({ mutationFn: (v: RecurringInput) => apiSend<Recurring>("POST", "/recurring", v), onSettled: done }),
+    update: useMutation({
+      mutationFn: (v: { id: string; patch: RecurringInput }) => apiSend<Recurring>("PATCH", `/recurring/${encodeURIComponent(v.id)}`, v.patch),
+      onSettled: done,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => apiSend<void>("DELETE", `/recurring/${encodeURIComponent(id)}`), onSettled: done }),
+    pay: useMutation({
+      mutationFn: (occId: string) => apiSend<Occurrence>("POST", `/recurring/occurrences/${encodeURIComponent(occId)}/pay`),
+      onSettled: done,
+    }),
+    skip: useMutation({
+      mutationFn: (occId: string) => apiSend<Occurrence>("POST", `/recurring/occurrences/${encodeURIComponent(occId)}/skip`),
+      onSettled: done,
+    }),
+  };
+}
+
+/** 4.1: nhà, mã mời, thành viên. */
+export const useHousehold = () => useQuery({ queryKey: qk.household, queryFn: () => apiGet<Household>("/households") });
+
+export function useHouseholdActions() {
+  const qc = useQueryClient();
+  const done = () => {
+    qc.invalidateQueries({ queryKey: qk.household });
+    qc.invalidateQueries({ queryKey: qk.me });
+  };
+  return {
+    invite: useMutation({ mutationFn: () => apiSend<{ code: string; expires_at: string }>("POST", "/households/invites"), onSettled: done }),
+    join: useMutation({ mutationFn: (code: string) => apiSend<Household>("POST", "/households/join", { code }), onSettled: done }),
+    leave: useMutation({ mutationFn: () => apiSend<void>("POST", "/households/leave"), onSettled: () => qc.invalidateQueries() }),
+    rename: useMutation({ mutationFn: (name: string) => apiSend<Household>("PATCH", "/households", { name }), onSettled: done }),
+    removeMember: useMutation({
+      mutationFn: (uid: string) => apiSend<void>("DELETE", `/households/members/${encodeURIComponent(uid)}`),
+      onSettled: done,
+    }),
+  };
+}
+
+/** 4.1 mục 9: gửi Kế hoạch cho người nhà mua hộ, hủy, xem vòng được nhờ. */
+export const useDelegated = (enabled = true) =>
+  useQuery({ queryKey: qk.delegated, queryFn: () => apiGet<Delegated>("/plan/delegated"), enabled });
+
+export function useAssignments() {
+  const qc = useQueryClient();
+  const done = () => qc.invalidateQueries({ queryKey: qk.plan });
+  return {
+    assign: useMutation({
+      mutationFn: (v: { buyer_uid: string; keys: string[]; note?: string }) =>
+        apiSend<Assignment>("POST", "/households/shopping-assignments", { ...v, plan_id: currentPlanId() }),
+      onSettled: done,
+    }),
+    cancel: useMutation({
+      mutationFn: (id: string) => apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(id)}/cancel`),
+      onSettled: done,
+    }),
+  };
 }
