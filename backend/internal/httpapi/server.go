@@ -50,6 +50,7 @@ type (
 		ChangeStock(ctx context.Context, p authz.Principal, key string, c item.StockChange) (item.Item, error)
 		UndoStock(ctx context.Context, p authz.Principal, key string, actedAt time.Time) (item.Item, error)
 		SetQuantity(ctx context.Context, p authz.Principal, key string, q item.QuantitySet) (item.Item, error)
+		Correct(ctx context.Context, p authz.Principal, key string, c item.Correction) (item.Item, error)
 	}
 	Home interface {
 		Get(ctx context.Context, p authz.Principal) (home.Summary, error)
@@ -239,6 +240,7 @@ func (s *Server) Handler() http.Handler {
 	private("PATCH /items/{key}/stock", s.defaultTimeout, s.changeStock)
 	private("DELETE /items/{key}/override", s.defaultTimeout, s.undoStock)
 	private("PUT /items/{key}/quantity", s.defaultTimeout, s.setQuantity)
+	private("PATCH /items/{key}", s.defaultTimeout, s.correctItem)
 	private("GET /households/needs", s.defaultTimeout, s.listSharedNeeds)
 	private("GET /spending", s.defaultTimeout, s.getSpending)
 	private("GET /plan", s.defaultTimeout, s.getPlan)
@@ -320,7 +322,7 @@ func (s *Server) implemented(p string) bool {
 
 var notYetImplemented = []string{
 	"DELETE /me",
-	"GET /needs", "PATCH /items/{key}",
+	"GET /needs",
 	"PATCH /receipts/{id}/lines/{lineId}", "GET /receipts",
 	"GET /forecast",
 	"GET /recurring", "POST /recurring", "PATCH /recurring/{id}", "DELETE /recurring/{id}", "POST /recurring/scan",

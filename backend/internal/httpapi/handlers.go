@@ -200,6 +200,21 @@ func (s *Server) setQuantity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, it)
 }
 
+// correctItem: sửa tên chuẩn hóa hoặc chuyển món sang nhóm đúng (0.1 mục 3.2).
+func (s *Server) correctItem(w http.ResponseWriter, r *http.Request) {
+	var c item.Correction
+	if err := decodeJSON(w, r, &c, maxJSONBody); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	it, err := s.items.Correct(r.Context(), principalFrom(r.Context()), r.PathValue("key"), c)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, it)
+}
+
 func (s *Server) undoStock(w http.ResponseWriter, r *http.Request) {
 	actedAt, err := time.Parse(time.RFC3339, r.URL.Query().Get("acted_at"))
 	if err != nil {

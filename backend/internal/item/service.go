@@ -9,10 +9,13 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/taxonomy"
 )
 
 // Record là tài liệu users/{uid}/items/{group_key} đã lưu.
@@ -508,3 +511,64 @@ func lead(p authz.Principal) int {
 }
 
 func loc(p authz.Principal) *time.Location { return domain.Location(p.Timezone) }
+
+// Corrector là phần tùy chọn của Store cho màn chi tiết món (0.1 mục 3.2): sửa tên chuẩn hóa
+// và chuyển món sang nhóm đúng khi AI phân loại sai. Lịch sử mua giữ nguyên số liệu, chỉ đổi
+// nhóm; tồn và dự đoán của nhóm đích tính lại từ lịch sử gộp.
+type Corrector interface {
+	RenameItem(ctx context.Context, uid, key, name string) (Record, error)
+	// RegroupItem chuyển mọi purchase của from sang to, gộp tồn vào to rồi xóa from.
+	RegroupItem(ctx context.Context, uid, from, to, category string) (Record, error)
+}
+
+// Correction là thân PATCH /items/{key}: chỉ gửi trường cần sửa.
+type Correction struct {
+	Name     *string `json:"name,omitempty"`
+	GroupKey *string `json:"group_key,omitempty"`
+}
+
+// Correct sửa tên và / hoặc nhóm của một món. Trả món sau khi sửa (key mới nếu đổi nhóm).
+func (s *Service) Correct(ctx context.Context, p authz.Principal, key string, c Correction) (Item, error) {
+	if err := authz.Can(p, authz.ActionWriteItems); err != nil {
+		return Item{}, err
+	}
+	if !ValidKey(key) {
+		return Item{}, apperr.ErrNotFound
+	}
+	cs, ok := s.store.(Corrector)
+	if !ok {
+		return Item{}, apperr.New(apperr.CodeNotImplemented, "Chưa hỗ trợ sửa món.")
+	}
+	if c.Name == nil && c.GroupKey == nil {
+		return Item{}, apperr.New(apperr.CodeValidation, "Chưa có gì để sửa.")
+	}
+	var rec Record
+	var err error
+	if c.Name != nil {
+		name := domain.CleanItemName(*c.Name)
+		if name == "" || utf8.RuneCountInString(name) > 60 || strings.IndexFunc(name, unicode.IsControl) >= 0 {
+			return Item{}, apperr.New(apperr.CodeValidation, "Tên món từ 1 đến 60 ký tự.").With("field", "name")
+		}
+		if rec, err = cs.RenameItem(ctx, p.UID, key, name); err != nil {
+			return Item{}, err
+		}
+	}
+	if c.GroupKey != nil {
+		to := taxonomy.Normalize(*c.GroupKey)
+		if !taxonomy.Has(to) {
+			return Item{}, apperr.New(apperr.CodeValidation, "Nhóm không có trong danh sách.").With("field", "group_key")
+		}
+		if to != key {
+			if rec, err = cs.RegroupItem(ctx, p.UID, key, to, taxonomy.SpendingCategory(to)); err != nil {
+				return Item{}, err
+			}
+		}
+	}
+	if rec.GroupKey == "" {
+		if rec, err = s.store.GetItem(ctx, p.UID, key); err != nil {
+			return Item{}, err
+		}
+	}
+	today := domain.Today(s.now(), loc(p))
+	return toItem(rec, domain.ViewAt(rec.Prediction, today, lead(p)), today), nil
+}

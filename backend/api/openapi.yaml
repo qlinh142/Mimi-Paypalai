@@ -225,8 +225,11 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
     patch:
       tags: [items]
-      x-status: planned
-      summary: Sửa tên và loại (lưu classification_corrections), hỏi lại sau, bỏ món
+      summary: Sửa tên chuẩn hóa hoặc chuyển món sang nhóm đúng (0.1 mục 3.2)
+      description: >
+        group_key khác key hiện tại thì mọi lần mua chuyển sang nhóm mới (số liệu giữ nguyên),
+        tồn còn lại gộp vào nhóm mới theo từng chiều đo, ghi classification_corrections và xóa
+        món cũ. Phản hồi là món ở key mới.
       parameters: [{ $ref: "#/components/parameters/ItemKey" }]
       requestBody:
         required: true
@@ -236,11 +239,11 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                name: { type: string, maxLength: 120 }
-                category_key: { type: string }
-                ask_later_until: { type: string, format: date }
-                dropped: { type: boolean }
-      responses: { "200": { description: OK } }
+                name: { type: string, maxLength: 60 }
+                group_key: { type: string, description: "Khóa nhóm taxonomy 0.2" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Item" } } } }
+        "422": { $ref: "#/components/responses/Error" }
   /items/{key}/stock:
     patch:
       tags: [items]

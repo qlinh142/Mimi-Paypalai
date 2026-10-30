@@ -92,6 +92,14 @@ const en = {
     time: "Time",
     tripFor: (p: string) => `Plan: ${p}`,
   },
+  itemFix: {
+    cta: "Fix name or group",
+    name: "Name",
+    saveName: "Save name",
+    group: (g: string) => `Group: ${g}`,
+    changeGroup: "Wrong group? Change it",
+    moved: (g: string) => `Moved to ${g}. Purchases and stock moved along.`,
+  },
   delegated: {
     title: "Asked to buy",
     from: (who: string) => `For ${who}`,
@@ -275,6 +283,14 @@ const vi: M1 = {
     alreadyIn: "Đã có trong Kế hoạch này",
     time: "Giờ",
     tripFor: (p) => `Kế hoạch: ${p}`,
+  },
+  itemFix: {
+    cta: "Sửa tên hoặc nhóm",
+    name: "Tên",
+    saveName: "Lưu tên",
+    group: (g) => `Nhóm: ${g}`,
+    changeGroup: "Sai nhóm? Đổi nhóm",
+    moved: (g) => `Đã chuyển sang ${g}. Lịch sử mua và tồn kho chuyển theo.`,
   },
   delegated: {
     title: "Được nhờ mua",

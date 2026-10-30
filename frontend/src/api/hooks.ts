@@ -109,6 +109,20 @@ export function useSetQuantity() {
   });
 }
 
+/** PATCH /items/{key}: sửa tên chuẩn hóa hoặc chuyển sang nhóm đúng (0.1 mục 3.2). */
+export function useCorrectItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; name?: string; group_key?: string }) =>
+      apiSend<Item>("PATCH", itemPath(v.key), { ...(v.name ? { name: v.name } : {}), ...(v.group_key ? { group_key: v.group_key } : {}) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: qk.items() });
+      qc.invalidateQueries({ queryKey: qk.item(v.key) });
+      qc.invalidateQueries({ queryKey: qk.plan });
+    },
+  });
+}
+
 export function useReadReceipt() {
   return useMutation({
     mutationFn: (v: { receiptId: string; images: Blob[]; lang: string }) =>

@@ -3,7 +3,7 @@ package domain
 import "testing"
 
 // samples là 100 test case chuẩn hóa đầu-cuối của tài liệu 0.1 mục 19: tên vào và lượng
-// tồn canonical mong đợi. groupName/detailName dùng ở test của package receipt.
+// tồn canonical mong đợi. groupName đối chiếu với taxonomy 0.2 ở normalization_test.go.
 var samples = []struct {
 	n          int
 	input      string

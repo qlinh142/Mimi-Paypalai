@@ -7,7 +7,7 @@ import type { ItemDetail as ItemDetailData } from "../api/types";
 import { TopBar, useUndo, MainFrame } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT, statusTone } from "../components/ItemRow";
 import { formatDayMonth, formatQty } from "../lib/text";
-import { LotsSection, PriceHistorySection } from "../components/ItemExtras";
+import { FixItemSection, LotsSection, PriceHistorySection } from "../components/ItemExtras";
 import { AddToPlanButton } from "../components/PlanExtras";
 import { m1 } from "../i18n/m1";
 
@@ -87,6 +87,7 @@ export function ItemDetail() {
             <StockSection item={item} onSaved={() => q.refetch()} />
             <LotsSection item={item} />
             <PriceHistorySection itemKey={item.key} />
+            <FixItemSection key={item.key} item={item} />
           </>
         )}
       </div>

@@ -315,3 +315,159 @@ func (s *Store) Lots(ctx context.Context, uid, key string, limit int) ([]domain.
 	}
 	return out, nil
 }
+
+// RenameItem sửa tên chuẩn hóa của món (0.1 mục 3.2). Lịch sử mua giữ tên in trên hóa đơn.
+func (s *Store) RenameItem(ctx context.Context, uid, key, name string) (item.Record, error) {
+	ref := s.user(uid).Collection("items").Doc(key)
+	var rec item.Record
+	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if isNotFound(err) {
+			return apperr.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		rec = decodeRecord(snap)
+		rec.Name, rec.NameNorm = name, domain.NormalizeVi(name)
+		return tx.Update(ref, []firestore.Update{
+			{Path: "name", Value: name}, {Path: "name_norm", Value: rec.NameNorm},
+			{Path: "name_by_user", Value: true}, {Path: "updated_at", Value: time.Now()},
+		})
+	})
+	return rec, err
+}
+
+// regroupLimit: số purchase tối đa chuyển trong một transaction (giới hạn 500 thao tác ghi).
+const regroupLimit = 450
+
+// RegroupItem chuyển món sang nhóm đúng (0.1 mục 3.2 "sửa group nếu AI phân loại sai"):
+//   - mọi purchase của nhóm cũ đổi group_key sang nhóm mới, số liệu mua giữ nguyên;
+//   - dự đoán của nhóm mới tính lại từ lịch sử gộp;
+//   - tồn còn lại của nhóm cũ cộng vào nhóm mới nếu cùng chiều đo, khác chiều đo thì thành
+//     stream riêng (không cộng g với ml);
+//   - ghi classification_corrections để biết người dùng đã sửa, rồi xóa món cũ.
+func (s *Store) RegroupItem(ctx context.Context, uid, from, to, category string) (item.Record, error) {
+	u := s.user(uid)
+	fromRef, toRef := u.Collection("items").Doc(from), u.Collection("items").Doc(to)
+	today := domain.Today(time.Now(), time.UTC)
+	var rec item.Record
+	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		// Đọc hết trước khi ghi.
+		fromSnap, err := tx.Get(fromRef)
+		if isNotFound(err) {
+			return apperr.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		old := decodeRecord(fromSnap)
+		moved, err := tx.Documents(u.Collection("purchases").Where("group_key", "==", from).Limit(regroupLimit + 1)).GetAll()
+		if err != nil {
+			return err
+		}
+		if len(moved) > regroupLimit {
+			return apperr.New(apperr.CodeInvalidState, "Món có quá nhiều lần mua để chuyển nhóm một lần.")
+		}
+		dst, err := s.readGroupState(tx, uid, to)
+		if err != nil {
+			return err
+		}
+
+		hist := append([]domain.Purchase(nil), dst.history...)
+		for _, d := range moved {
+			m := d.Data()
+			if habit, _ := m["habit"].(bool); !habit {
+				continue
+			}
+			if rev, _ := m["needs_review"].(bool); rev {
+				continue
+			}
+			if on, err := domain.ParseDate(fmt.Sprint(m["purchased_on"])); err == nil {
+				hist = append(hist, domain.Purchase{On: on, Habit: true})
+			}
+		}
+
+		rec = old
+		if dst.exists {
+			rec = dst.prev
+		}
+		rec.GroupKey = to
+		if category != "" {
+			rec.CategoryKey = category
+		}
+		rec.Prediction = domain.Predict(hist, rec.Override)
+		if dst.exists {
+			mergeStock(&rec, old, today)
+		}
+
+		for _, d := range moved {
+			upd := []firestore.Update{{Path: "group_key", Value: to}}
+			if category != "" {
+				upd = append(upd, firestore.Update{Path: "category_key", Value: category})
+			}
+			if err := tx.Update(d.Ref, upd); err != nil {
+				return err
+			}
+		}
+		doc := map[string]any{
+			"name": rec.Name, "name_norm": domain.NormalizeVi(rec.Name), "category_key": rec.CategoryKey,
+			"prediction": predictionDoc(rec.Prediction), "dropped": false, "updated_at": time.Now(),
+			"stock": baselineDoc(rec.Baseline), "rate_per_day": rec.RatePerDay, "consumed": consumedDoc(rec.Consumed),
+		}
+		if !latest(hist).IsZero() {
+			doc["last_purchase"] = latest(hist).String()
+		}
+		if len(rec.Extra) > 0 {
+			doc["extra_stock"] = extraDoc(rec.Extra)
+		}
+		if rec.Override != nil {
+			doc["override"] = overrideDoc(*rec.Override)
+		}
+		if err := tx.Set(toRef, doc, firestore.MergeAll); err != nil {
+			return err
+		}
+		if err := tx.Set(u.Collection("classification_corrections").Doc(from), map[string]any{
+			"from_group_key": from, "to_group_key": to, "purchases_moved": len(moved), "at": time.Now(),
+		}); err != nil {
+			return err
+		}
+		return tx.Delete(fromRef)
+	})
+	return rec, err
+}
+
+// mergeStock cộng tồn còn lại của món cũ vào món đích tại ngày chuyển nhóm.
+func mergeStock(dst *item.Record, old item.Record, today domain.Date) {
+	add := func(b domain.Baseline, rate float64, used []domain.Consumption) {
+		if b.On.IsZero() || b.Unit == "" {
+			return
+		}
+		left := domain.EstimateAt(b, rate, used, today)
+		switch {
+		case dst.Baseline.On.IsZero():
+			dst.Baseline, dst.RatePerDay, dst.Consumed = domain.Baseline{Qty: left, Unit: b.Unit, On: today, Source: b.Source}, rate, nil
+		case dst.Baseline.Unit == b.Unit:
+			dst.Baseline = domain.AfterPurchase(dst.Baseline, dst.RatePerDay, dst.Consumed, left, b.Unit, today, dst.Baseline.Source)
+			dst.Consumed = nil
+		default:
+			if dst.Extra == nil {
+				dst.Extra = map[domain.Unit]item.Stream{}
+			}
+			x := dst.Extra[b.Unit]
+			dst.Extra[b.Unit] = item.Stream{Baseline: domain.AfterPurchase(x.Baseline, x.RatePerDay, nil, left, b.Unit, today, b.Source), RatePerDay: max(x.RatePerDay, rate)}
+		}
+	}
+	add(old.Baseline, old.RatePerDay, old.Consumed)
+	for _, x := range old.Extra {
+		add(x.Baseline, x.RatePerDay, nil)
+	}
+}
+
+func consumedDoc(cs []domain.Consumption) []any {
+	out := make([]any, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, map[string]any{"qty": c.Qty, "on": c.On.String()})
+	}
+	return out
+}

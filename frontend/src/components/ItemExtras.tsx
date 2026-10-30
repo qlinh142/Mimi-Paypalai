@@ -1,6 +1,10 @@
 import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
-import { useItemPriceHistory } from "../api/hooks";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ApiError } from "../api/client";
+import { useCorrectItem, useItemPriceHistory, useTaxonomyLabels } from "../api/hooks";
+import { GroupPicker } from "./ReceiptLines";
 import type { ItemDetail } from "../api/types";
 import { formatDayMonth, formatQty, formatUnitPrice, formatVnd } from "../lib/text";
 
@@ -84,6 +88,72 @@ export function PriceHistorySection({ itemKey }: { itemKey: string }) {
         </>
       )}
       {d.other_dimension_count > 0 && <p className="hint">{m1.priceHistory.otherDimension(d.other_dimension_count)}</p>}
+    </section>
+  );
+}
+
+/**
+ * Sửa tên chuẩn hóa và sửa nhóm khi AI phân loại sai (0.1 mục 3.2). Đổi nhóm thì lịch sử
+ * mua và tồn kho chuyển sang nhóm mới; màn chuyển sang món ở nhóm mới.
+ */
+export function FixItemSection({ item }: { item: ItemDetail }) {
+  const fix = useCorrectItem();
+  const nav = useNavigate();
+  const groupLabel = useTaxonomyLabels();
+  const [open, setOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [name, setName] = useState(item.name);
+  // Sau khi đổi nhóm trang chuyển sang key mới; câu báo đi theo state của điều hướng.
+  const moved = (useLocation().state as { moved?: string } | null)?.moved ?? "";
+  const group = groupLabel(item.key);
+  return (
+    <section className="plan-sec" aria-labelledby="fix-title">
+      <button id="fix-title" type="button" className="btn btn--quiet btn--block" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {m1.itemFix.cta}
+      </button>
+      {moved && <p className="hint" role="status">{moved}</p>}
+      {open && (
+        <div className="plan-form">
+          <form
+            className="plan-form__row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!name.trim() || name.trim() === item.name || fix.isPending) return;
+              fix.mutate({ key: item.key, name: name.trim() });
+            }}
+          >
+            <label style={{ flex: 1 }}>
+              {m1.itemFix.name}
+              <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <button type="submit" className="btn btn--primary" aria-disabled={!name.trim() || name.trim() === item.name || undefined}>
+              {m1.itemFix.saveName}
+            </button>
+          </form>
+          {group && <p className="hint">{m1.itemFix.group(group)}</p>}
+          {!picking ? (
+            <button type="button" className="btn btn--quiet" onClick={() => setPicking(true)}>{m1.itemFix.changeGroup}</button>
+          ) : (
+            <GroupPicker
+              name={item.name}
+              onCancel={() => setPicking(false)}
+              onPick={(key) =>
+                fix.mutate(
+                  { key: item.key, group_key: key },
+                  {
+                    onSuccess: (it) => {
+                      setPicking(false);
+                      setOpen(false);
+                      nav(`/items/${encodeURIComponent(it.key)}`, { replace: true, state: { moved: m1.itemFix.moved(groupLabel(it.key) || it.name) } });
+                    },
+                  },
+                )
+              }
+            />
+          )}
+          {fix.isError && <p className="error" role="alert">{fix.error instanceof ApiError ? fix.error.message : t.common.genericError}</p>}
+        </div>
+      )}
     </section>
   );
 }

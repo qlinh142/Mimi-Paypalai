@@ -134,7 +134,7 @@ function LineForm({ line, currency, onChange }: { line: EditLine; currency: stri
   );
 }
 
-function GroupPicker({ name, onPick, onCancel }: { name: string; onPick: (key: string) => void; onCancel: () => void }) {
+export function GroupPicker({ name, onPick, onCancel }: { name: string; onPick: (key: string) => void; onCancel: () => void }) {
   const [q, setQ] = useState("");
   const found = useTaxonomySearch(q);
   return (

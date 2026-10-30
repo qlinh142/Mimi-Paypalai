@@ -237,6 +237,29 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       }));
       return json({ ...it, history, lots: mockLots(it) });
     }
+    // 0.1 mục 3.2: sửa tên chuẩn hóa hoặc chuyển sang nhóm đúng (gộp nếu nhóm đó đã có món).
+    if (method === "PATCH" && sub === "") {
+      const body = JSON.parse(String(init.body ?? "{}")) as { name?: string; group_key?: string };
+      let next: Item = it;
+      if (body.name !== undefined) {
+        const name = body.name.trim();
+        if (!name || name.length > 60) return json({ code: "validation_failed", message: "name", field: "name" }, 422);
+        next = { ...next, name };
+      }
+      if (body.group_key !== undefined && body.group_key !== key) {
+        const g = taxonomyGroups.groups.find((x) => x.key === body.group_key);
+        if (!g) return json({ code: "validation_failed", message: "group_key", field: "group_key" }, 422);
+        const dest = items.find((x) => x.key === g.key);
+        next = dest
+          ? { ...dest, purchase_count: dest.purchase_count + it.purchase_count }
+          : { ...next, key: g.key };
+        items = items.filter((x) => x.key !== key && x.key !== g.key);
+        items.push(next);
+        return json(next);
+      }
+      items = items.map((x) => (x.key === key ? next : x));
+      return json(next);
+    }
     if (method === "PATCH" && sub === "/stock") {
       const body = JSON.parse(String(init.body ?? "{}")) as { quick?: "plenty" | "soon" | "out" };
       if (!beforeOverride.has(key)) beforeOverride.set(key, it);

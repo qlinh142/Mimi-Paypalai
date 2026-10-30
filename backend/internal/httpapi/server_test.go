@@ -93,6 +93,9 @@ func (fakeItems) UndoStock(context.Context, authz.Principal, string, time.Time) 
 func (fakeItems) SetQuantity(context.Context, authz.Principal, string, item.QuantitySet) (item.Item, error) {
 	return item.Item{}, nil
 }
+func (fakeItems) Correct(context.Context, authz.Principal, string, item.Correction) (item.Item, error) {
+	return item.Item{}, nil
+}
 
 type fakeHome struct{}
 
