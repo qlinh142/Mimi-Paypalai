@@ -15,7 +15,7 @@ import { MimiMark } from "./MimiMark";
  * - main: logo Mimi bên trái (bấm về Home), chuông bên phải; tên màn chỉ đọc cho trình đọc màn hình.
  * - sub: nút quay lại, tên ở giữa, chuông bên phải (chi tiết món, thông báo...).
  */
-export function TopBar({ title, variant = "main" }: { title?: string; variant?: "main" | "sub"; brand?: boolean }) {
+export function TopBar({ title, variant = "main", showTitle = false }: { title?: string; variant?: "main" | "sub"; brand?: boolean; showTitle?: boolean }) {
   const home = useHome();
   const nav = useNavigate();
   const unread = home.data?.unread_notifications ?? 0;
@@ -41,7 +41,7 @@ export function TopBar({ title, variant = "main" }: { title?: string; variant?: 
       <Link to="/" className="topbar__logo" aria-label={t.nav.home}>
         <MimiMark size={44} label={null} />
       </Link>
-      {title && <h1 className="visually-hidden">{title}</h1>}
+      {title && <h1 className={showTitle ? "topbar__title" : "visually-hidden"}>{title}</h1>}
       <span className="topbar__spacer" />
       {bell}
     </header>

@@ -12,7 +12,8 @@ import { Home } from "../screens/Home";
 const Items = lazy(() => import("../screens/Items").then((m) => ({ default: m.Items })));
 const ItemDetail = lazy(() => import("../screens/ItemDetail").then((m) => ({ default: m.ItemDetail })));
 const Scan = lazy(() => import("../screens/Scan").then((m) => ({ default: m.Scan })));
-const Plan = lazy(() => import("../screens/Plan").then((m) => ({ default: m.Plan })));
+const PlanList = lazy(() => import("../screens/PlanList").then((m) => ({ default: m.PlanList })));
+const PlanDetail = lazy(() => import("../screens/PlanDetail").then((m) => ({ default: m.PlanDetail })));
 const Spending = lazy(() => import("../screens/Spending").then((m) => ({ default: m.Spending })));
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
 const Notifications = lazy(() => import("../screens/Notifications").then((m) => ({ default: m.Notifications })));
@@ -60,7 +61,8 @@ function Gate() {
         <Route path="/items/:key" element={<ItemDetail />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/spending" element={<Spending />} />
-        <Route path="/plan" element={<Plan />} />
+        <Route path="/plan" element={<PlanList />} />
+        <Route path="/plan/:id" element={<PlanDetail />} />
         <Route path="/plan/online" element={<OnlineBuy />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/orders/:id" element={<OrderDetail />} />

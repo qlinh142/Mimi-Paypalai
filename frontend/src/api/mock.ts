@@ -95,13 +95,19 @@ let cart = new Set<string>(["sua-tuoi", "nuoc-rua-chen", "trung-ga"]);
 /** Chi tiết dòng Kế hoạch (số lượng, ngày cần, ưu tiên); vắng: mặc định như backend. */
 type MockLine = PlanLinePatch & { source?: CartItem["source"]; bought_qty?: number; line_status?: "open" | "assigned"; assigned_to_uid?: string };
 let planLines = new Map<string, MockLine>();
-let planState: PlanState = { buy_date: "", buy_hour: null, trip_note: "" };
+// Mimi 1.5: Kế hoạch chính mẫu theo ảnh 5a (đi mua sau 2 ngày, 09:30, WinMart gần nhà).
+let planState: PlanState = { buy_date: new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10), buy_hour: 9, buy_minute: 30, trip_note: uiLang === "en" ? "WinMart nearby" : "WinMart gần nhà" };
 /** Món chưa có trong Đồ dùng: nhóm taxonomy hoặc món tự nhập (3.1). */
 const extraNames = new Map<string, string>();
 
 /** Nhiều Kế hoạch (3.1): mỗi Kế hoạch đặt tên có giỏ riêng; "default" dùng các biến ở trên. */
 type MockPlan = { name: string; status: "active" | "archived"; created: number; cart: Set<string>; lines: Map<string, MockLine>; state: PlanState };
-const namedPlans = new Map<string, MockPlan>();
+const namedPlans = new Map<string, MockPlan>([
+  ["p-be", {
+    name: L ? "Baby shopping" : "Mua đồ cho bé", status: "active", created: 1, cart: new Set(["sua-tuoi", "giay-ve-sinh"]), lines: new Map(),
+    state: { buy_date: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10), buy_hour: 18, buy_minute: 0, trip_note: L ? "Bach Hoa Xanh" : "Bách Hóa Xanh" },
+  }],
+]);
 
 /** Chạy fn trên Kế hoạch plan_id của request bằng cách đổi tạm các biến giỏ. */
 function inPlan<T>(id: string | null, fn: () => T): T {
@@ -667,7 +673,12 @@ function recurringView(r: MockRecurring) {
 
 const ME = "mock-uid";
 let household: { id: string; name: string; members: { uid: string; display_name: string; role: "owner" | "member"; joined_at: string }[]; invite?: { code: string; expires_at: string } } = {
-  id: "", name: "", members: [{ uid: ME, display_name: "Lan", role: "owner", joined_at: iso(today) }],
+  id: "nha-lan", name: "Nhà Lan", members: [
+    { uid: ME, display_name: "Lan", role: "owner", joined_at: iso(today) },
+    { uid: "mock-minh", display_name: "Minh", role: "member", joined_at: iso(today) },
+    { uid: "mock-bo", display_name: L ? "Dad" : "Bố", role: "member", joined_at: iso(today) },
+    { uid: "mock-me", display_name: L ? "Grandma" : "Bà", role: "member", joined_at: iso(today) },
+  ],
 };
 type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string }[]; created_at: string; note?: string;
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string } };
