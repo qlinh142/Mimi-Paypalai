@@ -111,7 +111,9 @@ function byStore(rows: ReceiptSummary[]) {
 function Report({ r, month }: { r: SpendingReport; month: string }) {
   const [allCats, setAllCats] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const cats = [...r.by_category].sort((a, b) => b.amount - a.amount);
+  // Khoản chi định kỳ luôn đứng đầu danh mục; các nhóm còn lại xếp theo số tiền.
+  const REC = "hoa-don-dinh-ky";
+  const cats = [...r.by_category].sort((a, b) => (a.key === REC ? -1 : b.key === REC ? 1 : b.amount - a.amount));
   const shown = allCats ? cats : cats.slice(0, TOP_CATS);
   const maxCat = Math.max(1, ...cats.map((c) => c.amount));
   const best = r.top_saving_receipts[0];
