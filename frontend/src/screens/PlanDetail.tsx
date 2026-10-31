@@ -17,6 +17,7 @@ import { setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { PLAN_ICONS, iconOf, planIcon, setPlanIcon } from "../lib/planIcon";
 import { formatVnd } from "../lib/text";
 import { planName } from "./PlanList";
+import { relationOf } from "../lib/relation";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -380,7 +381,10 @@ function MemberSheet({ cart, onClose }: { cart: Cart; onClose: () => void }) {
             <li key={m.uid}>
               <label>
                 <span className="members15__avatar" aria-hidden>{(m.display_name || "?").slice(0, 1).toUpperCase()}</span>
-                <span className="members15__name">{m.display_name}</span>
+                <span className="members15__name">
+                  {m.display_name}
+                  {relationOf(m.uid) && <span className="members15__rel">{m15.settings.relations[relationOf(m.uid)]}</span>}
+                </span>
                 <input type="radio" name="buyer" checked={pick === m.uid} onChange={() => setPick(m.uid)} />
               </label>
             </li>

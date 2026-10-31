@@ -16,6 +16,14 @@ const PlanList = lazy(() => import("../screens/PlanList").then((m) => ({ default
 const PlanDetail = lazy(() => import("../screens/PlanDetail").then((m) => ({ default: m.PlanDetail })));
 const Spending = lazy(() => import("../screens/Spending").then((m) => ({ default: m.Spending })));
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
+const lazySet = (k: "SettingsProfile" | "SettingsNotify" | "SettingsLanguage" | "SettingsMembers" | "SettingsMember" | "SettingsPrivacy") =>
+  lazy(() => import("../screens/Settings").then((m) => ({ default: m[k] })));
+const SettingsProfile = lazySet("SettingsProfile");
+const SettingsNotify = lazySet("SettingsNotify");
+const SettingsLanguage = lazySet("SettingsLanguage");
+const SettingsMembers = lazySet("SettingsMembers");
+const SettingsMember = lazySet("SettingsMember");
+const SettingsPrivacy = lazySet("SettingsPrivacy");
 const Notifications = lazy(() => import("../screens/Notifications").then((m) => ({ default: m.Notifications })));
 const Account = lazy(() => import("../screens/Stub").then((m) => ({ default: m.Account })));
 const OnlineBuy = lazy(() => import("../screens/Online").then((m) => ({ default: m.OnlineBuy })));
@@ -68,6 +76,12 @@ function Gate() {
         <Route path="/orders/:id" element={<OrderDetail />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/account" element={<Account />} />
+        <Route path="/settings/profile" element={<SettingsProfile />} />
+        <Route path="/settings/notify" element={<SettingsNotify />} />
+        <Route path="/settings/language" element={<SettingsLanguage />} />
+        <Route path="/settings/members" element={<SettingsMembers />} />
+        <Route path="/settings/members/:uid" element={<SettingsMember />} />
+        <Route path="/settings/privacy" element={<SettingsPrivacy />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/today" element={<TodayMeal />} />
         <Route path="*" element={<Navigate to="/" replace />} />

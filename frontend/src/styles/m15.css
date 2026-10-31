@@ -272,3 +272,42 @@
 .members15__avatar { width: 44px; height: 44px; border-radius: 50%; background: #dde8ff; color: var(--m15-blue); display: grid; place-items: center; font-weight: 800; }
 .members15__name { flex: 1; font-weight: 700; }
 .sent15 { margin: 0; padding: var(--s3); border-radius: 12px; background: #e3f6e6; color: #1f7a3a; font-weight: 700; }
+
+/* ===== Màn 6 · Cài đặt ===== */
+.set15 { display: grid; gap: var(--s4); }
+.set15__group { display: grid; gap: var(--s2); }
+.set15__group .h15sec { margin: 0; }
+.set15__list { list-style: none; padding: 0 var(--s4); gap: 0; }
+.set15__list > li { border-top: 1px solid var(--m15-line); }
+.set15__list > li:first-child { border-top: 0; }
+.set15__row { display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: 60px; padding: var(--s2) 0; background: none; border: 0; font: inherit; color: var(--ink); text-align: left; text-decoration: none; cursor: pointer; }
+.set15__row > svg:last-child { color: var(--ink-soft); flex: none; }
+.set15__row--soon { opacity: .5; cursor: default; }
+.set15__row--danger { color: #c62828; font-weight: 700; }
+.set15__row--danger .set15__icon { background: #fde7e7; color: #c62828; }
+.set15__icon { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #eaf0ff; color: var(--m15-blue); }
+.set15__text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.set15__text > span, .set15__text > strong { font-weight: 700; font-size: var(--fs-md); }
+.set15__text small, .set15__who small, .set15__note small { color: var(--ink-soft); font-size: var(--fs-sm); }
+.set15__chip { flex: none; }
+.set15__me { display: flex; align-items: center; gap: var(--s3); color: var(--ink); text-decoration: none; }
+.set15__avatar { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--orange); color: #fff; font-weight: 800; font-size: 1.25rem; }
+.set15__avatar--lg { width: 72px; height: 72px; font-size: 1.8rem; justify-self: center; }
+.set15__form { display: grid; gap: var(--s4); }
+.set15__form select.pick15 { appearance: auto; }
+.set15__ro { background: #f3f5fb !important; color: var(--ink-soft) !important; }
+.set15__who { margin: 0; display: grid; justify-items: center; gap: 2px; }
+.set15__who strong { font-size: var(--fs-lg); }
+.set15__note { display: flex; gap: var(--s3); align-items: flex-start; background: #f2fbf4; border-color: #cfe9d5; }
+.set15__note > svg { color: #2e7d32; flex: none; margin-top: 2px; }
+.set15__note span { display: grid; gap: 4px; }
+.set15__leave { border: 1.5px solid #c62828; color: #c62828; background: #fff; }
+.set15__page p { margin: 0; line-height: 1.55; }
+.house15 { display: grid; grid-template-columns: auto 1fr; gap: var(--s3); align-items: start; background: #fff7ec; border-color: #fbd9a8; }
+.house15__icon { font-size: 2rem; line-height: 1; }
+.house15__text { display: grid; gap: 2px; }
+.house15__text strong { font-size: var(--fs-lg); }
+.house15__text small { color: var(--ink-soft); font-size: var(--fs-sm); }
+.house15__code { margin-top: var(--s2); font-weight: 800; letter-spacing: .06em; color: var(--m15-blue); }
+.house15__copy { grid-column: 1 / -1; }
+.members15__rel { display: block; color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 400; }

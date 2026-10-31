@@ -1,192 +1,434 @@
 import { t, uiLang } from "../i18n";
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
-import { useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
-import type { Mandate, MandateCategory, Me, SettingsPatch } from "../api/types";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Bell, ChevronRight, Copy, Globe, Info, LogOut, Package, Plus, ShieldCheck, UsersRound, Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import { ApiError } from "../api/client";
+import { useHousehold, useHouseholdActions, useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
+import type { Mandate, MandateCategory, Me } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
-import { HouseholdPanel } from "../components/Household";
 import { m15 } from "../i18n/m15";
+import { m1 } from "../i18n/m1";
 import { useAuth } from "../lib/auth";
 import { clearQueue } from "../lib/offlineQueue";
+import { RELATIONS, relationOf, setRelation } from "../lib/relation";
+import { formatDayMonth } from "../lib/text";
 import { queryClient, queryPersister } from "../app/queryClient";
-import { LogOut } from "lucide-react";
 
-/** Đăng xuất (Mimi 1.5: chuyển từ biểu tượng tài khoản vào Cài đặt). Dọn cache và hàng đợi ghi trên máy. */
-function SignOutSection() {
-  const auth = useAuth();
-  return (
-    <section className="plan-sec">
-      <h2>{t.settings.account}</h2>
-      <p className="hint">{auth.session?.email ?? ""}</p>
-      <button
-        type="button"
-        className="btn btn--quiet btn--block"
-        onClick={async () => {
-          queryClient.clear();
-          await Promise.all([queryPersister.removeClient(), clearQueue()]);
-          await auth.signOut();
-        }}
-      >
-        <LogOut size={20} aria-hidden /> {m15.settings.signOut}
-      </button>
-    </section>
-  );
-}
-
+const S = m15.settings;
 const LEAD_DAYS = [1, 2, 3, 5, 7, 10, 14, 21, 30];
 const TIMEZONES = [
   "Asia/Ho_Chi_Minh", "Asia/Bangkok", "Asia/Singapore", "Asia/Tokyo", "Asia/Seoul",
   "Australia/Sydney", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles",
 ];
+const LANG_NAME = { vi: "Tiếng Việt", en: "English" } as const;
+const initial = (n: string) => (n.trim()[0] ?? "?").toUpperCase();
+const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
 
-type Form = {
-  display_name: string;
-  remind_enabled: boolean;
-  digest_time: string;
-  lead_days: number;
-  lang: "vi" | "en";
-  timezone: string;
-};
-
-function fromMe(me: Me): Form {
-  const s = me.settings;
-  return {
-    display_name: me.display_name ?? "",
-    remind_enabled: s.remind_enabled ?? true,
-    digest_time: s.digest_time ?? "08:00",
-    lead_days: s.lead_days ?? 7,
-    lang: s.lang ?? "vi",
-    timezone: s.timezone || "Asia/Ho_Chi_Minh",
-  };
+/** Một dòng trong danh sách Cài đặt. `soon`: tính năng đang treo (Mimi 1.5), làm mờ, bấm chỉ báo Sắp ra mắt. */
+function Row({ to, Icon, label, sub, chip, soon, onSoon }: { to?: string; Icon: LucideIcon; label: string; sub?: string; chip?: string; soon?: boolean; onSoon?: () => void }) {
+  const body = (
+    <>
+      <span className="set15__icon"><Icon size={22} aria-hidden /></span>
+      <span className="set15__text">
+        <span>{label}</span>
+        {sub && <small>{sub}</small>}
+      </span>
+      {chip && <span className="tag15 set15__chip">{chip}</span>}
+      {!soon && <ChevronRight size={20} aria-hidden />}
+    </>
+  );
+  if (soon || !to)
+    return (
+      <li>
+        <button type="button" className={`set15__row${soon ? " set15__row--soon" : ""}`} aria-disabled={soon || undefined} onClick={onSoon}>{body}</button>
+      </li>
+    );
+  return (
+    <li>
+      <Link to={to} className="set15__row">{body}</Link>
+    </li>
+  );
 }
 
-/** Chỉ gửi các trường đã đổi: PUT /settings giữ nguyên trường vắng mặt. */
-function diff(a: Form, b: Form): SettingsPatch {
-  const p: SettingsPatch = {};
-  if (a.display_name.trim() !== b.display_name.trim()) p.display_name = b.display_name.trim();
-  if (a.remind_enabled !== b.remind_enabled) p.remind_enabled = b.remind_enabled;
-  if (a.digest_time !== b.digest_time) p.digest_time = b.digest_time;
-  if (a.lead_days !== b.lead_days) p.lead_days = b.lead_days;
-  if (a.lang !== b.lang) p.lang = b.lang;
-  if (a.timezone !== b.timezone) p.timezone = b.timezone;
-  return p;
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="set15__group" aria-label={title}>
+      <h2 className="h15sec">{title}</h2>
+      <ul className="box15 set15__list">{children}</ul>
+    </section>
+  );
 }
 
-/** Cài đặt (spec mục 6). Phần chia sẻ với người nhà chưa có API nên chỉ ghi chú. */
-export function Settings() {
-  const me = useMe();
+/** Khung chung cho các trang con của Cài đặt: nút ‹ quay lại và tên trang. */
+function Sub({ title, children }: { title: string; children: ReactNode }) {
   return (
     <MainFrame>
-      <TopBar title={t.settings.title} />
-      <div className="page">
-        {me.isPending && <p className="hint">{t.common.loading}</p>}
-        {me.isError && !me.data && (
-          <div className="empty">
-            <p>{t.common.genericError}</p>
-            <button className="btn btn--quiet" onClick={() => me.refetch()}>{t.common.retry}</button>
-          </div>
-        )}
-        {me.data && <SettingsForm me={me.data} />}
+      <TopBar title={title} variant="sub" />
+      <div className="page p15 set15">{children}</div>
+    </MainFrame>
+  );
+}
 
-        <HouseholdPanel />
+function useMeData(): Me | undefined {
+  return useMe().data;
+}
 
-        {/* Mimi 1.5: Mimi mua online đang treo, ẩn phần Ủy quyền mua (MandateSection). */}
-        <SignOutSection />
+/** Cài đặt (Mimi 1.5, ảnh mẫu 6-cai-dat-va-thanh-vien.png, chốt 31/10 14:46). */
+export function Settings() {
+  const me = useMeData();
+  const auth = useAuth();
+  const h = useHousehold();
+  const [soon, setSoon] = useState(false);
+  const s = me?.settings;
+  const name = me?.display_name || auth.session?.email || "";
+  return (
+    <MainFrame>
+      <TopBar title={S.title} showTitle />
+      <div className="page p15 set15">
+        <Link to="/settings/profile" className="box15 set15__me">
+          <span className="set15__avatar" aria-hidden>{initial(name)}</span>
+          <span className="set15__text">
+            <strong>{name}</strong>
+            <small>{S.seeProfile}</small>
+          </span>
+          <ChevronRight size={22} aria-hidden />
+        </Link>
+
+        <Group title={S.general}>
+          <Row to="/settings/notify" Icon={Bell} label={S.notify} sub={s ? S.notifySub(s.digest_time ?? "08:00", s.lead_days ?? 7, s.remind_enabled ?? true) : undefined} />
+          <Row to="/settings/language" Icon={Globe} label={S.language} sub={S.languageSub(LANG_NAME[uiLang], (s?.timezone || "Asia/Ho_Chi_Minh").replace(/_/g, " "))} />
+        </Group>
+        <p className="hint hint15"><Info size={16} aria-hidden /> {S.langNote}</p>
+
+        <Group title={S.family}>
+          <Row to="/settings/members" Icon={UsersRound} label={S.members} sub={h.data ? S.membersSub(h.data.members.length) : undefined} />
+          <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+        </Group>
+
+        <Group title={S.shopping}>
+          <Row Icon={Package} label={S.orders} chip={S.comingSoon} soon onSoon={() => setSoon(true)} />
+        </Group>
+        {soon && <p className="hint hint15" role="status"><Info size={16} aria-hidden /> {S.soonNote}</p>}
+
+        <Group title={S.account}>
+          <Row to="/settings/privacy" Icon={ShieldCheck} label={S.privacy} />
+          <li>
+            <button
+              type="button"
+              className="set15__row set15__row--danger"
+              onClick={async () => {
+                queryClient.clear();
+                await Promise.all([queryPersister.removeClient(), clearQueue()]);
+                await auth.signOut();
+              }}
+            >
+              <span className="set15__icon"><LogOut size={22} aria-hidden /></span>
+              <span className="set15__text"><span>{S.signOut}</span></span>
+            </button>
+          </li>
+        </Group>
       </div>
     </MainFrame>
   );
 }
 
-function SettingsForm({ me }: { me: Me }) {
-  const [saved, setSaved] = useState<Form>(() => fromMe(me));
-  const [f, setF] = useState<Form>(saved);
-  const save = useSaveSettings();
-  const patch = diff(saved, f);
-  const dirty = Object.keys(patch).length > 0;
-  const zones = TIMEZONES.includes(f.timezone) ? TIMEZONES : [f.timezone, ...TIMEZONES];
+function SaveBar({ dirty, pending, ok, err }: { dirty: boolean; pending: boolean; ok: boolean; err: boolean }) {
+  return (
+    <>
+      {err && <p className="error" role="alert">{t.settings.saveFailed}</p>}
+      {ok && !dirty && <p className="hint" role="status">{S.saved}</p>}
+      <button type="submit" className="btn btn--primary btn--block btn--lg" aria-disabled={!dirty || pending || undefined}>
+        {pending ? t.confirm.saving : S.save}
+      </button>
+    </>
+  );
+}
 
+/** Hồ sơ cá nhân: sửa tên Mimi gọi; email chỉ xem. */
+export function SettingsProfile() {
+  const me = useMeData();
+  const auth = useAuth();
+  const save = useSaveSettings();
+  const [name, setName] = useState<string | null>(null);
+  const cur = name ?? me?.display_name ?? "";
+  const dirty = name != null && name.trim() !== "" && name.trim() !== (me?.display_name ?? "");
+  return (
+    <Sub title={S.profile}>
+      <form
+        className="box15 set15__form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!dirty || save.isPending) return;
+          save.mutate({ display_name: cur.trim() }, { onSuccess: () => setName(null) });
+        }}
+      >
+        <span className="set15__avatar set15__avatar--lg" aria-hidden>{initial(cur || auth.session?.email || "")}</span>
+        <label className="field15">
+          <span>{S.name}</span>
+          <input value={cur} maxLength={40} autoComplete="given-name" onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className="field15">
+          <span>{S.email}</span>
+          <input value={auth.session?.email ?? ""} readOnly aria-readonly="true" className="set15__ro" />
+        </label>
+        <SaveBar dirty={dirty} pending={save.isPending} ok={save.isSuccess} err={save.isError} />
+      </form>
+    </Sub>
+  );
+}
+
+/** Thông báo & nhắc mua: bật tắt email nhắc, giờ gửi, báo trước bao nhiêu ngày. */
+export function SettingsNotify() {
+  const me = useMeData();
+  return <Sub title={S.notify}>{me ? <NotifyForm me={me} /> : <p className="hint">{t.common.loading}</p>}</Sub>;
+}
+
+function NotifyForm({ me }: { me: Me }) {
+  const s = me.settings;
+  const start = { on: s.remind_enabled ?? true, time: s.digest_time ?? "08:00", lead: s.lead_days ?? 7 };
+  const [base, setBase] = useState(start);
+  const [f, setF] = useState(start);
+  const save = useSaveSettings();
+  const dirty = f.on !== base.on || f.time !== base.time || f.lead !== base.lead;
   return (
     <form
-      className="plan-form"
+      className="box15 set15__form"
       onSubmit={(e) => {
         e.preventDefault();
         if (!dirty || save.isPending) return;
-        save.mutate(patch, { onSuccess: () => setSaved(f) });
+        save.mutate({ remind_enabled: f.on, digest_time: f.time, lead_days: f.lead }, { onSuccess: () => setBase(f) });
       }}
     >
-      <section className="plan-sec">
-        <h2>{t.settings.profile}</h2>
-        <label>
-          {t.settings.displayName}
-          <input value={f.display_name} maxLength={40} autoComplete="given-name" onChange={(e) => setF({ ...f, display_name: e.target.value })} />
-        </label>
-      </section>
-
-      <section className="plan-sec plan-form">
-        <h2>{t.settings.reminders}</h2>
-        <label className="switch-row">
-          {t.settings.remindEnabled}
-          <input
-            type="checkbox"
-            role="switch"
-            {...{ switch: "" }}
-            checked={f.remind_enabled}
-            onChange={(e) => setF({ ...f, remind_enabled: e.target.checked })}
-          />
-        </label>
-        <div className="plan-form__row">
-          <label>
-            {t.settings.digestTime}
-            <input type="time" value={f.digest_time} disabled={!f.remind_enabled} onChange={(e) => e.target.value && setF({ ...f, digest_time: e.target.value })} />
-          </label>
-          <label>
-            {t.settings.leadDays}
-            <select value={f.lead_days} onChange={(e) => setF({ ...f, lead_days: Number(e.target.value) })}>
-              {LEAD_DAYS.map((n) => (
-                <option key={n} value={n}>{t.settings.leadDaysOption(n)}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <section className="plan-sec plan-form">
-        <h2>{t.settings.receipts}</h2>
-        <label>
-          {t.settings.receiptLang}
-          <select value={f.lang} onChange={(e) => setF({ ...f, lang: e.target.value as Form["lang"] })}>
-            <option value="vi">{t.settings.receiptLangVi}</option>
-            <option value="en">{t.settings.receiptLangEn}</option>
-          </select>
-        </label>
-      </section>
-
-      <section className="plan-sec plan-form">
-        <h2>{t.settings.region}</h2>
-        <label>
-          {t.settings.timezone}
-          <select value={f.timezone} onChange={(e) => setF({ ...f, timezone: e.target.value })}>
-            {zones.map((z) => (
-              <option key={z} value={z}>{z.replace(/_/g, " ")}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t.settings.appLanguage}
-          {/* Ngôn ngữ giao diện lưu trên máy (không gửi lên API); đổi xong tải lại trang. */}
-          <select value={uiLang} onChange={(e) => location.assign(`/settings?ui=${e.target.value}`)}>
-            <option value="en">English</option>
-            <option value="vi">Tiếng Việt</option>
-          </select>
-        </label>
-      </section>
-
-      {save.isError && <p className="error" role="alert">{t.settings.saveFailed}</p>}
-      <button type="submit" className="btn btn--primary btn--block btn--lg" aria-disabled={!dirty || save.isPending || undefined}>
-        {save.isPending ? t.confirm.saving : save.isSuccess && !dirty ? t.settings.saved : t.settings.save}
-      </button>
+      <label className="switch-row">
+        {S.remind}
+        <input type="checkbox" role="switch" {...{ switch: "" }} checked={f.on} onChange={(e) => setF({ ...f, on: e.target.checked })} />
+      </label>
+      <label className="field15">
+        <span>{S.time}</span>
+        <input type="time" value={f.time} disabled={!f.on} onChange={(e) => e.target.value && setF({ ...f, time: e.target.value })} />
+      </label>
+      <label className="field15">
+        <span>{S.lead}</span>
+        <select className="pick15" value={f.lead} disabled={!f.on} onChange={(e) => setF({ ...f, lead: Number(e.target.value) })}>
+          {LEAD_DAYS.map((n) => <option key={n} value={n}>{S.days(n)}</option>)}
+        </select>
+      </label>
+      <SaveBar dirty={dirty} pending={save.isPending} ok={save.isSuccess} err={save.isError} />
     </form>
+  );
+}
+
+/**
+ * Ngôn ngữ & khu vực. Một ngôn ngữ cho cả giao diện lẫn hóa đơn (chốt 31/10): đổi thì lưu `lang`
+ * lên API rồi tải lại trang với giao diện mới. Tiền tệ cố định VND.
+ */
+export function SettingsLanguage() {
+  const me = useMeData();
+  const save = useSaveSettings();
+  const tz = me?.settings.timezone || "Asia/Ho_Chi_Minh";
+  const zones = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES];
+  return (
+    <Sub title={S.language}>
+      <div className="box15 set15__form">
+        <label className="field15">
+          <span>{S.lang}</span>
+          <select
+            className="pick15"
+            value={uiLang}
+            disabled={save.isPending}
+            onChange={(e) => {
+              const lang = e.target.value as "vi" | "en";
+              const go = () => location.assign(`/settings/language?ui=${lang}`);
+              save.mutate({ lang }, { onSuccess: go, onError: go });
+            }}
+          >
+            <option value="vi">{LANG_NAME.vi}</option>
+            <option value="en">{LANG_NAME.en}</option>
+          </select>
+        </label>
+        <label className="field15">
+          <span>{S.currency}</span>
+          <input value="VND (đ)" readOnly aria-readonly="true" className="set15__ro" />
+        </label>
+        <label className="field15">
+          <span>{S.tz}</span>
+          <select className="pick15" value={tz} disabled={!me || save.isPending} onChange={(e) => save.mutate({ timezone: e.target.value })}>
+            {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+          </select>
+        </label>
+        {save.isError && <p className="error" role="alert">{t.settings.saveFailed}</p>}
+        {save.isSuccess && <p className="hint" role="status">{S.saved}</p>}
+      </div>
+      <p className="hint hint15"><Info size={16} aria-hidden /> {S.langNote}</p>
+    </Sub>
+  );
+}
+
+/** Thành viên: thẻ nhà có mã mời, danh sách người nhà, mời thành viên, rời nhà, vào nhà bằng mã. */
+export function SettingsMembers() {
+  const me = useMeData();
+  const h = useHousehold();
+  const act = useHouseholdActions();
+  const [copied, setCopied] = useState(false);
+  const [soon, setSoon] = useState(false);
+  const [code, setCode] = useState("");
+  const data = h.data;
+  if (!data) return <Sub title={S.members}><p className="hint">{t.common.loading}</p></Sub>;
+  const isOwner = data.my_role === "owner";
+  const invite = act.invite.data ?? data.invite;
+  const owner = data.members.find((m) => m.role === "owner");
+  const others = data.members.filter((m) => m.uid !== me?.uid);
+  return (
+    <Sub title={S.members}>
+      <section className="box15 house15" aria-label={S.houseOf(owner?.display_name ?? "")}>
+        <span className="house15__icon" aria-hidden>🏠</span>
+        <span className="house15__text">
+          <strong>{S.houseOf(owner?.display_name || data.name)}</strong>
+          <small>{S.membersSub(data.members.length)}</small>
+          {invite ? (
+            <>
+              <span className="house15__code">{S.houseCode(invite.code)}</span>
+              <small>{S.codeValid(formatDayMonth(invite.expires_at.slice(0, 10)))}</small>
+            </>
+          ) : (
+            isOwner && <small>{S.noCode}</small>
+          )}
+        </span>
+        {invite && (
+          <button
+            type="button"
+            className="btn btn--quiet house15__copy"
+            onClick={() => {
+              navigator.clipboard?.writeText(invite.code).catch(() => undefined);
+              setCopied(true);
+            }}
+          >
+            <Copy size={18} aria-hidden /> {copied ? S.copied : S.copy}
+          </button>
+        )}
+      </section>
+
+      <ul className="box15 set15__list">
+        {data.members.map((m) => {
+          const rel = relationOf(m.uid);
+          const role = m.role === "owner" ? S.owner : S.member;
+          return (
+            <li key={m.uid}>
+              <Link to={`/settings/members/${encodeURIComponent(m.uid)}`} className="set15__row">
+                <span className="set15__avatar" aria-hidden>{initial(m.display_name || "?")}</span>
+                <span className="set15__text">
+                  <span>{m.display_name || m1.assign.someone}{m.uid === me?.uid && ` (${S.you})`}</span>
+                  <small>{rel ? `${S.relations[rel]} · ${role}` : role}</small>
+                </span>
+                <ChevronRight size={20} aria-hidden />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+
+      {isOwner && (
+        <button type="button" className="btn btn--primary btn--block btn--lg" aria-disabled={act.invite.isPending || undefined} onClick={() => !act.invite.isPending && act.invite.mutate()}>
+          <Plus size={22} aria-hidden /> {S.invite}
+        </button>
+      )}
+      {act.invite.isError && <p className="error" role="alert">{errText(act.invite.error)}</p>}
+
+      <section className="box15 set15__note">
+        <ShieldCheck size={22} aria-hidden />
+        <span>
+          <strong>{S.privacyTitle}</strong>
+          <small>{S.privacyBody}</small>
+        </span>
+      </section>
+
+      <ul className="box15 set15__list">
+        <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+      </ul>
+      {soon && <p className="hint hint15" role="status"><Info size={16} aria-hidden /> {S.soonNote}</p>}
+
+      {others.length === 0 && (
+        <form
+          className="box15 set15__form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (code.trim().length !== 8 || act.join.isPending) return;
+            act.join.mutate(code.trim().toUpperCase(), { onSuccess: () => setCode("") });
+          }}
+        >
+          <label className="field15">
+            <span>{S.join}</span>
+            <input value={code} maxLength={8} autoCapitalize="characters" placeholder={m1.household.joinPlaceholder} onChange={(e) => setCode(e.target.value)} />
+          </label>
+          {act.join.isError && <p className="error" role="alert">{errText(act.join.error)}</p>}
+          <button type="submit" className="btn btn--quiet btn--block" aria-disabled={code.trim().length !== 8 || act.join.isPending || undefined}>{S.joinCta}</button>
+        </form>
+      )}
+
+      {data.id && data.members.length > 1 && (!isOwner || others.length === 0) && (
+        <button type="button" className="btn btn--block btn--lg set15__leave" onClick={() => act.leave.mutate()}>{S.leave}</button>
+      )}
+      {act.leave.isError && <p className="error" role="alert">{errText(act.leave.error)}</p>}
+    </Sub>
+  );
+}
+
+/** Một người nhà: tên, Vai trong nhà (tạm lưu trên máy), nút xóa khỏi nhà cho chủ nhà. */
+export function SettingsMember() {
+  const { uid = "" } = useParams();
+  const me = useMeData();
+  const h = useHousehold();
+  const act = useHouseholdActions();
+  const nav = useNavigate();
+  const [rel, setRel] = useState(() => relationOf(uid));
+  useEffect(() => setRelation(uid, rel), [uid, rel]);
+  const m = h.data?.members.find((x) => x.uid === uid);
+  if (!h.data) return <Sub title={S.members}><p className="hint">{t.common.loading}</p></Sub>;
+  if (!m) return <Sub title={S.members}><p className="hint">{t.common.genericError}</p></Sub>;
+  const canRemove = h.data.my_role === "owner" && m.uid !== me?.uid;
+  return (
+    <Sub title={m.display_name || S.members}>
+      <section className="box15 set15__form">
+        <span className="set15__avatar set15__avatar--lg" aria-hidden>{initial(m.display_name || "?")}</span>
+        <p className="set15__who">
+          <strong>{m.display_name}{m.uid === me?.uid && ` (${S.you})`}</strong>
+          <small>{m.role === "owner" ? S.owner : S.member}</small>
+        </p>
+        <label className="field15">
+          <span>{S.relation}</span>
+          <select className="pick15" value={rel} onChange={(e) => setRel(e.target.value)}>
+            <option value="">{S.relationNone}</option>
+            {RELATIONS.map((r) => <option key={r} value={r}>{S.relations[r]}</option>)}
+          </select>
+        </label>
+        <p className="hint">{S.relationNote}</p>
+      </section>
+      {canRemove && (
+        <button
+          type="button"
+          className="btn btn--block btn--lg set15__leave"
+          aria-disabled={act.removeMember.isPending || undefined}
+          onClick={() => !act.removeMember.isPending && act.removeMember.mutate(m.uid, { onSuccess: () => nav("/settings/members", { replace: true }) })}
+        >
+          {S.remove(m.display_name)}
+        </button>
+      )}
+      {act.removeMember.isError && <p className="error" role="alert">{errText(act.removeMember.error)}</p>}
+    </Sub>
+  );
+}
+
+/** Quyền riêng tư & bảo mật: tạm là trang chữ (chốt 31/10). */
+export function SettingsPrivacy() {
+  return (
+    <Sub title={S.privacy}>
+      <section className="box15 set15__page">
+        {S.privacyPage.map((p) => <p key={p}>{p}</p>)}
+      </section>
+    </Sub>
   );
 }
 
