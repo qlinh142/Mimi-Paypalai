@@ -3,7 +3,7 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
@@ -257,12 +257,11 @@ function daysText(i: Item) {
 function Suggestions({ cart }: { cart: Cart }) {
   const all = useItems({ tab: "active", horizon: 7 });
   const edit = usePlanItem();
-  const [checkAll, setCheckAll] = useState(false);
+  const nav = useNavigate();
   const [adding, setAdding] = useState(false);
   const inCart = useMemo(() => new Set(cart.items.map((i) => i.key)), [cart.items]);
   const rest = (all.data ?? []).filter((i) => !inCart.has(i.key));
   const sugg = rest.filter((i) => goodsTier(i) !== "plenty").sort((a, b) => (a.days_left ?? 999) - (b.days_left ?? 999));
-  const others = rest.filter((i) => goodsTier(i) === "plenty");
   const busy = edit.isPending ? edit.variables?.key : undefined;
   const row = (i: Item) => (
     <li key={i.key} className="line15">
@@ -286,15 +285,15 @@ function Suggestions({ cart }: { cart: Cart }) {
         <ul className="lines15">{sugg.map(row)}</ul>
       </section>
       <div className="pd15__two">
-        <button type="button" className="btn btn--outline" aria-expanded={checkAll} onClick={() => setCheckAll(!checkAll)}>
+        {/* Góp ý 31/10 16:22: bấm thì mở thẳng tab Đồ dùng. */}
+        <button type="button" className="btn btn--outline" onClick={() => nav("/items")}>
           <House size={20} aria-hidden /> <span>{m15.plan.checkHome}</span>
-          {checkAll ? <ChevronDown size={18} aria-hidden /> : <ChevronRight size={18} aria-hidden />}
+          <ChevronRight size={18} aria-hidden />
         </button>
         <button type="button" className="btn btn--outline" aria-expanded={adding} onClick={() => setAdding(!adding)}>
           <CirclePlus size={20} aria-hidden /> <span>{m15.plan.addProduct}</span>
         </button>
       </div>
-      {checkAll && <ul className="lines15">{others.map(row)}</ul>}
       {adding && <AddAnything cart={cart} />}
     </>
   );
