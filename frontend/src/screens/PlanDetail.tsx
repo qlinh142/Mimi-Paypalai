@@ -3,7 +3,7 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, ChevronDown, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState,
@@ -89,13 +89,16 @@ function Detail({ id }: { id: string }) {
 
   return (
     <MainFrame>
-      <TopBar title={meta ? planName(meta) : m15.plan.title} variant="sub" />
+      <TopBar title={meta ? planName(meta) : m15.plan.title} />
       <div className="page p15 pd15">
         {plan.isPending && <p className="hint">{t.common.loading}</p>}
         {plan.isError && !cart && <p className="error" role="alert">{errText(plan.error)}</p>}
 
         {/* Icon và tên */}
         <div className="pd15__head">
+          <button type="button" className="pd15__back" aria-label={m15.detail.back} onClick={() => nav("/plan")}>
+            <ChevronLeft size={28} aria-hidden />
+          </button>
           <button type="button" className="pd15__icon" aria-label={m15.plan.pickIcon} onClick={() => setIconSheet(true)}>
             <Icon size={28} aria-hidden />
           </button>

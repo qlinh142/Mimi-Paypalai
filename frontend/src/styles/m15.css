@@ -217,7 +217,8 @@
 .tag15--buyer { background: #fff0dc; color: #9a4a0b; }
 
 .pd15 { gap: var(--s3); }
-.pd15__head { display: grid; grid-template-columns: 60px 1fr; gap: var(--s2); }
+.pd15__head { display: grid; grid-template-columns: 32px 60px 1fr; gap: var(--s2); align-items: center; }
+.pd15__back { width: 32px; height: 56px; border: 0; background: none; color: var(--m15-blue); display: grid; place-items: center; cursor: pointer; padding: 0; }
 .pd15__icon { height: 56px; border: 1.5px solid var(--m15-blue); border-radius: 12px; background: #fff; color: var(--m15-blue); display: grid; place-items: center; cursor: pointer; }
 .pd15__name { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); padding: 0 var(--s4); border: 1.5px solid var(--m15-blue); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; font-size: var(--fs-lg); text-align: left; cursor: pointer; min-width: 0; }
 .pd15__name svg { color: var(--m15-blue); flex: none; }
