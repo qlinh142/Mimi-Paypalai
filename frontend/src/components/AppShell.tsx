@@ -1,36 +1,49 @@
 import { t } from "../i18n";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Bell, BookOpen, CircleUserRound, ClipboardList, Package, ScanLine, Settings } from "lucide-react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Bell, BookOpen, ChevronLeft, ClipboardList, Package, ScanLine, Settings } from "lucide-react";
+import { m15 } from "../i18n/m15";
 import { useHome } from "../api/hooks";
 import { applyUpdate, useUpdateReady } from "../app/pwaUpdate";
 import { useOnline } from "../lib/useOnline";
-import { MimiBrand, MimiMark } from "./MimiMark";
+import { MimiMark } from "./MimiMark";
 
 /* ---------- Thanh trên ---------- */
 
-/** Màn chính: tiêu đề + chuông + tài khoản. Màn con: tiêu đề + logo Mimi về Trang chủ. */
-export function TopBar({ title, variant = "main", brand = false }: { title?: string; variant?: "main" | "sub"; brand?: boolean }) {
+/**
+ * Mimi 1.5 (ảnh mẫu 31/10): không còn biểu tượng tài khoản (Đăng xuất nằm trong Cài đặt).
+ * - main: logo Mimi bên trái (bấm về Home), chuông bên phải; tên màn chỉ đọc cho trình đọc màn hình.
+ * - sub: nút quay lại, tên ở giữa, chuông bên phải (chi tiết món, thông báo...).
+ */
+export function TopBar({ title, variant = "main" }: { title?: string; variant?: "main" | "sub"; brand?: boolean }) {
   const home = useHome();
+  const nav = useNavigate();
   const unread = home.data?.unread_notifications ?? 0;
+  const bell = (
+    <Link to="/notifications" className="icon-btn" aria-label={t.nav.notifications(unread)}>
+      <Bell size={24} aria-hidden />
+      {unread > 0 && <span className="badge" aria-hidden>{unread}</span>}
+    </Link>
+  );
+  if (variant === "sub") {
+    return (
+      <header className="topbar topbar--sub">
+        <button type="button" className="icon-btn" aria-label={m15.detail.back} onClick={() => (history.length > 1 ? nav(-1) : nav("/"))}>
+          <ChevronLeft size={28} aria-hidden />
+        </button>
+        <h1>{title}</h1>
+        {bell}
+      </header>
+    );
+  }
   return (
     <header className="topbar">
-      {brand ? <MimiBrand /> : title ? <h1>{title}</h1> : <span className="topbar__spacer" />}
-      {variant === "main" ? (
-        <>
-          <Link to="/notifications" className="icon-btn" aria-label={t.nav.notifications(unread)}>
-            <Bell size={24} aria-hidden />
-            {unread > 0 && <span className="badge" aria-hidden>{unread}</span>}
-          </Link>
-          <Link to="/settings/account" className="icon-btn" aria-label={t.nav.account}>
-            <CircleUserRound size={26} aria-hidden />
-          </Link>
-        </>
-      ) : (
-        <Link to="/" className="icon-btn" aria-label={t.nav.home}>
-          <MimiMark size={36} label={null} />
-        </Link>
-      )}
+      <Link to="/" className="topbar__logo" aria-label={t.nav.home}>
+        <MimiMark size={44} label={null} />
+      </Link>
+      {title && <h1 className="visually-hidden">{title}</h1>}
+      <span className="topbar__spacer" />
+      {bell}
     </header>
   );
 }
@@ -38,10 +51,10 @@ export function TopBar({ title, variant = "main", brand = false }: { title?: str
 /* ---------- Thanh dưới: năm mục theo spec ---------- */
 
 const NAV = [
-  { to: "/spending", label: t.nav.spending, Icon: BookOpen },
-  { to: "/items", label: t.nav.items, Icon: Package },
+  { to: "/spending", label: m15.home.tiles.spending, Icon: BookOpen },
+  { to: "/items", label: m15.home.tiles.items, Icon: Package },
   { to: "/scan", label: t.nav.scan, Icon: ScanLine, scan: true },
-  { to: "/plan", label: t.nav.plan, Icon: ClipboardList },
+  { to: "/plan", label: m15.home.tiles.plan, Icon: ClipboardList },
   { to: "/settings", label: t.nav.settings, Icon: Settings },
 ];
 
@@ -127,12 +140,12 @@ export function UndoProvider({ children }: { children: ReactNode }) {
 
 /* ---------- Khung cho màn có thanh dưới ---------- */
 
-export function MainFrame({ children }: { children: ReactNode }) {
+export function MainFrame({ children, nav = true }: { children: ReactNode; nav?: boolean }) {
   return (
-    <div className="frame frame--nav">
+    <div className={nav ? "frame frame--nav" : "frame"}>
       <OfflineBanner />
       {children}
-      <BottomNav />
+      {nav && <BottomNav />}
     </div>
   );
 }

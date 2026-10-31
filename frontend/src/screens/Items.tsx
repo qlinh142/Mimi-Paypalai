@@ -1,203 +1,140 @@
 import { t } from "../i18n";
-import { useId, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ListFilter, Search, X } from "lucide-react";
+import { m15 } from "../i18n/m15";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Pencil, Search } from "lucide-react";
 import { OfflineError } from "../api/client";
-import { useItems, useQuickStock, useUndoStock } from "../api/hooks";
-import type { Item, ItemsQuery } from "../api/types";
-import { MainFrame, TopBar, useUndo } from "../components/AppShell";
-import { ItemRow } from "../components/ItemRow";
+import { useItems, usePlan } from "../api/hooks";
+import type { Item } from "../api/types";
+import { MainFrame, TopBar } from "../components/AppShell";
+import { CartButton } from "../components/CartButton";
+import { CategoryIcon } from "../components/ItemRow";
+import { RecurringList } from "../components/RecurringList";
+import { formatNum, goodsTier, stockInDisplay, unitLabel, type GoodsTier } from "../lib/displayUnit";
 import { normalizeVi } from "../lib/text";
 
-type Tier1 = "goods" | "recurring";
-type Grouping = "category" | "product";
-const HORIZONS = [3, 7, 14] as const;
+const TIERS: { key: GoodsTier; label: string }[] = [
+  { key: "now", label: m15.items.needNow },
+  { key: "soon", label: m15.items.soon },
+  { key: "plenty", label: m15.items.plenty },
+];
 
 /**
- * Màn mẫu của cả ứng dụng (spec mục 4): ít chữ, thoáng, ba tầng điều khiển từ cao xuống thấp.
- * Việc tiếp theo: đưa tầng 1, tầng 2 và chip ngày lên URL (useSearchParams) để bấm quay lại vẫn đúng tab.
+ * Đồ dùng (Mimi 1.5, ảnh mẫu 3-do-dung-va-chi-tiet.png và 3-khoan-chi-dinh-ky.png):
+ * hai nút Hàng tiêu dùng / Khoản chi định kỳ, ô tìm kiếm, ba nhóm màu. Nút giỏ hàng tròn
+ * thêm món vào Kế hoạch (giống "thêm vào giỏ").
  */
 export function Items() {
-  const [tier1, setTier1] = useState<Tier1>("goods");
-  const [tab, setTab] = useState<ItemsQuery["tab"]>("soon");
-  const [horizon, setHorizon] = useState<ItemsQuery["horizon"]>(7);
-  const [grouping, setGrouping] = useState<Grouping>("category");
-  const [showFilter, setShowFilter] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tier1 = params.get("tab") === "recurring" ? "recurring" : "goods";
   const [term, setTerm] = useState("");
-  const tabsId = useId();
-  const searchId = useId();
-
-  const items = useItems({ tab, horizon });
-  const quick = useQuickStock();
-  const undoStock = useUndoStock();
-  const showUndo = useUndo();
-
-  const visible = useMemo(() => {
-    const list = items.data ?? [];
-    const q = normalizeVi(term);
-    return q ? list.filter((i) => normalizeVi(i.name).includes(q)) : list;
-  }, [items.data, term]);
-
-  const groups = useMemo(() => {
-    if (grouping === "product") return [{ label: tab === "soon" ? t.items.soon : t.items.active, items: visible }];
-    const map = new Map<string, Item[]>();
-    for (const i of visible) map.set(i.category_label, [...(map.get(i.category_label) ?? []), i]);
-    return [...map].map(([label, items]) => ({ label, items }));
-  }, [visible, grouping, tab]);
-
-  function act(item: Item, kind: "plenty" | "out") {
-    quick.mutate(
-      { item, quick: kind },
-      {
-        onSuccess: ({ result }) =>
-          showUndo({
-            message:
-              (kind === "plenty" ? t.items.markedPlenty(item.name) : t.items.markedOut(item.name)) +
-              (result === "queued" ? t.items.willSync : "."),
-            onUndo: () => undoStock.mutate(item),
-          }),
-      },
-    );
-  }
 
   return (
     <MainFrame>
       <TopBar title={t.items.title} />
-      <div className="page" style={{ paddingTop: 0 }}>
-        {/* Tầng 1 */}
-        <div className="seg" role="group" aria-label={t.items.typeGroup}>
-          <button type="button" aria-pressed={tier1 === "goods"} onClick={() => setTier1("goods")}>{t.items.goods}</button>
-          <button type="button" aria-pressed={tier1 === "recurring"} onClick={() => setTier1("recurring")}>{t.items.recurring}</button>
+      <div className="page p15">
+        <div className="seg seg15" role="group" aria-label={t.items.typeGroup}>
+          <button type="button" aria-pressed={tier1 === "goods"} onClick={() => { setParams({}, { replace: true }); setTerm(""); }}>
+            {m15.items.goods}
+          </button>
+          <button type="button" aria-pressed={tier1 === "recurring"} onClick={() => { setParams({ tab: "recurring" }, { replace: true }); setTerm(""); }}>
+            {m15.items.recurring}
+          </button>
         </div>
 
-        {tier1 === "recurring" ? (
-          <div className="empty">
-            <h2>{t.items.recurringTitle}</h2>
-            <p>{t.items.recurringBody}</p>
-            <Link className="btn btn--quiet" to="/spending">{t.items.openSpending}</Link>
-          </div>
-        ) : (
-          <>
-            {/* Tầng 2 */}
-            <div className="tabs">
-              <div role="tablist" aria-label={t.items.statusGroup} id={tabsId} style={{ display: "contents" }}>
-                <button role="tab" className="tab" aria-selected={tab === "soon"} onClick={() => setTab("soon")}>{t.items.soon}</button>
-                <button role="tab" className="tab" aria-selected={tab === "active"} onClick={() => setTab("active")}>{t.items.active}</button>
-              </div>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={t.items.search}
-                aria-expanded={searchOpen}
-                aria-controls={searchId}
-                onClick={() => {
-                  setSearchOpen((v) => !v);
-                  if (searchOpen) setTerm("");
-                }}
-              >
-                {searchOpen ? <X size={22} aria-hidden /> : <Search size={22} aria-hidden />}
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={t.items.grouping}
-                aria-expanded={showFilter}
-                onClick={() => setShowFilter((v) => !v)}
-              >
-                <ListFilter size={22} aria-hidden />
-              </button>
-            </div>
+        <label className="search15">
+          <Search size={22} aria-hidden />
+          <span className="visually-hidden">{t.items.search}</span>
+          <input
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={tier1 === "goods" ? m15.items.searchGoods : m15.items.searchRecurring}
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+          />
+        </label>
 
-            {searchOpen && (
-              <div className="search" id={searchId}>
-                <label htmlFor={`${searchId}-q`} className="visually-hidden">{t.items.search}</label>
-                <input
-                  id={`${searchId}-q`}
-                  className="input"
-                  type="search"
-                  enterKeyHint="search"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={t.items.searchPlaceholder}
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {/* Tầng 3 và khoảng ngày */}
-            {(tab === "soon" || showFilter) && (
-              <div className="chips">
-                {tab === "soon" && (
-                  <>
-                    <span className="chips__label">{t.items.within}</span>
-                    {HORIZONS.map((h) => (
-                      <button key={h} type="button" className="chip" aria-pressed={horizon === h} onClick={() => setHorizon(h)}>
-                        {t.items.daysChip(h)}
-                      </button>
-                    ))}
-                  </>
-                )}
-                {showFilter && (
-                  <>
-                    <button type="button" className="chip" aria-pressed={grouping === "category"} onClick={() => setGrouping("category")}>{t.items.byCategory}</button>
-                    <button type="button" className="chip" aria-pressed={grouping === "product"} onClick={() => setGrouping("product")}>{t.items.byProduct}</button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {items.isPending ? (
-              <div aria-busy="true" aria-label={t.common.loading}>
-                {Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton" />)}
-              </div>
-            ) : items.isError && !items.data ? (
-              <div className="empty">
-                <h2>{t.items.loadFailedTitle}</h2>
-                {/* Chỉ gợi ý kiểm tra mạng khi thật sự mất mạng; lỗi khác hiện câu chung. */}
-                <p>{items.error instanceof OfflineError ? t.items.loadFailedBody : t.common.genericError}</p>
-                <button className="btn btn--quiet" onClick={() => items.refetch()}>{t.common.retry}</button>
-              </div>
-            ) : visible.length === 0 ? (
-              term ? (
-                <div className="empty"><h2>{t.items.noMatch(term)}</h2></div>
-              ) : tab === "soon" ? (
-                <div className="empty">
-                  <h2>{t.items.noneSoonTitle(horizon)}</h2>
-                  <p>{t.items.noneSoonBody}</p>
-                </div>
-              ) : (
-                <div className="empty">
-                  <h2>{t.items.emptyTitle}</h2>
-                  <p>{t.items.emptyBody}</p>
-                  <Link className="btn btn--primary" to="/scan">{t.home.scan}</Link>
-                </div>
-              )
-            ) : (
-              groups.map((g) => (
-                <section key={g.label} className="group" aria-label={g.label}>
-                  <h2>{g.label}</h2>
-                  <ul className="list">
-                    {g.items.map((item) => (
-                      <ItemRow key={item.key} item={item}>
-                        {tab === "soon" && (
-                          <div className="quick">
-                            <button type="button" className="btn btn--quiet" onClick={() => act(item, "plenty")}>{t.items.stillHave}</button>
-                            <button type="button" className="btn btn--quiet" onClick={() => act(item, "out")}>{t.items.ranOut}</button>
-                          </div>
-                        )}
-                      </ItemRow>
-                    ))}
-                  </ul>
-                </section>
-              ))
-            )}
-          </>
-        )}
+        {tier1 === "goods" ? <Goods term={term} /> : <RecurringList term={term} />}
       </div>
     </MainFrame>
+  );
+}
+
+function Goods({ term }: { term: string }) {
+  const items = useItems({ tab: "active", horizon: 7 });
+  const plan = usePlan();
+  const inPlan = useMemo(() => new Set((plan.data?.items ?? []).map((i) => i.key)), [plan.data]);
+
+  const groups = useMemo(() => {
+    const q = normalizeVi(term);
+    const list = (items.data ?? []).filter((i) => !q || normalizeVi(i.name).includes(q));
+    const byDays = (a: Item, b: Item) => (a.days_left ?? 999) - (b.days_left ?? 999);
+    return TIERS.map((tier) => ({ ...tier, items: list.filter((i) => goodsTier(i) === tier.key).sort(byDays) })).filter((g) => g.items.length > 0);
+  }, [items.data, term]);
+
+  if (items.isPending) {
+    return (
+      <div aria-busy="true" aria-label={t.common.loading}>
+        {Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton" />)}
+      </div>
+    );
+  }
+  if (items.isError && !items.data) {
+    return (
+      <div className="empty">
+        <h2>{t.items.loadFailedTitle}</h2>
+        <p>{items.error instanceof OfflineError ? t.items.loadFailedBody : t.common.genericError}</p>
+        <button className="btn btn--quiet" onClick={() => items.refetch()}>{t.common.retry}</button>
+      </div>
+    );
+  }
+  if (groups.length === 0) {
+    return term ? (
+      <div className="empty"><h2>{m15.items.noMatch(term)}</h2></div>
+    ) : (
+      <div className="empty">
+        <p>{m15.items.empty}</p>
+        <Link className="btn btn--primary" to="/scan">{t.home.scan}</Link>
+      </div>
+    );
+  }
+  return (
+    <>
+      {groups.map((g) => (
+        <section key={g.key} className="g15" aria-label={g.label}>
+          <h2 className={`g15__head g15__head--${g.key}`}>{g.label}</h2>
+          <ul className="g15__list">
+            {g.items.map((item) => (
+              <GoodsCard key={item.key} item={item} added={inPlan.has(item.key)} />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
+  );
+}
+
+function GoodsCard({ item, added }: { item: Item; added: boolean }) {
+  const nav = useNavigate();
+  const qty = stockInDisplay(item);
+  const days = item.status === "waiting" || item.days_left == null ? null : Math.max(0, item.days_left);
+  const sub = [
+    qty ? `${formatNum(qty[0])} ${unitLabel(qty[1])}` : null,
+    days == null ? m15.items.learning : m15.items.left(days),
+  ].filter(Boolean).join(" · ");
+  return (
+    <li className="card15">
+      <button type="button" className="card15__main" onClick={() => nav(`/items/${encodeURIComponent(item.key)}`)}>
+        <span className="card15__icon"><CategoryIcon category={item.category_key} /></span>
+        <span className="card15__text">
+          <span className="card15__name">{item.name}</span>
+          <span className="card15__sub">{sub}</span>
+          <span className="card15__edit"><Pencil size={14} aria-hidden /> {m15.items.edit}</span>
+        </span>
+      </button>
+      <CartButton planKey={item.key} name={item.name} added={added} />
+    </li>
   );
 }

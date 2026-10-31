@@ -1,4 +1,5 @@
 import { t, uiLang } from "../i18n";
+import { m15 } from "../i18n/m15";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Camera, ImagePlus, X } from "lucide-react";
@@ -158,6 +159,8 @@ function ScanSession({ onNext }: { onNext: () => void }) {
         <Link to="/" className="icon-btn" aria-label={t.scan.close}><X size={26} aria-hidden /></Link>
         <Link to="/" className="icon-btn" aria-label={t.nav.home}><MimiMark size={36} label={null} /></Link>
       </div>
+
+      <p className="scan__privacy" role="note">⚠️ {m15.scan.privacy}</p>
 
       <div className="scan__view">
         {!cameraFailed ? (

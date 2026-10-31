@@ -214,6 +214,7 @@ export const en = {
   },
   /** Nhãn nhóm hàng theo category_key của backend (taxonomy trong cmd/mimi). */
   categories: {
+    "hoa-don-dinh-ky": "Recurring bills",
     "sua": "Dairy & milk",
     "do-uong": "Drinks",
     "tuoi-song": "Meat, fish & eggs",

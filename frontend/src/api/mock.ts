@@ -34,8 +34,14 @@ const seeds: Seed[] = [
   ["nuoc-mam", ["Nước mắm", "Fish sauce"], "gia-vi", ["Gia vị", "Condiments"], 26, 3],
   ["ca-phe", ["Cà phê hạt", "Coffee beans"], "sua", ["Sữa và đồ uống", "Dairy & drinks"], null, 1],
 ];
-const today = new Date(2026, 9, 16);
+// Mimi 1.5: bản chạy thử dùng ngày thật (trước đây cố định 16/10, lỗi V5).
+const today = (() => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12)); })();
 const iso = (d: Date) => d.toISOString().slice(0, 10);
+/** Tồn mẫu (đơn vị chuẩn) để thẻ Đồ dùng hiện "0 chai", "2 quả"... */
+const SEED_STOCK: Record<string, [number, "pc" | "g" | "ml"]> = {
+  "sua-tuoi": [1, "pc"], "nuoc-rua-chen": [0, "pc"], "trung-ga": [2, "pc"], "dau-goi": [1, "pc"], gao: [2000, "g"],
+  "giay-ve-sinh": [4, "pc"], "bot-giat": [1500, "g"], "kem-danh-rang": [2, "pc"], "nuoc-mam": [1, "pc"],
+};
 
 let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase_count]) => ({
   key,
@@ -48,6 +54,9 @@ let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase
   confidence: purchase_count >= 4 ? "high" : purchase_count === 3 ? "mid" : purchase_count === 2 ? "low" : null,
   source: "predicted",
   predicted_out_on: days === null ? null : iso(new Date(today.getTime() + days * 86_400_000)),
+  ...(SEED_STOCK[key]
+    ? { stock: { estimated: SEED_STOCK[key][0], unit: SEED_STOCK[key][1], confirmed: SEED_STOCK[key][0], confirmed_on: iso(today), confirmed_source: "receipt" as const } }
+    : {}),
 }));
 
 let receiptCount = 3;
@@ -284,7 +293,16 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       const on = iso(today);
       items = items.map((x) =>
         x.key === key
-          ? { ...x, stock: { estimated: qty, unit, confirmed: qty, confirmed_on: on, confirmed_source: "manual", rate_per_day: x.stock?.rate_per_day } }
+          ? {
+              ...x,
+              stock: { estimated: qty, unit, confirmed: qty, confirmed_on: on, confirmed_source: "manual", rate_per_day: x.stock?.rate_per_day },
+              // Mimi 1.5: tồn 0 thì Cần mua ngay; có tồn thì ước lượng lại số ngày (mô phỏng).
+              ...(qty <= 0
+                ? { status: "out" as const, days_left: 0, source: "manual" as const }
+                : x.status === "out" || x.status === "buy_now"
+                  ? (() => { const d = Math.max(1, Math.round(x.stock?.rate_per_day ? qty / x.stock.rate_per_day : unit === "pc" ? qty * 4 : qty / 150)); return { status: statusFor(d, 9), days_left: d, source: "manual" as const, predicted_out_on: iso(new Date(today.getTime() + d * 86_400_000)) }; })()
+                  : {}),
+            }
           : x,
       );
       return json(items.find((x) => x.key === key));
@@ -382,6 +400,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
     return json({
       ...base, spent: 1_284_000, spent_prev_month_pct: 20, saved: 96_000, saved_ratio: 0.07, receipt_count: receiptCount,
       by_category: [
+        { key: "hoa-don-dinh-ky", amount: 354_499, pct: 27.6 },
         { key: "hoa-pham", amount: 412_000, pct: 32.1 }, { key: "sua", amount: 318_000, pct: 24.8 },
         { key: "tuoi-song", amount: 264_000, pct: 20.6 }, { key: "do-kho", amount: 190_000, pct: 14.8 },
         { key: "chua-phan-loai", amount: 100_000, pct: 7.8 },
@@ -621,9 +640,12 @@ function mockLots(it: Item) {
 }
 
 type MockRecurring = { id: string; name: string; amount: number; cycle: "weekly" | "monthly" | "quarterly" | "yearly"; next_due_at: string; active: boolean };
+const dueIn = (n: number) => iso(new Date(today.getTime() + n * 86_400_000));
 let recurring: MockRecurring[] = [
-  { id: "netflix", name: "Netflix", amount: 104_499, cycle: "monthly", next_due_at: iso(new Date(today.getTime() + 3 * 86_400_000)), active: true },
-  { id: "internet", name: "Internet Viettel", amount: 250_000, cycle: "monthly", next_due_at: iso(new Date(today.getTime() + 12 * 86_400_000)), active: true },
+  { id: "dien", name: L ? "Electricity" : "Tiền điện", amount: 680_000, cycle: "monthly", next_due_at: dueIn(0), active: true },
+  { id: "internet", name: "Internet", amount: 250_000, cycle: "monthly", next_due_at: dueIn(5), active: true },
+  { id: "netflix", name: "Netflix", amount: 260_000, cycle: "monthly", next_due_at: dueIn(12), active: true },
+  { id: "dien-thoai", name: L ? "Phone" : "Điện thoại", amount: 150_000, cycle: "monthly", next_due_at: dueIn(28), active: true },
 ];
 const occHistory: { id: string; recurring_id: string; name: string; due_at: string; amount: number; status: "paid" | "skipped" | "matched"; paid_at?: string }[] = [];
 const occId = (r: MockRecurring) => `${r.id}_${r.next_due_at}`;

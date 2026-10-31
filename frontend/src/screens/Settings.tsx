@@ -6,6 +6,33 @@ import { useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks
 import type { Mandate, MandateCategory, Me, SettingsPatch } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { HouseholdPanel } from "../components/Household";
+import { m15 } from "../i18n/m15";
+import { useAuth } from "../lib/auth";
+import { clearQueue } from "../lib/offlineQueue";
+import { queryClient, queryPersister } from "../app/queryClient";
+import { LogOut } from "lucide-react";
+
+/** Đăng xuất (Mimi 1.5: chuyển từ biểu tượng tài khoản vào Cài đặt). Dọn cache và hàng đợi ghi trên máy. */
+function SignOutSection() {
+  const auth = useAuth();
+  return (
+    <section className="plan-sec">
+      <h2>{t.settings.account}</h2>
+      <p className="hint">{auth.session?.email ?? ""}</p>
+      <button
+        type="button"
+        className="btn btn--quiet btn--block"
+        onClick={async () => {
+          queryClient.clear();
+          await Promise.all([queryPersister.removeClient(), clearQueue()]);
+          await auth.signOut();
+        }}
+      >
+        <LogOut size={20} aria-hidden /> {m15.settings.signOut}
+      </button>
+    </section>
+  );
+}
 
 const LEAD_DAYS = [1, 2, 3, 5, 7, 10, 14, 21, 30];
 const TIMEZONES = [
@@ -64,15 +91,8 @@ export function Settings() {
 
         <HouseholdPanel />
 
-        <MandateSection />
-
-        <section className="plan-sec">
-          <h2>{t.settings.account}</h2>
-          <Link to="/settings/account" className="link-row">
-            <span>{t.settings.accountLink}</span>
-            <ChevronRight size={20} aria-hidden />
-          </Link>
-        </section>
+        {/* Mimi 1.5: Mimi mua online đang treo, ẩn phần Ủy quyền mua (MandateSection). */}
+        <SignOutSection />
       </div>
     </MainFrame>
   );
@@ -173,7 +193,7 @@ function SettingsForm({ me }: { me: Me }) {
 const MANDATE_CATS: MandateCategory[] = ["grocery", "household"];
 
 /** Household Mandate (Mimi 2.0 mục 13): phạm vi Mimi được tự thanh toán online. Chỉ chủ nhà sửa được. */
-function MandateSection() {
+export function MandateSection() {
   const q = useMandate();
   return (
     <section className="plan-sec" aria-labelledby="mandate-h">
