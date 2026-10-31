@@ -59,7 +59,7 @@ let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase
     : {}),
 }));
 
-let receiptCount = 3;
+let receiptCount = 5;
 let mockSettings: Me["settings"] & { display_name?: string } = {
   lead_days: 7, lang: "vi", timezone: "Asia/Ho_Chi_Minh", remind_enabled: true, digest_time: "08:00",
 };
@@ -412,7 +412,8 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
         { key: "chua-phan-loai", amount: 100_000, pct: 7.8 },
       ],
       top_saving_receipts: [r("r2", "Co.opmart Lý Thường Kiệt", 12, 486_000, 54_000), r("r1", "Bách Hóa Xanh", 4, 312_000, 42_000)],
-      recent_receipts: [r("r3", "Bách Hóa Xanh", 15, 274_000, 0), r("r2", "Co.opmart Lý Thường Kiệt", 12, 486_000, 54_000), r("r1", "Bách Hóa Xanh", 4, 312_000, 42_000)],
+      // Mimi 1.5: Lịch sử mua hàng liệt kê mọi hóa đơn của tháng (API trả tối đa 200).
+      recent_receipts: [r("r3", "Bách Hóa Xanh", 15, 274_000, 0), r("r2", "Co.opmart Lý Thường Kiệt", 12, 486_000, 54_000), r("r4", "WinMart gần nhà", 8, 140_000, 0), r("r1", "Bách Hóa Xanh", 4, 312_000, 42_000), r("r5", "Chợ Bến Thành", 2, 72_000, 0)],
     } satisfies SpendingReport);
   }
 

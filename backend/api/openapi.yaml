@@ -897,7 +897,7 @@ components:
         refunded: { $ref: "#/components/schemas/Vnd" }
         by_category: { type: array, items: { type: object, properties: { key: { type: string }, amount: { $ref: "#/components/schemas/Vnd" }, pct: { type: number } } } }
         top_saving_receipts: { type: array, maxItems: 3, items: { $ref: "#/components/schemas/ReceiptSummary" } }
-        recent_receipts: { type: array, maxItems: 3, items: { $ref: "#/components/schemas/ReceiptSummary" } }
+        recent_receipts: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/ReceiptSummary" } }
     ReceiptSummary:
       type: object
       properties:
