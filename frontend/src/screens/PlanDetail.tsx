@@ -6,7 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
-  useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState,
+  useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
 } from "../api/hooks";
 import type { Cart, CartItem, Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
@@ -46,7 +46,8 @@ function Detail({ id }: { id: string }) {
   const nav = useNavigate();
   const metaAct = usePlanMeta();
   const [confirmDel, setConfirmDel] = useState(false);
-  const [delNote, setDelNote] = useState(false);
+  const clearDefault = useClearDefaultPlan();
+  const deleting = metaAct.remove.isPending || clearDefault.isPending;
   const saveState = useSavePlanState();
 
   const [name, setName] = useState("");
@@ -155,12 +156,14 @@ function Detail({ id }: { id: string }) {
           <button
             type="button"
             className={`btn btn--lg pd15__del${confirmDel ? " pd15__del--confirm" : ""}`}
-            aria-disabled={!meta || meta.default || metaAct.remove.isPending || undefined}
+            aria-disabled={!meta || deleting || undefined}
             onClick={() => {
-              if (!meta || metaAct.remove.isPending) return;
-              if (meta.default) return setDelNote(true);
+              if (!meta || deleting) return;
               if (!confirmDel) return setConfirmDel(true);
-              metaAct.remove.mutate(id, { onSuccess: () => { setCurrentPlanId("default"); nav("/plan", { replace: true }); } });
+              const back = () => { setCurrentPlanId("default"); nav("/plan", { replace: true }); };
+              // Giỏ mua sắm (mặc định) không xóa hẳn được ở máy chủ: làm trống thì nó tự ẩn (góp ý 31/10 16:04).
+              if (meta.default) clearDefault.mutate((cart?.items ?? []).map((i) => i.key), { onSuccess: back });
+              else metaAct.remove.mutate(id, { onSuccess: back });
             }}
           >
             <Trash2 size={18} aria-hidden /> {confirmDel ? m15.plan.deleteConfirm : m15.plan.deleteShort}
@@ -170,8 +173,7 @@ function Detail({ id }: { id: string }) {
           </button>
         </div>
         {confirmDel && <p className="hint" role="status">{m15.plan.deleteAsk}</p>}
-        {delNote && <p className="hint" role="status">{m15.plan.deleteMain}</p>}
-        {metaAct.remove.isError && <p className="error" role="alert">{errText(metaAct.remove.error)}</p>}
+        {(metaAct.remove.isError || clearDefault.isError) && <p className="error" role="alert">{errText(metaAct.remove.error ?? clearDefault.error)}</p>}
       </div>
 
       {iconSheet && (

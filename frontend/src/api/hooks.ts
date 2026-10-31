@@ -354,6 +354,25 @@ function uiLangParam() {
 export const usePlans = () =>
   useQuery({ queryKey: qk.plans, queryFn: async () => (await apiGet<{ plans: PlanMeta[] }>("/plans")).plans });
 
+/**
+ * Mimi 1.5 (góp ý 31/10 16:04): "Xóa" Giỏ mua sắm. Máy chủ giữ sẵn Kế hoạch mặc định, nên xóa ở đây
+ * là bỏ hết món và xóa ngày giờ, nơi mua; Giỏ trống thì tự ẩn khỏi danh sách.
+ */
+export function useClearDefaultPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (keys: string[]) => {
+      for (const k of keys) await apiSend<void>("DELETE", `/plan/items/${encodeURIComponent(k)}${planQuery("default")}`);
+      await apiSend<PlanState>("PUT", `/plan/state${planQuery("default")}`, { buy_date: "", buy_hour: null, buy_minute: null, trip_note: "" });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.plan });
+      qc.invalidateQueries({ queryKey: qk.plans });
+      qc.invalidateQueries({ queryKey: qk.home });
+    },
+  });
+}
+
 /** Mimi 1.5: đọc giỏ của nhiều Kế hoạch một lúc (thẻ ở màn danh sách Kế hoạch). Cùng khóa cache với usePlan. */
 export function usePlanCarts(ids: string[]) {
   return useQueries({

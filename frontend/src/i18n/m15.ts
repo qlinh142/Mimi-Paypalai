@@ -162,7 +162,6 @@ const vi = {
     addedTo: (n: string, p: string) => `Đã thêm ${n} vào ${p}`,
     deleteConfirm: "Xóa hẳn",
     deleteAsk: "Bấm \"Xóa hẳn\" để xóa kế hoạch này. Không khôi phục được.",
-    deleteMain: "Giỏ mua sắm là nơi nhận các món mẹ bấm giỏ hàng, nên không xóa được. Mẹ có thể bỏ từng món trong danh sách.",
   },
   settings: {
     signOut: "Đăng xuất",
@@ -385,7 +384,6 @@ const en: typeof vi = {
     addedTo: (n, p) => `Added ${n} to ${p}`,
     deleteConfirm: "Delete now",
     deleteAsk: "Tap \"Delete now\" to remove this plan for good. It cannot be undone.",
-    deleteMain: "The shopping cart collects items you tap the cart button on, so it cannot be deleted. You can remove items one by one.",
   },
   settings: {
     signOut: "Sign out",
