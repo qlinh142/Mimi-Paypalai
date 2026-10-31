@@ -311,3 +311,7 @@
 .house15__code { margin-top: var(--s2); font-weight: 800; letter-spacing: .06em; color: var(--m15-blue); }
 .house15__copy { grid-column: 1 / -1; }
 .members15__rel { display: block; color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 400; }
+.pd15__actions { display: grid; grid-template-columns: 1fr 2fr; gap: var(--s3); }
+.pd15__del { white-space: nowrap; gap: 6px; padding-inline: var(--s3); border: 1.5px solid #c62828; color: #c62828; background: #fff; }
+.pd15__del--confirm { background: #c62828; color: #fff; }
+.pd15__del[aria-disabled="true"] { opacity: .45; }

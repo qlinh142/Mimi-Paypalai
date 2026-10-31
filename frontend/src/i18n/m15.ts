@@ -154,6 +154,10 @@ const vi = {
     nothingToSend: "Kế hoạch chưa có món nào để gửi.",
     close: "Đóng",
     delete: "Xóa kế hoạch",
+    deleteShort: "Xóa",
+    deleteConfirm: "Xóa hẳn",
+    deleteAsk: "Bấm \"Xóa hẳn\" để xóa kế hoạch này. Không khôi phục được.",
+    deleteMain: "Kế hoạch chính không xóa được. Mẹ có thể bỏ từng món trong danh sách.",
   },
   settings: {
     signOut: "Đăng xuất",
@@ -368,6 +372,10 @@ const en: typeof vi = {
     nothingToSend: "This plan has nothing to send yet.",
     close: "Close",
     delete: "Delete plan",
+    deleteShort: "Delete",
+    deleteConfirm: "Delete now",
+    deleteAsk: "Tap \"Delete now\" to remove this plan for good. It cannot be undone.",
+    deleteMain: "The main plan cannot be deleted. You can remove items one by one.",
   },
   settings: {
     signOut: "Sign out",

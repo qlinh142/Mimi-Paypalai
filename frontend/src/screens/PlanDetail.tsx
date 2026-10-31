@@ -44,6 +44,8 @@ function Detail({ id }: { id: string }) {
   const cart = plan.data;
   const nav = useNavigate();
   const metaAct = usePlanMeta();
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [delNote, setDelNote] = useState(false);
   const saveState = useSavePlanState();
 
   const [name, setName] = useState("");
@@ -147,18 +149,28 @@ function Detail({ id }: { id: string }) {
         {cart && <Buyer cart={cart} planId={id} onSend={() => setMemberSheet(true)} />}
 
         {(saveState.isError || metaAct.update.isError) && <p className="error" role="alert">{errText(saveState.error ?? metaAct.update.error)}</p>}
-        <button type="button" className="btn btn--primary btn--block btn--lg" aria-disabled={busy || undefined} onClick={save}>
-          {m15.plan.save}
-        </button>
-        {meta && !meta.default && (
+        {/* Góp ý 31/10 15:43: nút Xóa nằm cạnh Lưu kế hoạch. Xóa không hoàn tác được nên bấm hai lần. */}
+        <div className="pd15__actions">
           <button
             type="button"
-            className="btn btn--quiet btn--block btn--danger"
-            onClick={() => metaAct.remove.mutate(id, { onSuccess: () => { setCurrentPlanId("default"); nav("/plan", { replace: true }); } })}
+            className={`btn btn--lg pd15__del${confirmDel ? " pd15__del--confirm" : ""}`}
+            aria-disabled={!meta || meta.default || metaAct.remove.isPending || undefined}
+            onClick={() => {
+              if (!meta || metaAct.remove.isPending) return;
+              if (meta.default) return setDelNote(true);
+              if (!confirmDel) return setConfirmDel(true);
+              metaAct.remove.mutate(id, { onSuccess: () => { setCurrentPlanId("default"); nav("/plan", { replace: true }); } });
+            }}
           >
-            <Trash2 size={18} aria-hidden /> {m15.plan.delete}
+            <Trash2 size={18} aria-hidden /> {confirmDel ? m15.plan.deleteConfirm : m15.plan.deleteShort}
           </button>
-        )}
+          <button type="button" className="btn btn--primary btn--lg" aria-disabled={busy || undefined} onClick={save}>
+            {m15.plan.save}
+          </button>
+        </div>
+        {confirmDel && <p className="hint" role="status">{m15.plan.deleteAsk}</p>}
+        {delNote && <p className="hint" role="status">{m15.plan.deleteMain}</p>}
+        {metaAct.remove.isError && <p className="error" role="alert">{errText(metaAct.remove.error)}</p>}
       </div>
 
       {iconSheet && (
