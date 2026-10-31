@@ -325,3 +325,10 @@
 .add15__row { grid-template-columns: 1fr auto; }
 .add15__row .plan-row__name { white-space: normal; overflow: visible; text-overflow: clip; }
 .add15__btn { flex: none; width: auto; min-height: 40px; padding: 0 14px; font-size: var(--fs-sm); gap: 4px; }
+/* Góp ý 31/10 16:28: nút chỉ có biểu tượng, dấu tích để lưu, thùng rác để bỏ. */
+.line15__edit { display: flex; align-items: center; gap: var(--s2); }
+.line15__edit .stepper15 { flex: 1; }
+.icon15 { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 12px; border: 1.5px solid var(--m15-line); background: #fff; cursor: pointer; }
+.icon15--ok { color: #fff; background: var(--m15-blue); border-color: var(--m15-blue); }
+.icon15--del { color: #c62828; border-color: #f2c4c4; }
+.icon15[aria-disabled="true"] { opacity: .5; }

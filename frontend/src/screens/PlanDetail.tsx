@@ -3,7 +3,7 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
@@ -215,7 +215,14 @@ function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boo
   const edit = usePlanItem();
   const unit = line.unit || savedUnit({ key: line.key, name: line.name });
   const price = line.unit_price != null ? formatVnd(line.unit_price * line.qty) : m15.plan.noPrice;
-  const setQty = (q: number) => q >= 1 && !patch.isPending && patch.mutate({ key: line.key, patch: { qty: q } });
+  // Góp ý 31/10 16:28: −/+ chỉ đổi số trên màn; bấm dấu tích mới lưu. Bỏ món bằng biểu tượng thùng rác.
+  const [qty, setQty] = useState(line.qty);
+  useEffect(() => setQty(line.qty), [line.qty, open]);
+  const saveQty = () => {
+    if (patch.isPending) return;
+    if (qty === line.qty) return onToggle();
+    patch.mutate({ key: line.key, patch: { qty } }, { onSuccess: onToggle });
+  };
   return (
     <li className="line15">
       <div className="line15__row">
@@ -234,12 +241,15 @@ function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boo
       {open && (
         <div className="line15__edit">
           <div className="stepper15">
-            <button type="button" aria-label={m15.detail.minus} onClick={() => setQty(line.qty - 1)}><Minus size={18} aria-hidden /></button>
-            <input readOnly value={line.qty} aria-label={m15.detail.qtyTitle} />
-            <button type="button" aria-label={m15.detail.plus} onClick={() => setQty(line.qty + 1)}><Plus size={18} aria-hidden /></button>
+            <button type="button" aria-label={m15.detail.minus} onClick={() => qty > 1 && setQty(qty - 1)}><Minus size={18} aria-hidden /></button>
+            <input readOnly value={qty} aria-label={m15.detail.qtyTitle} />
+            <button type="button" aria-label={m15.detail.plus} onClick={() => setQty(qty + 1)}><Plus size={18} aria-hidden /></button>
           </div>
-          <button type="button" className="btn btn--quiet btn--danger" onClick={() => edit.mutate({ key: line.key, add: false })}>
-            <Trash2 size={18} aria-hidden /> {m15.plan.removeLine}
+          <button type="button" className="icon15 icon15--ok" aria-label={m15.plan.saveLine(line.name)} aria-disabled={patch.isPending || undefined} onClick={saveQty}>
+            <Check size={22} aria-hidden />
+          </button>
+          <button type="button" className="icon15 icon15--del" aria-label={m15.plan.removeLineOf(line.name)} aria-disabled={edit.isPending || undefined} onClick={() => !edit.isPending && edit.mutate({ key: line.key, add: false })}>
+            <Trash2 size={22} aria-hidden />
           </button>
         </div>
       )}

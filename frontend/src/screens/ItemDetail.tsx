@@ -2,7 +2,7 @@ import { t } from "../i18n";
 import { m15 } from "../i18n/m15";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronDown, Minus, Plus, Save, ShoppingCart } from "lucide-react";
+import { Check, ChevronDown, Minus, Plus, ShoppingCart } from "lucide-react";
 import { GroupPicker } from "../components/ReceiptLines";
 import { ApiError } from "../api/client";
 import { useCorrectItem, useItem, useItemPriceHistory, useSetQuantity, useTaxonomyLabels } from "../api/hooks";
@@ -140,7 +140,7 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
           );
         }}
       >
-        <Save size={20} aria-hidden /> {m15.detail.update}
+        <Check size={20} aria-hidden /> {m15.detail.update}
       </button>
       {set.isSuccess && <p className="hint" role="status">{m15.detail.updated}</p>}
       <button
