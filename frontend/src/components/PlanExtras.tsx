@@ -125,13 +125,13 @@ export function AddAnything({ cart }: { cart: Cart }) {
       <input className="input" value={q} placeholder={m1.add.placeholder} onChange={(e) => setQ(e.target.value)} aria-label={m1.add.placeholder} />
       <ul className="list">
         {(found.data ?? []).map((g) => (
-          <li key={g.key} className="plan-row">
+          <li key={g.key} className="plan-row add15__row">
             <span className="plan-row__text">
               <span className="plan-row__name">{g.label}</span>
             </span>
             <button
               type="button"
-              className="btn btn--quiet"
+              className="btn btn--quiet add15__btn"
               aria-disabled={inCart.has(g.key) || edit.isPending || undefined}
               onClick={() => !inCart.has(g.key) && add(g.key)}
             >

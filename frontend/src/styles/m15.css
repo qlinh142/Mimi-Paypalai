@@ -321,3 +321,7 @@
 .pick15list__row--new { border-style: dashed; color: var(--m15-blue); }
 .pick15list__text { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .pick15list__text small { color: var(--ink-soft); font-size: var(--fs-sm); display: flex; align-items: center; gap: 4px; }
+/* Thêm món mới (góp ý 31/10 16:23): nút + Thêm nhỏ gọn bên phải, tên món chiếm phần còn lại. */
+.add15__row { grid-template-columns: 1fr auto; }
+.add15__row .plan-row__name { white-space: normal; overflow: visible; text-overflow: clip; }
+.add15__btn { flex: none; width: auto; min-height: 40px; padding: 0 14px; font-size: var(--fs-sm); gap: 4px; }
