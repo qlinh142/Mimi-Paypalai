@@ -79,7 +79,7 @@ export function RecurringList({ term }: { term: string }) {
                     <span className="card15__icon"><span className="row__icon" aria-hidden><Icon size={22} strokeWidth={1.8} /></span></span>
                     <span className="card15__text">
                       <span className="card15__name">{r.name}</span>
-                      <span className="card15__sub">{formatVnd(r.amount)} · {dueText(r)} · {m1.recurring.cycles[r.cycle]}</span>
+                      <span className="card15__sub">{formatVnd(r.amount)} · {dueText(r)}</span>
                       <span className="card15__edit"><Pencil size={14} aria-hidden /> {m15.items.edit}</span>
                     </span>
                   </button>
