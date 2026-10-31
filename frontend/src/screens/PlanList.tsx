@@ -6,6 +6,7 @@ import { useDelegated, usePlanCarts, usePlanMeta, usePlans } from "../api/hooks"
 import type { Cart, PlanMeta } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { setCurrentPlanId } from "../lib/currentPlan";
+import { visiblePlans } from "../components/PlanPicker";
 import { iconOf, planIcon } from "../lib/planIcon";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { t } from "../i18n";
@@ -48,7 +49,8 @@ function Mine() {
   const meta = usePlanMeta();
   const nav = useNavigate();
   const delegated = useDelegated();
-  const list = (plans.data ?? []).filter((p) => p.status === "active");
+  // Giỏ mua sắm (mặc định) ẩn khi trống (chốt 31/10 15:58).
+  const list = visiblePlans(plans.data);
   const carts = usePlanCarts(list.map((p) => p.id));
   const [err, setErr] = useState(false);
 

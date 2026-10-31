@@ -4,7 +4,8 @@ import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
 import { m15 } from "../i18n/m15";
 import { ApiError } from "../api/client";
-import { usePlan, useRecurring, useRecurringActions } from "../api/hooks";
+import { useRecurring, useRecurringActions } from "../api/hooks";
+import { useKeysInPlans } from "./PlanPicker";
 import type { Recurring, RecurringCycle } from "../api/types";
 import { daysUntil } from "../lib/displayUnit";
 import { formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
@@ -53,9 +54,8 @@ function dueText(r: Recurring): string {
 /** Tab Khoản chi định kỳ ở màn Đồ dùng (ảnh mẫu 3-khoan-chi-dinh-ky.png). */
 export function RecurringList({ term }: { term: string }) {
   const list = useRecurring();
-  const plan = usePlan();
   const [editing, setEditing] = useState<string | null>(null);
-  const inPlan = useMemo(() => new Set((plan.data?.items ?? []).map((i) => i.key)), [plan.data]);
+  const inPlan = useKeysInPlans();
 
   const groups = useMemo(() => {
     const q = normalizeVi(term);

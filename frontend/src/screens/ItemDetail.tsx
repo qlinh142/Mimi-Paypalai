@@ -5,9 +5,10 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronDown, Minus, Plus, Save, ShoppingCart } from "lucide-react";
 import { GroupPicker } from "../components/ReceiptLines";
 import { ApiError } from "../api/client";
-import { useCorrectItem, useItem, useItemPriceHistory, usePlan, usePlanItem, useSetQuantity, useTaxonomyLabels } from "../api/hooks";
+import { useCorrectItem, useItem, useItemPriceHistory, useSetQuantity, useTaxonomyLabels } from "../api/hooks";
+import { PlanPicker, useKeysInPlans } from "../components/PlanPicker";
 import type { ItemDetail as ItemDetailData } from "../api/types";
-import { MainFrame, TopBar, useUndo } from "../components/AppShell";
+import { MainFrame, TopBar } from "../components/AppShell";
 import { ALL_UNITS, formatNum, rememberUnit, savedUnit, stockInDisplay, unitLabel } from "../lib/displayUnit";
 import { formatDayMonth, formatVnd } from "../lib/text";
 
@@ -44,9 +45,6 @@ export function ItemDetail() {
 
 function QuantityCard({ item }: { item: ItemDetailData }) {
   const set = useSetQuantity();
-  const plan = usePlan();
-  const add = usePlanItem();
-  const showUndo = useUndo();
   const current = stockInDisplay(item);
   const [qty, setQty] = useState(current?.[0] ?? 0);
   const [unit, setUnit] = useState(current?.[1] ?? savedUnit(item));
@@ -57,7 +55,8 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
       setUnit(c[1]);
     }
   }, [item]);
-  const inPlan = (plan.data?.items ?? []).some((i) => i.key === item.key) || add.isSuccess;
+  const inPlan = useKeysInPlans().has(item.key);
+  const [picker, setPicker] = useState(false);
   const fix = useCorrectItem();
   const nav = useNavigate();
   const groupLabel = useTaxonomyLabels();
@@ -148,14 +147,12 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
         type="button"
         className="btn btn--outline btn--block"
         aria-pressed={inPlan}
-        aria-disabled={add.isPending || undefined}
-        onClick={() => {
-          if (inPlan || add.isPending) return;
-          add.mutate({ key: item.key, add: true }, { onSuccess: () => showUndo({ message: m15.items.added(item.name), onUndo: () => add.mutate({ key: item.key, add: false }, { onSuccess: () => add.reset() }) }) });
-        }}
+        aria-haspopup="dialog"
+        onClick={() => setPicker(true)}
       >
         <ShoppingCart size={20} aria-hidden /> {m15.detail.shop}
       </button>
+      {picker && <PlanPicker planKey={item.key} name={item.name} onClose={() => setPicker(false)} />}
     </section>
   );
 }

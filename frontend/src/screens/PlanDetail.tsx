@@ -3,7 +3,7 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState,
@@ -17,6 +17,7 @@ import { setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { PLAN_ICONS, iconOf, planIcon, setPlanIcon } from "../lib/planIcon";
 import { formatVnd } from "../lib/text";
 import { planName } from "./PlanList";
+import { Sheet } from "../components/Sheet15";
 import { relationOf } from "../lib/relation";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -426,25 +427,3 @@ function MemberSheet({ cart, onClose }: { cart: Cart; onClose: () => void }) {
   );
 }
 
-function Sheet({ title, sub, onClose, children }: { title: string; sub: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div className="sheet15" role="presentation" onClick={onClose}>
-      <div className="sheet15__panel" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
-        <span className="sheet15__grip" aria-hidden />
-        <div className="sheet15__head">
-          <div>
-            <h2>{title}</h2>
-            <p>{sub}</p>
-          </div>
-          <button type="button" className="icon-btn" aria-label={m15.plan.close} onClick={onClose}><X size={24} aria-hidden /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
