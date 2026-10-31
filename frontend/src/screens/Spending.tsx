@@ -1,75 +1,83 @@
 import { categoryLabel, t } from "../i18n";
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ScanLine } from "lucide-react";
+import { m15 } from "../i18n/m15";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, ScanLine, ShoppingCart, Trophy } from "lucide-react";
 import { ApiError } from "../api/client";
-import { useSpending } from "../api/hooks";
+import { useForecast, useItems, useRecurring, useSpending } from "../api/hooks";
 import type { ReceiptSummary, SpendingReport } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
-import { ForecastCard, RecurringPanel } from "../components/Recurring";
-import { addMonths, currentMonth, formatDayMonth, formatMonth, formatVnd } from "../lib/text";
+import { recurringTier } from "../components/RecurringList";
+import { goodsTier } from "../lib/displayUnit";
+import { addMonths, currentMonth, formatDayMonth, formatVnd } from "../lib/text";
+
+const TOP_CATS = 5;
+const ym = (s: string) => s.split("-").map(Number) as [number, number];
 
 /**
- * Sổ chi tiêu (spec mục 3). Mọi con số do API tính từ hóa đơn đã lưu; màn này chỉ hiển thị.
- * Tổng tháng là con số lớn (không cần biểu đồ); chi theo nhóm là thanh ngang một màu, mỗi thanh có
- * nhãn và số tiền nên đọc được cả khi không phân biệt màu.
+ * Sổ chi tiêu (Mimi 1.5, ảnh mẫu 4-so-chi-tieu.png): hai nút Đã chi / Sắp chi.
+ * Mọi con số tiền của Đã chi do API tính; Sắp chi cộng các khoản đã có giá theo luật chốt 31/10.
  */
 export function Spending() {
-  const [month, setMonth] = useState(currentMonth());
-  const q = useSpending(month);
-  const r = q.data;
-  const isCurrent = month >= currentMonth();
-
-  if (q.error instanceof ApiError && q.error.status === 403) {
-    return (
-      <MainFrame>
-        <TopBar title={t.spending.title} />
-        <div className="page empty"><p>{t.spending.ownerOnly}</p></div>
-      </MainFrame>
-    );
-  }
-
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "upcoming" ? "upcoming" : "spent";
   return (
     <MainFrame>
       <TopBar title={t.spending.title} />
-      <div className="page spend">
-        <div className="month-switch" role="group" aria-label={t.spending.title}>
-          <button type="button" className="icon-btn" aria-label={t.spending.prevMonth} onClick={() => setMonth(addMonths(month, -1))}>
-            <ChevronLeft size={22} aria-hidden />
-          </button>
-          <span className="month-switch__label" aria-live="polite">{formatMonth(month)}</span>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label={t.spending.nextMonth}
-            aria-disabled={isCurrent || undefined}
-            onClick={() => !isCurrent && setMonth(addMonths(month, 1))}
-          >
-            <ChevronRight size={22} aria-hidden />
-          </button>
+      <div className="page p15">
+        <div className="seg seg15" role="group" aria-label={t.spending.title}>
+          <button type="button" aria-pressed={tab === "spent"} onClick={() => setParams({}, { replace: true })}>{m15.spending.spent}</button>
+          <button type="button" aria-pressed={tab === "upcoming"} onClick={() => setParams({ tab: "upcoming" }, { replace: true })}>{m15.spending.upcoming}</button>
         </div>
-
-        {q.isPending && <p className="hint">{t.common.loading}</p>}
-        {q.isError && !r && (
-          <div className="empty">
-            <h2>{t.spending.loadFailed}</h2>
-            <button className="btn btn--quiet" onClick={() => q.refetch()}>{t.common.retry}</button>
-          </div>
-        )}
-        {r && (r.receipt_count === 0 && !r.online_orders ? <EmptyMonth month={month} /> : <Report r={r} month={month} />)}
-        {/* 2.1: Dự báo 30 ngày và khoản định kỳ luôn theo hôm nay, không theo tháng đang xem. */}
-        {isCurrent && <ForecastCard />}
-        <RecurringPanel />
+        {tab === "spent" ? <Spent /> : <Upcoming />}
       </div>
     </MainFrame>
   );
 }
 
-function EmptyMonth({ month }: { month: string }) {
+function Spent() {
+  const [month, setMonth] = useState(currentMonth());
+  const q = useSpending(month);
+  const r = q.data;
+  const isCurrent = month >= currentMonth();
+  const [y, m] = ym(month);
+
+  if (q.error instanceof ApiError && q.error.status === 403) return <div className="empty"><p>{t.spending.ownerOnly}</p></div>;
+
+  return (
+    <>
+      <div className="month15" role="group" aria-label={t.spending.title}>
+        <button type="button" className="icon-btn" aria-label={t.spending.prevMonth} onClick={() => setMonth(addMonths(month, -1))}>
+          <ChevronLeft size={22} aria-hidden />
+        </button>
+        <span aria-live="polite">{m15.spending.month(m, y)}</span>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={t.spending.nextMonth}
+          aria-disabled={isCurrent || undefined}
+          onClick={() => !isCurrent && setMonth(addMonths(month, 1))}
+        >
+          <ChevronRight size={22} aria-hidden />
+        </button>
+      </div>
+
+      {q.isPending && <p className="hint">{t.common.loading}</p>}
+      {q.isError && !r && (
+        <div className="empty">
+          <h2>{t.spending.loadFailed}</h2>
+          <button className="btn btn--quiet" onClick={() => q.refetch()}>{t.common.retry}</button>
+        </div>
+      )}
+      {r && (r.receipt_count === 0 && r.spent === 0 ? <EmptyMonth /> : <Report r={r} month={month} />)}
+    </>
+  );
+}
+
+function EmptyMonth() {
   return (
     <div className="empty">
-      <h2>{t.spending.emptyTitle(formatMonth(month))}</h2>
-      <p>{t.spending.emptyBody}</p>
+      <p>{m15.spending.empty}</p>
       <Link to="/scan" className="btn btn--primary">
         <ScanLine size={20} aria-hidden /> {t.spending.scan}
       </Link>
@@ -77,84 +85,183 @@ function EmptyMonth({ month }: { month: string }) {
   );
 }
 
+function compare(r: SpendingReport, month: string): string {
+  const [py, pm] = ym(addMonths(month, -1));
+  const prev = m15.spending.prevMonth(pm, py);
+  const pct = r.spent_prev_month_pct;
+  if (pct == null) return m15.spending.noPrev(prev);
+  const n = Math.round(Math.abs(pct));
+  if (n === 0) return m15.spending.same(prev);
+  return pct > 0 ? `▲ ${m15.spending.more(n, prev)}` : `▼ ${m15.spending.less(n, prev)}`;
+}
+
+/** Gộp hóa đơn theo cửa hàng: tổng tiền và lần mua gần nhất. */
+function byStore(rows: ReceiptSummary[]) {
+  const map = new Map<string, { store: string; total: number; last: string }>();
+  for (const x of rows) {
+    const store = x.store || t.confirm.unknown;
+    const cur = map.get(store) ?? { store, total: 0, last: x.purchased_on };
+    cur.total += x.total_vnd;
+    if (x.purchased_on > cur.last) cur.last = x.purchased_on;
+    map.set(store, cur);
+  }
+  return [...map.values()].sort((a, b) => b.last.localeCompare(a.last));
+}
+
 function Report({ r, month }: { r: SpendingReport; month: string }) {
-  const prev = formatMonth(addMonths(month, -1));
-  const maxCat = Math.max(1, ...r.by_category.map((c) => c.amount));
+  const [allCats, setAllCats] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  // Khoản chi định kỳ luôn đứng đầu danh mục; các nhóm còn lại xếp theo số tiền.
+  const REC = "hoa-don-dinh-ky";
+  const cats = [...r.by_category].sort((a, b) => (a.key === REC ? -1 : b.key === REC ? 1 : b.amount - a.amount));
+  const shown = allCats ? cats : cats.slice(0, TOP_CATS);
+  const maxCat = Math.max(1, ...cats.map((c) => c.amount));
+  const best = r.top_saving_receipts[0];
+  const stores = byStore(r.recent_receipts);
   return (
     <>
-      <section className="spend-hero" aria-label={t.spending.spentIn(formatMonth(month))}>
-        <p className="spend-hero__label">{t.spending.spentIn(formatMonth(month))}</p>
-        <p className="spend-hero__num num">{formatVnd(r.spent)}</p>
-        <p className="spend-hero__sub">
-          {r.spent_prev_month_pct != null ? t.spending.vsPrev(Math.round(r.spent_prev_month_pct), prev) : t.spending.noPrev(prev)}
-          {" · "}
-          {t.spending.receipts(r.receipt_count)}
-        </p>
-        {(r.online_spent ?? 0) > 0 && (
-          <p className="spend-hero__sub">
-            <Link to="/orders">{t.spending.online(formatVnd(r.online_spent ?? 0), r.online_orders ?? 0)}</Link>
-            {(r.refunded ?? 0) > 0 && ` · ${t.spending.refunded(formatVnd(r.refunded ?? 0))}`}
-          </p>
-        )}
-        {r.saved > 0 && (
-          <p className="spend-hero__saved">
-            {t.spending.saved(formatVnd(r.saved))}
-            {r.saved_ratio != null && ` · ${t.spending.savedRatio(Math.round(r.saved_ratio * 100))}`}
-          </p>
-        )}
+      <section className="hero15" aria-label={m15.spending.spent}>
+        <p className="hero15__num num">{formatVnd(r.spent)}</p>
+        <p className="hero15__sub">{compare(r, month)}</p>
       </section>
 
-      {r.by_category.length > 0 && (
-        <section className="plan-sec" aria-labelledby="spend-cat">
-          <h2 id="spend-cat">{t.spending.byCategory}</h2>
-          <ul className="bars">
-            {r.by_category.map((c) => (
-              <li key={c.key} className="bar">
-                <span className="bar__label">{categoryLabel(c.key)}</span>
-                <span className="bar__value num">
-                  {formatVnd(c.amount)} <span className="bar__pct">{Math.round(c.pct)}%</span>
-                </span>
-                {/* Độ dài thanh so với nhóm lớn nhất; số tiền luôn ghi bên cạnh. */}
-                <span className="bar__track" aria-hidden>
-                  <span className="bar__fill" style={{ width: `${Math.max(2, (c.amount / maxCat) * 100)}%` }} />
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="hint">{t.spending.tableNote}</p>
+      {cats.length > 0 && (
+        <section aria-labelledby="cat15">
+          <h2 id="cat15" className="h15sec">{m15.spending.byCategory}</h2>
+          <div className="box15">
+            <ul className="bars15">
+              {shown.map((c) => (
+                <li key={c.key}>
+                  <span className="bars15__label">{categoryLabel(c.key)}</span>
+                  <span className="bars15__value num">{formatVnd(c.amount)}</span>
+                  <span className="bars15__pct">{Math.round(c.pct)}%</span>
+                  <span className="bars15__track" aria-hidden>
+                    <span style={{ width: `${Math.max(2, (c.amount / maxCat) * 100)}%` }} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {cats.length > TOP_CATS && (
+              <button type="button" className="link15" aria-expanded={allCats} onClick={() => setAllCats(!allCats)}>
+                {allCats ? m15.spending.seeLess : m15.spending.seeAll} <ChevronRight size={16} aria-hidden />
+              </button>
+            )}
+          </div>
         </section>
       )}
 
-      {r.top_saving_receipts.length > 0 && (
-        <section className="plan-sec" aria-labelledby="spend-save">
-          <h2 id="spend-save">{t.spending.topSaving}</h2>
-          <ReceiptList rows={r.top_saving_receipts} showDiscount />
+      {best && best.discount_vnd > 0 && (
+        <section className="save15" aria-label={m15.spending.topSaving}>
+          <span className="save15__icon"><Trophy size={26} aria-hidden /></span>
+          <span>
+            <strong>{m15.spending.topSaving}</strong>
+            <span>{best.store || t.confirm.unknown}</span>
+            <span className="save15__amt">{m15.spending.saved(formatVnd(best.discount_vnd))}</span>
+          </span>
+        </section>
+      )}
+
+      {stores.length > 0 && (
+        <section aria-labelledby="store15">
+          <h2 id="store15" className="h15sec">{m15.spending.stores}</h2>
+          <ul className="box15 rows15">
+            {stores.map((s, i) => (
+              <li key={s.store}>
+                <span className={`rows15__icon rows15__icon--${i % 2 ? "red" : "green"}`}><ShoppingCart size={18} aria-hidden /></span>
+                <span className="rows15__text">
+                  <span>{s.store}</span>
+                  <small>{formatDayMonth(s.last)}</small>
+                </span>
+                <span className="num">{formatVnd(s.total)}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
       {r.recent_receipts.length > 0 && (
-        <section className="plan-sec" aria-labelledby="spend-recent">
-          <h2 id="spend-recent">{t.spending.recent}</h2>
-          <ReceiptList rows={r.recent_receipts} />
+        <section>
+          <button type="button" className="box15 rowlink15" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}>
+            <Clock size={20} aria-hidden />
+            <span>{m15.spending.history}</span>
+            {showHistory ? <ChevronDown size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
+          </button>
+          {showHistory && (
+            <ul className="box15 rows15">
+              {r.recent_receipts.map((x) => (
+                <li key={x.receipt_id}>
+                  <span className="rows15__text">
+                    <span>{x.store || t.confirm.unknown}</span>
+                    <small>{formatDayMonth(x.purchased_on)}</small>
+                  </span>
+                  <span className="num">{formatVnd(x.total_vnd)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
     </>
   );
 }
 
-function ReceiptList({ rows, showDiscount = false }: { rows: ReceiptSummary[]; showDiscount?: boolean }) {
+/**
+ * Sắp chi (chốt 31/10): Khoản chi định kỳ Đến hạn + Sắp tới (≤ 7 ngày) và Hàng tiêu dùng
+ * Cần mua ngay + Sắp hết, tính theo giá đã trả gần nhất (lấy từ Dự báo của API).
+ */
+function Upcoming() {
+  const rec = useRecurring();
+  const items = useItems({ tab: "active", horizon: 7 });
+  const fc = useForecast();
+  const [open, setOpen] = useState<"rec" | "goods" | null>(null);
+
+  const recRows = useMemo(
+    () => (rec.data?.items ?? []).filter((r) => recurringTier(r) !== "later").map((r) => ({ key: r.id, name: r.name, sub: formatDayMonth(r.next_due_at), amount: r.amount as number | null })),
+    [rec.data],
+  );
+  const goodsRows = useMemo(() => {
+    const price = new Map((fc.data?.shopping ?? []).map((s) => [s.key, s.amount]));
+    return (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").map((i) => ({ key: i.key, name: i.name, sub: "", amount: price.get(i.key) ?? null }));
+  }, [items.data, fc.data]);
+
+  const sum = (rows: { amount: number | null }[]) => rows.reduce((a, x) => a + (x.amount ?? 0), 0);
+  const recTotal = sum(recRows);
+  const goodsTotal = sum(goodsRows);
+
+  if (rec.isPending || items.isPending) return <p className="hint">{t.common.loading}</p>;
+
+  const lines = [
+    { id: "rec" as const, Icon: CalendarDays, label: m15.spending.recurring, total: recTotal, rows: recRows },
+    { id: "goods" as const, Icon: ShoppingCart, label: m15.spending.goods, total: goodsTotal, rows: goodsRows },
+  ];
+
   return (
-    <ul className="lines">
-      {rows.map((x) => (
-        <li key={x.receipt_id}>
-          <span>{x.store || t.confirm.unknown}</span>
-          <span className="num">{formatVnd(x.total_vnd)}</span>
-          <span className="sub">
-            {formatDayMonth(x.purchased_on)}
-            {showDiscount && x.discount_vnd > 0 && ` · ${t.spending.discount(formatVnd(x.discount_vnd))}`}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <section className="hero15 fc15" aria-labelledby="fc15">
+      <p id="fc15" className="fc15__label">{m15.spending.forecast}</p>
+      <p className="hero15__num num">{formatVnd(recTotal + goodsTotal)}</p>
+      <ul className="fc15__lines">
+        {lines.map(({ id, Icon, label, total, rows }) => (
+          <li key={id}>
+            <button type="button" className="fc15__line" aria-expanded={open === id} onClick={() => setOpen(open === id ? null : id)}>
+              <Icon size={22} aria-hidden />
+              <span>{label}</span>
+              <span className="num">{formatVnd(total)}</span>
+              {open === id ? <ChevronDown size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
+            </button>
+            {open === id && (
+              <ul className="fc15__rows">
+                {rows.map((x) => (
+                  <li key={x.key}>
+                    <span>{x.name}{x.sub && <small> · {x.sub}</small>}</span>
+                    <span className="num">{x.amount != null ? formatVnd(x.amount) : m15.spending.noPrice}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="hint">{m15.spending.forecastNote}</p>
+    </section>
   );
 }

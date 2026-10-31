@@ -1,93 +1,40 @@
 import { t } from "../i18n";
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { m15 } from "../i18n/m15";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ChevronDown, Minus, Plus, Save, ShoppingCart } from "lucide-react";
+import { GroupPicker } from "../components/ReceiptLines";
 import { ApiError } from "../api/client";
-import { useItem, useQuickStock, useSetQuantity, useUndoStock } from "../api/hooks";
+import { useCorrectItem, useItem, useItemPriceHistory, usePlan, usePlanItem, useSetQuantity, useTaxonomyLabels } from "../api/hooks";
 import type { ItemDetail as ItemDetailData } from "../api/types";
-import { TopBar, useUndo, MainFrame } from "../components/AppShell";
-import { CategoryIcon, STATUS_TEXT, statusTone } from "../components/ItemRow";
-import { formatDayMonth, formatQty } from "../lib/text";
-import { FixItemSection, LotsSection, PriceHistorySection } from "../components/ItemExtras";
-import { AddToPlanButton } from "../components/PlanExtras";
-import { m1 } from "../i18n/m1";
+import { MainFrame, TopBar, useUndo } from "../components/AppShell";
+import { ALL_UNITS, formatNum, rememberUnit, savedUnit, stockInDisplay, unitLabel } from "../lib/displayUnit";
+import { formatDayMonth, formatVnd } from "../lib/text";
 
-const CONFIDENCE = t.detail.confidenceLevels;
-
-/** Chi tiết món (spec mục 4). Bản khung: số ngày, độ tin cậy, nguồn, ba nút chỉnh nhanh. */
+/**
+ * Chi tiết món (Mimi 1.5, ảnh mẫu 3-do-dung-va-chi-tiet.png): số lượng hiện có với − / + và đơn vị,
+ * Cập nhật sản phẩm, Mua sắm (thêm vào Kế hoạch), Lịch sử mua hàng.
+ */
 export function ItemDetail() {
   const { key = "" } = useParams();
   const q = useItem(key);
-  const quick = useQuickStock();
-  const undo = useUndoStock();
-  const showUndo = useUndo();
   const item = q.data;
 
   return (
     <MainFrame>
       <TopBar title={item?.name ?? t.detail.fallbackTitle} variant="sub" />
-      <div className="page detail">
+      <div className="page p15">
         {!item && q.isPending && <p className="hint">{t.common.loading}</p>}
         {!item && q.isError && (
           <div className="empty">
-            <p>
-              {q.error instanceof ApiError && q.error.status === 404 ? t.detail.notFound : t.common.genericError}
-            </p>
+            <p>{q.error instanceof ApiError && q.error.status === 404 ? t.detail.notFound : t.common.genericError}</p>
             <Link className="btn btn--quiet" to="/items">{t.items.title}</Link>
           </div>
         )}
         {item && (
           <>
-            <div className="detail__figure">
-              <CategoryIcon category={item.category_key} />
-              <span className={`tone-${statusTone(item)}`}>
-                <span className="row__big num">{item.days_left ?? "–"}</span>{" "}
-                <span className="row__unit">{item.days_left === null ? t.detail.waiting : t.detail.daysLeft(STATUS_TEXT[item.status])}</span>
-              </span>
-            </div>
-            <dl className="facts">
-              <dt>{t.detail.expected}</dt>
-              <dd>{item.predicted_out_on ? formatDayMonth(item.predicted_out_on) : t.detail.notEnough}</dd>
-              <dt>{t.detail.confidence}</dt>
-              <dd>{item.confidence ? CONFIDENCE[item.confidence] : t.detail.none} ({t.detail.purchases(item.purchase_count)})</dd>
-              <dt>{t.detail.source}</dt>
-              <dd>{item.source === "manual" ? t.detail.manual : t.detail.predicted}</dd>
-              <dt>{t.detail.category}</dt>
-              <dd>{item.category_label}</dd>
-            </dl>
-            <div className="stock-btns" role="group" aria-label={t.detail.stockGroup}>
-              {(
-                [
-                  ["plenty", t.detail.plenty],
-                  ["soon", t.detail.soon],
-                  ["out", t.detail.out],
-                ] as const
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  className="btn btn--quiet"
-                  onClick={() =>
-                    quick.mutate(
-                      { item, quick: k },
-                      {
-                        onSuccess: () => {
-                          q.refetch();
-                          showUndo({ message: t.detail.marked(label), onUndo: () => undo.mutate(item, { onSuccess: () => q.refetch() }) });
-                        },
-                      },
-                    )
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="hint">{t.detail.hint}</p>
-            <AddToPlanButton itemKey={item.key} />
-            <StockSection item={item} onSaved={() => q.refetch()} />
-            <LotsSection item={item} />
-            <PriceHistorySection itemKey={item.key} />
-            <FixItemSection key={item.key} item={item} />
+            <QuantityCard item={item} />
+            <HistoryCard itemKey={item.key} unit={stockInDisplay(item)?.[1] ?? savedUnit(item)} />
           </>
         )}
       </div>
@@ -95,94 +42,153 @@ export function ItemDetail() {
   );
 }
 
-const SET_UNITS = ["kg", "g", "l", "ml", "cai", "hop", "goi", "chai", "qua"] as const;
-
-/**
- * Tồn theo số lượng (Mimi 2.0 mục 4): số Mimi ước tính, mốc xác nhận gần nhất và nguồn,
- * và form "SET số lượng thực tế". Mọi con số do API tính; màn này chỉ hiển thị.
- */
-function StockSection({ item, onSaved }: { item: ItemDetailData; onSaved: () => void }) {
+function QuantityCard({ item }: { item: ItemDetailData }) {
   const set = useSetQuantity();
-  const [action, setAction] = useState<"set" | "increase" | "decrease">("set");
-  const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState<string>(item.stock?.unit === "g" ? "kg" : item.stock?.unit === "ml" ? "l" : item.stock?.unit === "m" ? "m" : "cai");
-  const st = item.stock;
-  const pc = t.stock.units.pc;
-  const value = Number(qty.replace(",", "."));
-  const valid = qty.trim() !== "" && Number.isFinite(value) && value >= 0;
+  const plan = usePlan();
+  const add = usePlanItem();
+  const showUndo = useUndo();
+  const current = stockInDisplay(item);
+  const [qty, setQty] = useState(current?.[0] ?? 0);
+  const [unit, setUnit] = useState(current?.[1] ?? savedUnit(item));
+  useEffect(() => {
+    const c = stockInDisplay(item);
+    if (c) {
+      setQty(c[0]);
+      setUnit(c[1]);
+    }
+  }, [item]);
+  const inPlan = (plan.data?.items ?? []).some((i) => i.key === item.key) || add.isSuccess;
+  const fix = useCorrectItem();
+  const nav = useNavigate();
+  const groupLabel = useTaxonomyLabels();
+  const [name, setName] = useState(item.name);
+  const [picking, setPicking] = useState(false);
+  useEffect(() => setName(item.name), [item.name]);
+  const step = unit === "g" || unit === "ml" ? 100 : unit === "kg" || unit === "l" ? 0.5 : 1;
+
   return (
-    <section className="plan-sec" aria-labelledby="stock-title">
-      <h2 id="stock-title">{t.stock.title}</h2>
-      {st ? (
-        <dl className="facts">
-          <dt>{t.stock.estimated}</dt>
-          <dd className="num">
-            {formatQty(st.estimated, st.unit, pc)}
-            {/* Chiều đo khác (0.1 mục 20): mỗi chiều một dòng, không cộng thành một tổng. */}
-            {(st.parts ?? []).map((p) => (
-              <span key={p.unit}> · {formatQty(p.estimated, p.unit, pc)}</span>
-            ))}
-          </dd>
-          <dt>{t.detail.source}</dt>
-          <dd>{t.stock.confirmed(formatQty(st.confirmed, st.unit, pc), formatDayMonth(st.confirmed_on), t.stock.sources[st.confirmed_source])}</dd>
-          {st.days_of_stock != null && (
-            <>
-              <dt>{t.detail.expected}</dt>
-              <dd>{t.stock.lasts(st.days_of_stock)}</dd>
-            </>
-          )}
-        </dl>
-      ) : (
-        <p className="hint">{t.stock.none}</p>
-      )}
-      <form
-        className="plan-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!valid || set.isPending) return;
-          set.mutate({ key: item.key, qty: value, unit, action }, { onSuccess: () => { setQty(""); onSaved(); } });
-        }}
-      >
-        {st && (
-          <label>
-            {m1.quantity.action}
-            <select value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
-              <option value="set">{m1.quantity.set}</option>
-              <option value="increase">{m1.quantity.increase}</option>
-              <option value="decrease">{m1.quantity.decrease}</option>
-            </select>
-          </label>
-        )}
-        <div className="plan-form__row">
-          <label>
-            {t.stock.qty}
-            <input inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
-          </label>
-          <label>
-            {t.stock.unit}
-            <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-              {SET_UNITS.map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {set.isError && <p className="error" role="alert">{set.error instanceof ApiError ? set.error.message : t.common.genericError}</p>}
-        {set.isSuccess && <p className="hint">{t.stock.saved}</p>}
-        <button type="submit" className="btn btn--quiet btn--block" aria-disabled={!valid || set.isPending || undefined}>
-          {t.stock.set}
-        </button>
-        {st && st.estimated > 0 && (
-          <button
-            type="button"
-            className="btn btn--quiet btn--block"
-            aria-disabled={set.isPending || undefined}
-            onClick={() => !set.isPending && set.mutate({ key: item.key, qty: 0, unit: "", action: "mark_out" }, { onSuccess: onSaved })}
-          >
-            {m1.quantity.markOut}
+    <section className="box15" aria-labelledby="qty-title">
+      <label className="field15">
+        <span>{m15.detail.name}</span>
+        <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <div className="field15">
+        <span>{m15.detail.group}</span>
+        {picking ? (
+          <GroupPicker
+            name={item.name}
+            onCancel={() => setPicking(false)}
+            onPick={(key) =>
+              fix.mutate(
+                { key: item.key, group_key: key },
+                {
+                  onSuccess: (it) => {
+                    setPicking(false);
+                    if (it.key !== item.key) nav(`/items/${encodeURIComponent(it.key)}`, { replace: true });
+                  },
+                },
+              )
+            }
+          />
+        ) : (
+          <button type="button" className="pick15" onClick={() => setPicking(true)}>
+            <span>{groupLabel(item.key) || item.category_label}</span>
+            <ChevronDown size={20} aria-hidden />
           </button>
         )}
-      </form>
+      </div>
+      {fix.isError && <p className="error" role="alert">{fix.error instanceof ApiError ? fix.error.message : t.common.genericError}</p>}
+      <h2 id="qty-title">{m15.detail.qtyTitle}</h2>
+      <div className="qty15">
+        <div className="stepper15">
+          <button type="button" aria-label={m15.detail.minus} onClick={() => setQty((v) => Math.max(0, +(v - step).toFixed(2)))}>
+            <Minus size={20} aria-hidden />
+          </button>
+          <input
+            inputMode="decimal"
+            aria-label={m15.detail.qtyTitle}
+            value={formatNum(qty)}
+            onChange={(e) => {
+              const v = Number(e.target.value.replace(/\./g, "").replace(",", "."));
+              if (Number.isFinite(v) && v >= 0) setQty(v);
+            }}
+          />
+          <button type="button" aria-label={m15.detail.plus} onClick={() => setQty((v) => +(v + step).toFixed(2))}>
+            <Plus size={20} aria-hidden />
+          </button>
+        </div>
+        <label className="unit15">
+          <span className="visually-hidden">{m15.detail.unit}</span>
+          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+            {ALL_UNITS.map((u) => (
+              <option key={u} value={u}>{unitLabel(u)}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {set.isError && <p className="error" role="alert">{set.error instanceof ApiError ? set.error.message : t.common.genericError}</p>}
+      <button
+        type="button"
+        className="btn btn--primary btn--block"
+        aria-disabled={set.isPending || undefined}
+        onClick={() => {
+          if (set.isPending) return;
+          const newName = name.trim();
+          if (newName && newName !== item.name) fix.mutate({ key: item.key, name: newName });
+          set.mutate(
+            { key: item.key, qty, unit, action: "set" },
+            { onSuccess: () => rememberUnit(item.key, unit) },
+          );
+        }}
+      >
+        <Save size={20} aria-hidden /> {m15.detail.update}
+      </button>
+      {set.isSuccess && <p className="hint" role="status">{m15.detail.updated}</p>}
+      <button
+        type="button"
+        className="btn btn--outline btn--block"
+        aria-pressed={inPlan}
+        aria-disabled={add.isPending || undefined}
+        onClick={() => {
+          if (inPlan || add.isPending) return;
+          add.mutate({ key: item.key, add: true }, { onSuccess: () => showUndo({ message: m15.items.added(item.name), onUndo: () => add.mutate({ key: item.key, add: false }, { onSuccess: () => add.reset() }) }) });
+        }}
+      >
+        <ShoppingCart size={20} aria-hidden /> {m15.detail.shop}
+      </button>
+    </section>
+  );
+}
+
+function HistoryCard({ itemKey, unit }: { itemKey: string; unit: string }) {
+  const h = useItemPriceHistory(itemKey);
+  const rows = h.data?.history ?? [];
+  const prices = rows.map((r) => r.paid_price);
+  const avg = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
+  const per = `/${unitLabel(unit)}`;
+  return (
+    <section className="box15" aria-labelledby="hist-title">
+      <h2 id="hist-title">{m15.detail.history}</h2>
+      {rows.length === 0 ? (
+        <p className="hint">{h.isPending ? t.common.loading : m15.detail.noHistory}</p>
+      ) : (
+        <>
+          <dl className="stats15">
+            <div><dt>{m15.detail.last}</dt><dd className="num">{h.data?.last_purchase ? formatVnd(h.data.last_purchase.paid_price) : "–"}</dd></div>
+            <div><dt>{m15.detail.lowest}</dt><dd className="num">{h.data?.lowest_historical ? formatVnd(h.data.lowest_historical.paid_price) : "–"}</dd></div>
+            <div><dt>{m15.detail.avg}</dt><dd className="num">{avg != null ? formatVnd(avg) : "–"}</dd></div>
+          </dl>
+          <ul className="hist15">
+            {rows.map((r, i) => (
+              <li key={i}>
+                <span>{formatDayMonth(r.purchased_at.slice(0, 10))}</span>
+                <span>{r.store_name}</span>
+                <span className="num">{formatVnd(r.paid_price)}{per}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

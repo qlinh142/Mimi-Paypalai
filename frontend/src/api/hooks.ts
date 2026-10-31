@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryLabel } from "../i18n";
 import { apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
 import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
@@ -353,6 +353,13 @@ function uiLangParam() {
 /** 3.1: danh sách Kế hoạch. */
 export const usePlans = () =>
   useQuery({ queryKey: qk.plans, queryFn: async () => (await apiGet<{ plans: PlanMeta[] }>("/plans")).plans });
+
+/** Mimi 1.5: đọc giỏ của nhiều Kế hoạch một lúc (thẻ ở màn danh sách Kế hoạch). Cùng khóa cache với usePlan. */
+export function usePlanCarts(ids: string[]) {
+  return useQueries({
+    queries: ids.map((id) => ({ queryKey: qk.cart(id), queryFn: () => apiGet<Cart>(`/plan${planQuery(id)}`) })),
+  });
+}
 
 export function usePlanMeta() {
   const qc = useQueryClient();

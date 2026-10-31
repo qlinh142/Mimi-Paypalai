@@ -191,6 +191,7 @@ export const vi: Messages = {
     notifications: "Thông báo",
   },
   categories: {
+    "hoa-don-dinh-ky": "Khoản chi định kỳ",
     "sua": "Sữa và chế phẩm sữa",
     "do-uong": "Đồ uống",
     "tuoi-song": "Thịt, cá, trứng",

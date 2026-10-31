@@ -3,7 +3,7 @@ import { vi } from "./vi";
 
 /**
  * Ngôn ngữ giao diện, tách riêng với `lang` (ngôn ngữ dịch hóa đơn) như spec mục 7 đề xuất.
- * Mặc định tiếng Anh cho bản dự thi. Đổi bằng ?ui=vi (lưu lại trong máy) khi cần xem bản Việt.
+ * Mimi 1.5: mặc định tiếng Việt. Đổi trong Cài đặt (hoặc ?ui=en), lưu lại trong máy.
  */
 export type UiLang = "en" | "vi";
 const KEY = "mimi.uiLang";
@@ -20,7 +20,7 @@ function detect(): UiLang {
   } catch {
     // localStorage có thể bị chặn (trình duyệt riêng tư): dùng mặc định
   }
-  return "en";
+  return "vi";
 }
 
 export const uiLang: UiLang = detect();
