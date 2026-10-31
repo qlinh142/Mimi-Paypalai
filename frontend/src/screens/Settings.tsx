@@ -241,7 +241,8 @@ export function SettingsLanguage() {
             disabled={save.isPending}
             onChange={(e) => {
               const lang = e.target.value as "vi" | "en";
-              const go = () => location.assign(`/settings/language?ui=${lang}`);
+              const go = () =>
+                location.assign(import.meta.env.VITE_ROUTER === "hash" ? `?ui=${lang}#/settings/language` : `/settings/language?ui=${lang}`);
               save.mutate({ lang }, { onSuccess: go, onError: go });
             }}
           >

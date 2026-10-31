@@ -85,7 +85,7 @@ export function Welcome() {
               {t.welcome.resend}
             </button>
             {API_MODE === "mock" && (
-              <a className="btn btn--primary" href="/?mockLink=1">
+              <a className="btn btn--primary" href="?mockLink=1">
                 {t.welcome.openMockLink}
               </a>
             )}

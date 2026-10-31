@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:proto": "tsc -b && vite build -c vite.proto.config.ts && node scripts/inline-proto.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "gen:api": "openapi-typescript ../backend/api/openapi.yaml -o src/api/schema.d.ts"
