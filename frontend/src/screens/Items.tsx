@@ -8,6 +8,7 @@ import { useItems, usePlan } from "../api/hooks";
 import type { Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CartButton } from "../components/CartButton";
+import { Group15 } from "../components/Group15";
 import { CategoryIcon } from "../components/ItemRow";
 import { RecurringList } from "../components/RecurringList";
 import { formatNum, goodsTier, stockInDisplay, unitLabel, type GoodsTier } from "../lib/displayUnit";
@@ -103,14 +104,11 @@ function Goods({ term }: { term: string }) {
   return (
     <>
       {groups.map((g) => (
-        <section key={g.key} className="g15" aria-label={g.label}>
-          <h2 className={`g15__head g15__head--${g.key}`}>{g.label}</h2>
-          <ul className="g15__list">
-            {g.items.map((item) => (
-              <GoodsCard key={item.key} item={item} added={inPlan.has(item.key)} />
-            ))}
-          </ul>
-        </section>
+        <Group15 key={g.key} id={`goods-${g.key}`} label={g.label} tone={g.key} count={g.items.length}>
+          {g.items.map((item) => (
+            <GoodsCard key={item.key} item={item} added={inPlan.has(item.key)} />
+          ))}
+        </Group15>
       ))}
     </>
   );

@@ -9,6 +9,7 @@ import type { Recurring, RecurringCycle } from "../api/types";
 import { daysUntil } from "../lib/displayUnit";
 import { formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 import { CartButton } from "./CartButton";
+import { Group15 } from "./Group15";
 
 const CYCLES: RecurringCycle[] = ["monthly", "weekly", "quarterly", "yearly"];
 type Tier = "due" | "upcoming" | "later";
@@ -69,9 +70,7 @@ export function RecurringList({ term }: { term: string }) {
     <>
       {list.data && groups.length === 0 && editing !== "new" && <div className="empty"><p>{term ? m15.items.noMatch(term) : m15.rec.empty}</p></div>}
       {groups.map((g) => (
-        <section key={g.key} className="g15" aria-label={g.label}>
-          <h2 className={`g15__head g15__head--${g.key === "due" ? "now" : g.key === "upcoming" ? "soon" : "plenty"}`}>{g.label}</h2>
-          <ul className="g15__list">
+        <Group15 key={g.key} id={`rec-${g.key}`} label={g.label} tone={g.key === "due" ? "now" : g.key === "upcoming" ? "soon" : "plenty"} count={g.rows.length}>
             {g.rows.map((r) => {
               const Icon = iconFor(r.name);
               return (
@@ -89,8 +88,7 @@ export function RecurringList({ term }: { term: string }) {
                 </li>
               );
             })}
-          </ul>
-        </section>
+        </Group15>
       ))}
       {editing === "new" ? (
         <RecurringEdit onDone={() => setEditing(null)} />

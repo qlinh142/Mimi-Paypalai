@@ -179,3 +179,19 @@
 
 /* Thanh tab dưới theo ảnh mẫu: nút Quét tròn nổi */
 .nav a[aria-current="page"] { color: var(--m15-blue); }
+
+/* Dải nhóm bấm được: rút gọn / mở rộng */
+.g15__head { padding: 0; }
+.g15__toggle { width: 100%; display: flex; align-items: center; gap: var(--s2); min-height: 44px; padding: 0 var(--s3) 0 var(--s4); border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.g15__toggle > span:first-child { flex: 1; }
+.g15__count { min-width: 26px; height: 26px; padding: 0 8px; border-radius: var(--r-pill); background: rgb(255 255 255 / .75); font-size: var(--fs-xs); display: grid; place-items: center; }
+.g15__chev { transition: rotate .2s; }
+.g15__toggle[aria-expanded="false"] .g15__chev { rotate: -90deg; }
+.g15__toggle:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; border-radius: 10px; }
+
+/* Chi tiết món: tên và nhóm sản phẩm */
+.field15 { display: grid; gap: 6px; }
+.field15 > span { font-weight: 700; font-size: var(--fs-md); }
+.field15 input, .pick15 { width: 100%; min-height: 52px; border: 1.5px solid var(--m15-line); border-radius: 10px; padding: 0 var(--s3); font: inherit; font-size: var(--fs-md); background: #fff; color: var(--ink); }
+.pick15 { display: flex; align-items: center; justify-content: space-between; cursor: pointer; text-align: left; }
+.field15 input:focus-visible, .pick15:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }

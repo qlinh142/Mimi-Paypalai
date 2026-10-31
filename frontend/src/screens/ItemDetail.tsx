@@ -1,13 +1,13 @@
 import { t } from "../i18n";
 import { m15 } from "../i18n/m15";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { Minus, Plus, Save, ShoppingCart } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ChevronDown, Minus, Plus, Save, ShoppingCart } from "lucide-react";
+import { GroupPicker } from "../components/ReceiptLines";
 import { ApiError } from "../api/client";
-import { useItem, useItemPriceHistory, usePlan, usePlanItem, useSetQuantity } from "../api/hooks";
+import { useCorrectItem, useItem, useItemPriceHistory, usePlan, usePlanItem, useSetQuantity, useTaxonomyLabels } from "../api/hooks";
 import type { ItemDetail as ItemDetailData } from "../api/types";
 import { MainFrame, TopBar, useUndo } from "../components/AppShell";
-import { FixItemSection } from "../components/ItemExtras";
 import { ALL_UNITS, formatNum, rememberUnit, savedUnit, stockInDisplay, unitLabel } from "../lib/displayUnit";
 import { formatDayMonth, formatVnd } from "../lib/text";
 
@@ -35,7 +35,6 @@ export function ItemDetail() {
           <>
             <QuantityCard item={item} />
             <HistoryCard itemKey={item.key} unit={stockInDisplay(item)?.[1] ?? savedUnit(item)} />
-            <FixItemSection key={item.key} item={item} />
           </>
         )}
       </div>
@@ -59,10 +58,46 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
     }
   }, [item]);
   const inPlan = (plan.data?.items ?? []).some((i) => i.key === item.key) || add.isSuccess;
+  const fix = useCorrectItem();
+  const nav = useNavigate();
+  const groupLabel = useTaxonomyLabels();
+  const [name, setName] = useState(item.name);
+  const [picking, setPicking] = useState(false);
+  useEffect(() => setName(item.name), [item.name]);
   const step = unit === "g" || unit === "ml" ? 100 : unit === "kg" || unit === "l" ? 0.5 : 1;
 
   return (
     <section className="box15" aria-labelledby="qty-title">
+      <label className="field15">
+        <span>{m15.detail.name}</span>
+        <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <div className="field15">
+        <span>{m15.detail.group}</span>
+        {picking ? (
+          <GroupPicker
+            name={item.name}
+            onCancel={() => setPicking(false)}
+            onPick={(key) =>
+              fix.mutate(
+                { key: item.key, group_key: key },
+                {
+                  onSuccess: (it) => {
+                    setPicking(false);
+                    if (it.key !== item.key) nav(`/items/${encodeURIComponent(it.key)}`, { replace: true });
+                  },
+                },
+              )
+            }
+          />
+        ) : (
+          <button type="button" className="pick15" onClick={() => setPicking(true)}>
+            <span>{groupLabel(item.key) || item.category_label}</span>
+            <ChevronDown size={20} aria-hidden />
+          </button>
+        )}
+      </div>
+      {fix.isError && <p className="error" role="alert">{fix.error instanceof ApiError ? fix.error.message : t.common.genericError}</p>}
       <h2 id="qty-title">{m15.detail.qtyTitle}</h2>
       <div className="qty15">
         <div className="stepper15">
@@ -98,14 +133,17 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
         aria-disabled={set.isPending || undefined}
         onClick={() => {
           if (set.isPending) return;
+          const newName = name.trim();
+          if (newName && newName !== item.name) fix.mutate({ key: item.key, name: newName });
           set.mutate(
             { key: item.key, qty, unit, action: "set" },
-            { onSuccess: () => { rememberUnit(item.key, unit); showUndo({ message: m15.detail.updated, onUndo: () => {} }); } },
+            { onSuccess: () => rememberUnit(item.key, unit) },
           );
         }}
       >
         <Save size={20} aria-hidden /> {m15.detail.update}
       </button>
+      {set.isSuccess && <p className="hint" role="status">{m15.detail.updated}</p>}
       <button
         type="button"
         className="btn btn--outline btn--block"
@@ -116,7 +154,7 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
           add.mutate({ key: item.key, add: true }, { onSuccess: () => showUndo({ message: m15.items.added(item.name), onUndo: () => add.mutate({ key: item.key, add: false }, { onSuccess: () => add.reset() }) }) });
         }}
       >
-        <ShoppingCart size={20} aria-hidden /> {inPlan ? m15.detail.inPlan : m15.detail.shop}
+        <ShoppingCart size={20} aria-hidden /> {m15.detail.shop}
       </button>
     </section>
   );
