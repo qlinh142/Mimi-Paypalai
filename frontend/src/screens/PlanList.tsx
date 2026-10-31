@@ -128,7 +128,7 @@ function ToMe() {
             <div className="plancard15">
               <span className="plancard15__icon"><UsersRound size={26} aria-hidden /></span>
               <span className="plancard15__body">
-                <span className="plancard15__name">{a.trip?.plan_name || m15.plan.main}</span>
+                <span className="plancard15__name">{a.trip?.plan_name && a.trip.plan_name !== "Kế hoạch chính" ? a.trip.plan_name : m15.plan.main}</span>
                 <span className="plancard15__sub">{m15.plan.from(a.owner_display_name)} · {m15.plan.count(n)}</span>
                 <span className="plancard15__sub"><MapPin size={15} aria-hidden /> {st?.trip_note || m15.plan.noStore}</span>
                 <span className="plancard15__sub"><CalendarDays size={15} aria-hidden /> {whenText(st)}</span>
