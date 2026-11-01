@@ -6,7 +6,7 @@ import taxonomyGroups from "./taxonomy-groups.json";
  */
 import type {
   Basket, CanonicalUnit, Cart, CartItem, HomeSummary, Item, Mandate, MandateReason, Me, Notification, Order, OrderLine, OrderState,
-  PlanLinePatch, PlanPrices, PlanState, PlanStop, ReceiptDraft, RefundReason, SpendingReport, StockStatus,
+  PlanLinePatch, PlanPrices, PlanState, PlanStop, ReceiptDetail, ReceiptDetailLine, ReceiptDraft, RefundReason, SpendingReport, StockStatus,
 } from "./types";
 
 const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
@@ -720,11 +720,58 @@ function priceObs(key: string) {
   ]);
 }
 
+
+/* Spec 1.5 mục 4: lịch sử mua hàng nhiều tháng, chi tiết hóa đơn (dữ liệu mẫu). */
+type HLine = [string, string, number, number, string, ("for_owner" | "mine")?];
+const HIST_SRC: [string, string, number, number, HLine[], number?][] = [
+  // id, cửa hàng, số ngày trước, giờ, các dòng [tên, quy cách, sl, đơn giá, danh mục], giảm giá
+  ["h1", "Bách Hóa Xanh", 1, 18, [["Sữa tươi Vinamilk không đường", "1L", 2, 32_000, "sua"], ["Trứng gà", "hộp 10", 1, 36_000, "tuoi-song"], ["Nước rửa chén Sunlight chanh", "750ml", 1, 38_000, "hoa-pham"]], 10_000],
+  ["h2", "Co.opmart Lý Thường Kiệt", 3, 10, [["Gạo ST25", "5kg", 1, 185_000, "do-kho"], ["Dầu ăn Neptune", "1L", 2, 52_000, "gia-vi"], ["Giấy vệ sinh Pulppy", "10 cuộn", 1, 72_000, "hoa-pham"]], 24_000],
+  ["h3", "WinMart gần nhà", 6, 9, [["Bánh mì sandwich", "ổ", 4, 5_000, "do-kho"], ["Sữa chua Vinamilk", "lốc 4", 2, 28_000, "sua"]]],
+  ["h4", "Chợ Bến Thành", 9, 7, [["Thịt heo ba chỉ", "500g", 1, 75_000, "tuoi-song"], ["Rau muống", "bó", 2, 8_000, "tuoi-song"]]],
+  ["h5", "Bách Hóa Xanh", 12, 19, [["Nước mắm Nam Ngư", "750ml", 1, 42_000, "gia-vi"], ["Dầu gội Clear", "650g", 1, 165_000, "ve-sinh"]]],
+  ["h6", "Co.opmart Lý Thường Kiệt", 34, 11, [["Sữa tươi Vinamilk không đường", "1L", 4, 31_000, "sua"], ["Nước giặt Omo", "3.6kg", 1, 189_000, "hoa-pham"]], 15_000],
+  ["h7", "WinMart gần nhà", 38, 17, [["Trứng gà", "hộp 10", 2, 35_000, "tuoi-song"], ["Mì gói Hảo Hảo", "thùng", 1, 115_000, "do-kho"]]],
+  ["h8", "Bách Hóa Xanh", 45, 8, [["Gạo ST25", "5kg", 1, 180_000, "do-kho"]]],
+  ["h9", "Chợ Bến Thành", 52, 7, [["Cá basa", "1kg", 1, 85_000, "tuoi-song"]]],
+  ["h10", "Bách Hóa Xanh", 66, 18, [["Kem đánh răng P/S", "200g", 2, 34_000, "ve-sinh"], ["Sữa tươi Vinamilk không đường", "1L", 2, 30_000, "sua"]]],
+];
+function histDate(daysAgo: number, hour: number) {
+  const d = new Date(today.getTime() - daysAgo * 86_400_000);
+  d.setUTCHours(hour - 7, 15);
+  return d.toISOString();
+}
+function histDetail(id: string): ReceiptDetail | null {
+  if (id === "h-minh") {
+    const lines: ReceiptDetailLine[] = [
+      { name: L ? "Fresh milk" : "Sữa tươi Vinamilk", spec: "900ml", qty: 2, unit_price: 29_000, amount: 58_000, category_key: "sua" },
+      { name: L ? "Toilet paper" : "Giấy vệ sinh Pulppy", spec: "10 cuộn", qty: 1, unit_price: 72_000, amount: 72_000, category_key: "hoa-pham" },
+    ];
+    return { receipt_id: id, store: "Bách Hóa Xanh", purchased_at: histDate(0, 17), total_vnd: 130_000, item_names: [], kind: "delegated", buyer_name: "Minh", plan_name: L ? "Baby shopping" : "Mua đồ cho bé", plans: [{ id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }], lines, subtotal: 130_000, discount: 0 };
+  }
+  const src = HIST_SRC.find((h) => h[0] === id);
+  if (!src) return null;
+  const [rid, store, ago, hour, ls, disc = 0] = src;
+  const lines = ls.map(([name, spec, qty, unit_price, category_key]) => ({ name, spec, qty, unit_price, amount: qty * unit_price, category_key }));
+  const subtotal = lines.reduce((a, l) => a + l.amount, 0);
+  const plans = rid === "h1" ? [{ id: "default", name: L ? "Shopping cart" : "Giỏ mua sắm" }] : rid === "h2" ? [{ id: "default", name: L ? "Shopping cart" : "Giỏ mua sắm" }, { id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }] : [];
+  return { receipt_id: rid, store, purchased_at: histDate(ago, hour), total_vnd: subtotal - disc, item_names: [], kind: "own", plans, lines, subtotal, discount: disc };
+}
+
 function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   const p = url.pathname;
   const body = () => (init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {});
   const notFound = () => json({ code: "not_found", message: L ? "Not found." : "Không tìm thấy." }, 404);
 
+  if (method === "GET" && p === "/receipts/history") {
+    const all = ["h-minh", ...HIST_SRC.map((h) => h[0])].map((id) => histDetail(id)!);
+    return json({ receipts: all.map(({ lines, plans: _p, subtotal: _s, discount: _d, ...r }) => ({ ...r, item_names: lines.map((l) => l.name) })) });
+  }
+  const histM = p.match(/^\/receipts\/(h[\w-]+)$/);
+  if (method === "GET" && histM) {
+    const d = histDetail(decodeURIComponent(histM[1]));
+    return d ? json(d) : json({ code: "not_found", message: "Không tìm thấy." }, 404);
+  }
   if (method === "GET" && p === "/taxonomy") {
     const q = fold(url.searchParams.get("q") ?? "");
     const hits = TAXONOMY.filter((g) => !q || fold(g.labels.vi).includes(q) || g.labels.en.toLowerCase().includes(q));

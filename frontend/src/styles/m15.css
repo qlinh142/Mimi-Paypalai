@@ -382,3 +382,31 @@
 .scan15__plan .link15 { border: 0; background: #eef4ff; border-radius: 8px; padding: 4px 8px; font-weight: 700; color: var(--m15-blue); }
 .scan15__plan select { font: inherit; padding: 6px; border-radius: 8px; border: 1.5px solid var(--m15-line); }
 .scan15__offline { margin: var(--s3); }
+
+/* Spec 1.5 mục 4 · Lịch sử mua hàng 4c, Chi tiết hóa đơn 4d */
+.ph15 { display: grid; gap: var(--s3); }
+.ph15__head { display: flex; align-items: center; gap: var(--s2); }
+.ph15__search { display: flex; gap: var(--s2); }
+.ph15__q { flex: 1; display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--m15-line); border-radius: 12px; padding: 0 12px; background: #fff; }
+.ph15__q input { flex: 1; border: 0; font: inherit; padding: 12px 0; min-width: 0; outline: none; }
+.ph15__sel { display: grid; gap: 4px; font-size: var(--fs-sm); }
+.ph15__sel select { font: inherit; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 12px; background: #fff; }
+.ph15__month h2 { margin: 0; font-size: var(--fs-md); }
+.ph15__list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ph15__list li + li { border-top: 1px solid var(--m15-line); }
+.ph15__row { display: flex; align-items: center; gap: var(--s3); padding: 10px 0; color: inherit; text-decoration: none; }
+.ph15__row .rows15__text { flex: 1; display: grid; min-width: 0; }
+.ph15__row .num { font-weight: 700; }
+.ph15__icon { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; background: #eef4ff; color: var(--m15-blue); }
+.ph15__more { justify-self: start; border: 0; background: none; display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--m15-blue); padding: 0; }
+.ph15__store { grid-template-columns: auto 1fr; align-items: center; }
+.ph15__store .rows15__text { display: grid; }
+.ph15__plans { display: flex; align-items: center; gap: var(--s2); color: var(--m15-blue); font-weight: 700; text-decoration: none; }
+.ph15__plans span { flex: 1; }
+.ph15__sum p { display: flex; justify-content: space-between; margin: 0; }
+.ph15__disc { color: #1f7a3a; }
+.ph15__total { font-weight: 800; font-size: var(--fs-lg); border-top: 1px solid var(--m15-line); padding-top: var(--s2); }
+.ph15__privacy { display: flex; gap: 6px; align-items: flex-start; }
+.ph15 > * { min-width: 0; }
+.ph15__list > li { display: block; padding: 0; }
+.ph15 .line15 { display: block; }
