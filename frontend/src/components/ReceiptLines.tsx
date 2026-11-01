@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
+import { m15 } from "../i18n/m15";
 import { useTaxonomyLabels, useTaxonomySearch } from "../api/hooks";
 import type { ReceiptDraftLine } from "../api/types";
 import { formatQty, formatVnd } from "../lib/text";
+import { GroupInput } from "./GroupInput";
 
 /** Dòng trên màn xác nhận: removed = người dùng bỏ, không gửi khi lưu (6.1 mục 10). */
 export type EditLine = ReceiptDraftLine & { removed?: boolean };
@@ -33,7 +35,6 @@ export function ReceiptLines({
 }) {
   const groupLabel = useTaxonomyLabels();
   const [editing, setEditing] = useState<string | null>(null);
-  const [picking, setPicking] = useState<string | null>(null);
   const pc = t.stock.units.pc;
   return (
     <ul className="lines">
@@ -53,7 +54,6 @@ export function ReceiptLines({
                 : l.discount
                   ? t.confirm.discountLine
                   : [
-                      group || m1.receiptEdit.noGroup,
                       l.canonical_quantity ? formatQty(l.canonical_quantity, l.canonical_unit ?? "item", pc) : t.confirm.qty(l.qty),
                       l.amount_vnd == null ? t.confirm.notConverted : "",
                       l.needs_review ? (l.review_reasons ?? []).map((r) => m1.scan.reviewReasons[r]).join(", ") || m1.scan.needsReview : "",
@@ -62,17 +62,23 @@ export function ReceiptLines({
             {l.detail_name && l.detail_name !== l.name && !l.removed && <span className="sub" style={{ gridColumn: "1 / -1" }}>{l.name}</span>}
             {extra && !l.removed && !l.discount && <span style={{ gridColumn: "1 / -1" }}>{extra(l)}</span>}
 
+            {!l.removed && !l.discount && (
+              <GroupInput
+                label={m15.detail.group}
+                value={group}
+                placeholder={m1.receiptEdit.noGroup}
+                onPick={(key) => {
+                  // Người dùng chọn nhóm: server lấy danh mục theo nhóm, dòng hết "cần chọn nhóm".
+                  const reasons = (l.review_reasons ?? []).filter((r) => r !== "missing_group" && r !== "missing_category");
+                  onChange(l.line_id, { group_key: key, category_key: "", review_reasons: reasons, needs_review: reasons.length > 0 });
+                }}
+              />
+            )}
             <div className="plan-form__row" style={{ gridColumn: "1 / -1" }}>
               {l.removed ? (
                 <button type="button" className="btn btn--quiet" onClick={() => onChange(l.line_id, { removed: false })}>{m1.receiptEdit.keep}</button>
               ) : (
                 <>
-                  {!l.discount && (
-                    <button type="button" className="btn btn--quiet" aria-expanded={picking === l.line_id}
-                      onClick={() => setPicking(picking === l.line_id ? null : l.line_id)}>
-                      {l.group_key ? m1.receiptEdit.changeGroup : t.confirm.chooseGroup}
-                    </button>
-                  )}
                   <button type="button" className="btn btn--quiet" aria-expanded={open}
                     onClick={() => setEditing(open ? null : l.line_id)}>
                     {open ? m1.receiptEdit.done : m1.receiptEdit.edit}
@@ -83,18 +89,6 @@ export function ReceiptLines({
             </div>
 
             {open && !l.removed && <LineForm line={l} currency={currency} onChange={(p) => onChange(l.line_id, p)} />}
-            {picking === l.line_id && !l.removed && (
-              <GroupPicker
-                name={title}
-                onPick={(key) => {
-                  // Người dùng chọn nhóm: server lấy danh mục theo nhóm, dòng hết "cần chọn nhóm".
-                  const reasons = (l.review_reasons ?? []).filter((r) => r !== "missing_group" && r !== "missing_category");
-                  onChange(l.line_id, { group_key: key, category_key: "", review_reasons: reasons, needs_review: reasons.length > 0 });
-                  setPicking(null);
-                }}
-                onCancel={() => setPicking(null)}
-              />
-            )}
           </li>
         );
       })}

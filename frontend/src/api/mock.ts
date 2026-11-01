@@ -658,7 +658,17 @@ let recurring: MockRecurring[] = [
   { id: "netflix", name: "Netflix", amount: 260_000, cycle: "monthly", next_due_at: dueIn(12), active: true },
   { id: "dien-thoai", name: L ? "Phone" : "Điện thoại", amount: 150_000, cycle: "monthly", next_due_at: dueIn(28), active: true },
 ];
-const occHistory: { id: string; recurring_id: string; name: string; due_at: string; amount: number; status: "paid" | "skipped" | "matched"; paid_at?: string }[] = [];
+const occHistory: { id: string; recurring_id: string; name: string; due_at: string; amount: number; status: "paid" | "skipped" | "matched"; paid_at?: string; source_type?: "manual" | "receipt"; source_id?: string }[] = [];
+// Góp ý 01/11 (Phần E): lịch sử các kỳ đã trả, để thấy ở màn chi tiết khoản định kỳ và Lịch sử mua hàng.
+for (const [rid, name, amount, monthsAgo, day, via] of [
+  ["dien", L ? "Electricity" : "Tiền điện", 642_000, 1, 5, "manual"], ["dien", L ? "Electricity" : "Tiền điện", 598_000, 2, 5, "manual"],
+  ["internet", "Internet", 250_000, 1, 10, "manual"], ["internet", "Internet", 250_000, 2, 10, "manual"],
+  ["netflix", "Netflix", 260_000, 1, 17, "manual"], ["dien-thoai", L ? "Phone" : "Điện thoại", 150_000, 1, 3, "manual"],
+] as const) {
+  const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - monthsAgo, day, 12));
+  occHistory.push({ id: `${rid}_${iso(d)}`, recurring_id: rid, name, due_at: iso(d), amount, status: "paid", paid_at: iso(d), source_type: via });
+}
+occHistory.sort((a, b) => a.due_at.localeCompare(b.due_at));
 const occId = (r: MockRecurring) => `${r.id}_${r.next_due_at}`;
 const addPeriod = (d: string, c: MockRecurring["cycle"]) => {
   const x = new Date(`${d}T12:00:00Z`);
@@ -765,7 +775,11 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
 
   if (method === "GET" && p === "/receipts/history") {
     const all = ["h-minh", ...HIST_SRC.map((h) => h[0])].map((id) => histDetail(id)!);
-    return json({ receipts: all.map(({ lines, plans: _p, subtotal: _s, discount: _d, ...r }) => ({ ...r, item_names: lines.map((l) => l.name) })) });
+    // Góp ý 01/11: Lịch sử mua hàng có thêm các khoản định kỳ đã trả (kỳ trả qua hóa đơn chỉ hiện hóa đơn).
+    const rec = occHistory.filter((o) => o.status === "paid" && o.source_type !== "receipt").map((o) => ({
+      receipt_id: `rec-${o.id}`, store: o.name, purchased_at: `${o.paid_at ?? o.due_at}T02:00:00Z`, total_vnd: o.amount, item_names: [o.name], kind: "recurring" as const, recurring_id: o.recurring_id,
+    }));
+    return json({ receipts: [...all.map(({ lines, plans: _p, subtotal: _s, discount: _d, ...r }) => ({ ...r, item_names: lines.map((l) => l.name) })), ...rec] });
   }
   const histM = p.match(/^\/receipts\/(h[\w-]+)$/);
   if (method === "GET" && histM) {

@@ -2,8 +2,8 @@ import { t } from "../i18n";
 import { m15 } from "../i18n/m15";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, ChevronDown, Minus, Plus, ShoppingCart } from "lucide-react";
-import { GroupPicker } from "../components/ReceiptLines";
+import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
+import { GroupInput } from "../components/GroupInput";
 import { ApiError } from "../api/client";
 import { useCorrectItem, useItem, useItemPriceHistory, useSetQuantity, useTaxonomyLabels } from "../api/hooks";
 import { PlanPicker, useKeysInPlans } from "../components/PlanPicker";
@@ -61,7 +61,6 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
   const nav = useNavigate();
   const groupLabel = useTaxonomyLabels();
   const [name, setName] = useState(item.name);
-  const [picking, setPicking] = useState(false);
   useEffect(() => setName(item.name), [item.name]);
   const step = unit === "g" || unit === "ml" ? 100 : unit === "kg" || unit === "l" ? 0.5 : 1;
 
@@ -71,31 +70,17 @@ function QuantityCard({ item }: { item: ItemDetailData }) {
         <span>{m15.detail.name}</span>
         <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
       </label>
-      <div className="field15">
-        <span>{m15.detail.group}</span>
-        {picking ? (
-          <GroupPicker
-            name={item.name}
-            onCancel={() => setPicking(false)}
-            onPick={(key) =>
-              fix.mutate(
-                { key: item.key, group_key: key },
-                {
-                  onSuccess: (it) => {
-                    setPicking(false);
-                    if (it.key !== item.key) nav(`/items/${encodeURIComponent(it.key)}`, { replace: true });
-                  },
-                },
-              )
-            }
-          />
-        ) : (
-          <button type="button" className="pick15" onClick={() => setPicking(true)}>
-            <span>{groupLabel(item.key) || item.category_label}</span>
-            <ChevronDown size={20} aria-hidden />
-          </button>
-        )}
-      </div>
+      <GroupInput
+        label={m15.detail.group}
+        value={groupLabel(item.key) || item.category_label}
+        busy={fix.isPending && fix.variables?.group_key != null}
+        onPick={(key) =>
+          fix.mutate(
+            { key: item.key, group_key: key },
+            { onSuccess: (it) => it.key !== item.key && nav(`/items/${encodeURIComponent(it.key)}`, { replace: true }) },
+          )
+        }
+      />
       {fix.isError && <p className="error" role="alert">{fix.error instanceof ApiError ? fix.error.message : t.common.genericError}</p>}
       <h2 id="qty-title">{m15.detail.qtyTitle}</h2>
       <div className="qty15">

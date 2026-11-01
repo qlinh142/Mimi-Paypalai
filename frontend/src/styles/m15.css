@@ -419,3 +419,30 @@
 .sync15 ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .sync15 li { display: flex; justify-content: space-between; gap: var(--s2); }
 .sync15 li small { color: var(--ink-soft); }
+.ph15__rectag { margin-left: 6px; background: #eef4ff; color: var(--m15-blue); vertical-align: middle; }
+
+/* Góp ý 01/11 Phần E · Chi tiết khoản định kỳ */
+.rd15 { display: grid; gap: var(--s4); }
+.rd15 > * { min-width: 0; }
+.rd15__head { display: flex; align-items: center; gap: var(--s2); }
+.rd15__head .pd15__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: #eef4ff; color: var(--m15-blue); flex: none; }
+.rd15__form .field15 { display: grid; gap: 4px; }
+.rd15__form input, .rd15__form select { font: inherit; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 10px; background: #fff; min-width: 0; }
+.rd15__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.rd15__now h2 { margin: 0; font-size: var(--fs-md); }
+.rd15__line { display: flex; justify-content: space-between; align-items: center; margin: 0; }
+.rd15__actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.rd15__save { grid-column: 1 / -1; }
+
+/* Phần E góp ý 1: dòng "Khoản chi định kỳ" ở Sổ chi tiêu bấm được, sang Đồ dùng → Khoản chi định kỳ */
+.bars15__link { display: contents; color: inherit; text-decoration: none; }
+.bars15__link .bars15__label { color: var(--m15-blue); font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
+
+/* Phần E góp ý 2: ô nhóm gõ có gợi ý */
+.gi15 { position: relative; display: grid; gap: var(--s1, 4px); }
+.gi15__list { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; border: 1.5px solid var(--m15-line); border-radius: 12px; background: #fff; box-shadow: 0 6px 18px rgba(20, 40, 90, 0.12); }
+.gi15__opt { width: 100%; min-height: 48px; padding: 0 var(--s3); border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: var(--fs-md); color: var(--ink); text-align: left; cursor: pointer; }
+.gi15__opt:hover, .gi15__opt:focus-visible { background: #eef3fd; outline: none; }
+.gi15__none { padding: var(--s2) var(--s3); color: var(--ink-soft); font-size: var(--fs-sm); }
+.lines .gi15 { grid-column: 1 / -1; }
+.lines .gi15__list li { display: block; padding: 0; border: 0; }

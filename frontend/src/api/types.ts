@@ -231,7 +231,9 @@ export type PlanPrices = {
 export type HistoryReceipt = {
   receipt_id: string; store: string; purchased_at: string; total_vnd: number; /** Tên các món, để tìm theo món. */ item_names: string[];
   /** "delegated" = khoản người nhà mua hộ, chỉ phần món của mình, không có hóa đơn gốc. */
-  kind?: "own" | "delegated"; buyer_name?: string; plan_name?: string;
+  kind?: "own" | "delegated" | "recurring"; buyer_name?: string; plan_name?: string;
+  /** kind "recurring": khoản định kỳ đã trả, bấm thì mở chi tiết khoản (góp ý 01/11). */
+  recurring_id?: string;
 };
 export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number; amount: number; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
 export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };
