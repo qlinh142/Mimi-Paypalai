@@ -227,6 +227,14 @@ export type PlanPrices = {
 };
 
 /** GET /spending?month=YYYY-MM (chỉ chủ giỏ). */
+/** Spec 1.5 mục 4 (việc 2): Lịch sử mua hàng mọi tháng và Chi tiết hóa đơn (chỉ xem, không ảnh, đã lọc thông tin cá nhân). */
+export type HistoryReceipt = {
+  receipt_id: string; store: string; purchased_at: string; total_vnd: number; /** Tên các món, để tìm theo món. */ item_names: string[];
+  /** "delegated" = khoản người nhà mua hộ, chỉ phần món của mình, không có hóa đơn gốc. */
+  kind?: "own" | "delegated"; buyer_name?: string; plan_name?: string;
+};
+export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number; amount: number; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
+export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };
 export type ReceiptSummary = { receipt_id: string; store?: string; purchased_on: string; total_vnd: number; discount_vnd: number };
 export type SpendingReport = {
   month: string;
@@ -377,10 +385,10 @@ export type Household = {
   id: string; name: string; owner_uid: string; my_role: "owner" | "member";
   members: HouseholdMember[]; invite?: { code: string; expires_at: string };
 };
-export type AssignmentItem = { consumption_group_key: string; name_display: string; qty?: number; unit?: string; status: "assigned" | "done" | "returned" };
+export type AssignmentItem = { consumption_group_key: string; name_display: string; qty?: number; unit?: string; status: "assigned" | "done" | "returned"; unit_price?: number; category_key?: string };
 export type Assignment = {
   assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string;
-  plan_id: string; status: "assigned" | "shopping" | "completed" | "closed_partial" | "cancelled"; note?: string;
+  plan_id: string; status: "assigned" | "shopping" | "completed" | "closed_partial" | "cancelled" | "declined"; note?: string;
   items: AssignmentItem[]; created_at: string;
   /** Tên, thời gian, ghi chú của Plan gốc, luôn là bản mới nhất (3.1 mục 3B.4). */
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string };

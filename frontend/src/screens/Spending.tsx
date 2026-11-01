@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, ScanLine, ShoppingCart, Trophy } from "lucide-react";
 import { ApiError } from "../api/client";
-import { useForecast, useItems, useRecurring, useSpending } from "../api/hooks";
+import { useForecast, useItems, useReceiptHistory, useRecurring, useSpending } from "../api/hooks";
+import { ReceiptRow } from "./PurchaseHistory";
 import type { ReceiptSummary, SpendingReport } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { recurringTier } from "../components/RecurringList";
@@ -110,7 +111,6 @@ function byStore(rows: ReceiptSummary[]) {
 
 function Report({ r, month }: { r: SpendingReport; month: string }) {
   const [allCats, setAllCats] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   // Khoản chi định kỳ luôn đứng đầu danh mục; các nhóm còn lại xếp theo số tiền.
   const REC = "hoa-don-dinh-ky";
   const cats = [...r.by_category].sort((a, b) => (a.key === REC ? -1 : b.key === REC ? 1 : b.amount - a.amount));
@@ -179,28 +179,8 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
         </section>
       )}
 
-      {r.recent_receipts.length > 0 && (
-        <section>
-          <button type="button" className="box15 rowlink15" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}>
-            <Clock size={20} aria-hidden />
-            <span>{m15.spending.history}</span>
-            {showHistory ? <ChevronDown size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
-          </button>
-          {showHistory && (
-            <ul className="box15 rows15">
-              {r.recent_receipts.map((x) => (
-                <li key={x.receipt_id}>
-                  <span className="rows15__text">
-                    <span>{x.store || t.confirm.unknown}</span>
-                    <small>{formatDayMonth(x.purchased_on)}</small>
-                  </span>
-                  <span className="num">{formatVnd(x.total_vnd)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+      {/* Spec 1.5 mục 4: tóm tắt 3 hóa đơn mới nhất; bấm tiêu đề mở màn 4c, bấm hóa đơn mở 4d. */}
+      <HistorySummary />
     </>
   );
 }
@@ -262,6 +242,22 @@ function Upcoming() {
         ))}
       </ul>
       <p className="hint">{m15.spending.forecastNote}</p>
+    </section>
+  );
+}
+
+function HistorySummary() {
+  const h = useReceiptHistory();
+  const rows = [...(h.data ?? [])].sort((a, b) => b.purchased_at.localeCompare(a.purchased_at)).slice(0, 3);
+  if (rows.length === 0) return null;
+  return (
+    <section>
+      <Link to="/spending/history" className="box15 rowlink15">
+        <Clock size={20} aria-hidden />
+        <span>{m15.spending.history}</span>
+        <ChevronRight size={20} aria-hidden />
+      </Link>
+      <ul className="box15 ph15__list">{rows.map((x) => <ReceiptRow key={x.receipt_id} r={x} />)}</ul>
     </section>
   );
 }

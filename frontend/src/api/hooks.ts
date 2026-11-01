@@ -3,7 +3,7 @@ import { categoryLabel } from "../i18n";
 import { apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
 import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
-  Assignment, Basket, BasketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
+  Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
   ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
   QuickStock, ReceiptDraft, ReceiptDraftLine, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
   SpendingReport, TaxonomyGroup,
@@ -16,6 +16,8 @@ function withLabel<T extends Item>(i: T): T {
 
 /** Khóa cache gom một chỗ để invalidate đúng phạm vi sau mỗi thao tác ghi. */
 export const qk = {
+  receiptHistory: ["receipts", "history"] as const,
+  receipt: (id: string) => ["receipts", id] as const,
   me: ["me"] as const,
   home: ["home"] as const,
   items: (q?: ItemsQuery) => (q ? (["items", q] as const) : (["items"] as const)),
@@ -481,9 +483,26 @@ export function useAssignments() {
         apiSend<Assignment>("POST", "/households/shopping-assignments", { ...v, plan_id: currentPlanId() }),
       onSettled: done,
     }),
+    /** Spec 1.5 mục 2: kết quả đi mua hộ (món đã tick, giá, ghi chú, có quét bill hay không). */
+    complete: useMutation({
+      mutationFn: (v: { id: string; result: unknown }) =>
+        apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(v.id)}/complete`, v.result),
+      onSettled: done,
+    }),
+    /** Spec 1.5 câu 5: người được nhờ từ chối. */
+    decline: useMutation({
+      mutationFn: (id: string) => apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(id)}/decline`),
+      onSettled: done,
+    }),
     cancel: useMutation({
       mutationFn: (id: string) => apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(id)}/cancel`),
       onSettled: done,
     }),
   };
 }
+
+/** Spec 1.5 mục 4: Lịch sử mua hàng (mọi tháng) và Chi tiết hóa đơn. */
+export const useReceiptHistory = () =>
+  useQuery({ queryKey: qk.receiptHistory, queryFn: async () => (await apiGet<{ receipts: HistoryReceipt[] }>("/receipts/history")).receipts });
+export const useReceiptDetail = (id: string) =>
+  useQuery({ queryKey: qk.receipt(id), queryFn: () => apiGet<ReceiptDetail>(`/receipts/${encodeURIComponent(id)}`) });

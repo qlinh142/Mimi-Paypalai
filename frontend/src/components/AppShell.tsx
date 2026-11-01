@@ -6,6 +6,7 @@ import { m15 } from "../i18n/m15";
 import { useHome } from "../api/hooks";
 import { applyUpdate, useUpdateReady } from "../app/pwaUpdate";
 import { useOnline } from "../lib/useOnline";
+import { useQueue } from "../lib/offlineQueue";
 import { MimiMark } from "./MimiMark";
 
 /* ---------- Thanh trên ---------- */
@@ -59,13 +60,15 @@ const NAV = [
 ];
 
 export function BottomNav() {
+  // Spec 1.5 mục 8: chấm đỏ ở Cài đặt khi còn việc chưa gửi.
+  const waiting = useQueue().length > 0;
   return (
     <nav className="nav" aria-label={t.nav.label}>
       <ul>
         {NAV.map(({ to, label, Icon, scan }) => (
           <li key={to}>
             <NavLink to={to} className={scan ? "nav__scan" : undefined}>
-              <span><Icon size={scan ? 24 : 22} aria-hidden /></span>
+              <span className="nav__ico"><Icon size={scan ? 24 : 22} aria-hidden />{to === "/settings" && waiting && <i className="nav__dot" aria-label={m15.sync.dot} />}</span>
               <span>{label}</span>
             </NavLink>
           </li>

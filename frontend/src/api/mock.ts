@@ -6,7 +6,7 @@ import taxonomyGroups from "./taxonomy-groups.json";
  */
 import type {
   Basket, CanonicalUnit, Cart, CartItem, HomeSummary, Item, Mandate, MandateReason, Me, Notification, Order, OrderLine, OrderState,
-  PlanLinePatch, PlanPrices, PlanState, PlanStop, ReceiptDraft, RefundReason, SpendingReport, StockStatus,
+  PlanLinePatch, PlanPrices, PlanState, PlanStop, ReceiptDetail, ReceiptDetailLine, ReceiptDraft, RefundReason, SpendingReport, StockStatus,
 } from "./types";
 
 const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
@@ -104,7 +104,11 @@ const extraNames = new Map<string, string>();
 type MockPlan = { name: string; status: "active" | "archived"; created: number; cart: Set<string>; lines: Map<string, MockLine>; state: PlanState };
 const namedPlans = new Map<string, MockPlan>([
   ["p-be", {
-    name: L ? "Baby shopping" : "Mua đồ cho bé", status: "active", created: 1, cart: new Set(["sua-tuoi", "giay-ve-sinh"]), lines: new Map(),
+    name: L ? "Baby shopping" : "Mua đồ cho bé", status: "active", created: 1, cart: new Set(["sua-tuoi", "giay-ve-sinh", "nuoc-mam"]), lines: new Map([
+      ["sua-tuoi", { line_status: "assigned", assigned_to_uid: "mock-minh" }],
+      ["giay-ve-sinh", { line_status: "assigned", assigned_to_uid: "mock-minh" }],
+      ["nuoc-mam", { line_status: "assigned", assigned_to_uid: "mock-minh" }],
+    ]),
     state: { buy_date: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10), buy_hour: 18, buy_minute: 0, trip_note: L ? "Bach Hoa Xanh" : "Bách Hóa Xanh" },
   }],
 ]);
@@ -681,13 +685,30 @@ let household: { id: string; name: string; members: { uid: string; display_name:
     { uid: "mock-me", display_name: L ? "Grandma" : "Bà", role: "member", joined_at: iso(today) },
   ],
 };
-type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string }[]; created_at: string; note?: string;
+type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string; qty?: number; unit?: string; unit_price?: number; category_key?: string }[]; created_at: string; note?: string;
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string } };
-const assignments: MockAssignment[] = [];
+// Spec 1.5 mục 2: một lần nhờ Minh mua đang dở, để thấy màn mẹ xem kết quả (tiến độ, ghi chú).
+const assignments: MockAssignment[] = [{
+  assignment_id: "trip-be", owner_uid: ME, owner_display_name: "Lan", buyer_uid: "mock-minh", buyer_display_name: "Minh", plan_id: "p-be",
+  status: "shopping", created_at: iso(today), note: L ? "1L milk was out, got 900ml instead." : "Sữa 1L hết hàng, con lấy loại 900ml.",
+  items: [
+    { consumption_group_key: "sua-tuoi", name_display: L ? "Fresh milk" : "Sữa tươi", status: "done" },
+    { consumption_group_key: "giay-ve-sinh", name_display: L ? "Toilet paper" : "Giấy vệ sinh", status: "done" },
+    { consumption_group_key: "nuoc-mam", name_display: L ? "Fish sauce" : "Nước mắm", status: "assigned" },
+  ],
+}];
 // Một lời nhờ mẫu từ người nhà, để thấy luồng Buyer.
 const incoming: MockAssignment = {
   assignment_id: "trip-mau", owner_uid: "mock-minh", owner_display_name: "Minh", buyer_uid: ME, buyer_display_name: "Lan", plan_id: "default",
-  status: "assigned", created_at: iso(today), items: [{ consumption_group_key: "banh-mi", name_display: L ? "Bread" : "Bánh mì", status: "assigned" }],
+  status: "assigned", created_at: iso(today),
+  // Spec 1.5 mục 2: đủ món, số lượng và đơn giá dự kiến để thấy màn đi mua hộ.
+  items: [
+    { consumption_group_key: "sua-tuoi", name_display: L ? "Unsweetened fresh milk 1L" : "Sữa tươi không đường 1L", status: "assigned", qty: 2, unit: L ? "box" : "hộp", unit_price: 30_000, category_key: "sua" },
+    { consumption_group_key: "trung-ga", name_display: L ? "Chicken eggs (10)" : "Trứng gà hộp 10", status: "assigned", qty: 1, unit: L ? "box" : "hộp", unit_price: 36_000, category_key: "tuoi-song" },
+    { consumption_group_key: "banh-mi", name_display: L ? "Bread" : "Bánh mì", status: "assigned", qty: 4, unit: L ? "pc" : "ổ", unit_price: 5_000, category_key: "do-kho" },
+    { consumption_group_key: "nuoc-rua-chen", name_display: L ? "Dish soap 750ml" : "Nước rửa chén 750ml", status: "assigned", qty: 1, unit: L ? "bottle" : "chai", unit_price: 38_000, category_key: "hoa-pham" },
+    { consumption_group_key: "dau-an", name_display: L ? "Cooking oil 1L" : "Dầu ăn 1L", status: "assigned", qty: 1, unit: L ? "bottle" : "chai", unit_price: 52_000, category_key: "gia-vi" },
+  ],
   trip: { plan_name: L ? "Weekend shopping" : "Mua đồ cuối tuần", buy_date: iso(new Date(today.getTime() + 2 * 86_400_000)), buy_hour: 9, buy_minute: 30, trip_note: L ? "WinMart near home" : "WinMart gần nhà" },
 };
 
@@ -699,11 +720,58 @@ function priceObs(key: string) {
   ]);
 }
 
+
+/* Spec 1.5 mục 4: lịch sử mua hàng nhiều tháng, chi tiết hóa đơn (dữ liệu mẫu). */
+type HLine = [string, string, number, number, string, ("for_owner" | "mine")?];
+const HIST_SRC: [string, string, number, number, HLine[], number?][] = [
+  // id, cửa hàng, số ngày trước, giờ, các dòng [tên, quy cách, sl, đơn giá, danh mục], giảm giá
+  ["h1", "Bách Hóa Xanh", 1, 18, [["Sữa tươi Vinamilk không đường", "1L", 2, 32_000, "sua"], ["Trứng gà", "hộp 10", 1, 36_000, "tuoi-song"], ["Nước rửa chén Sunlight chanh", "750ml", 1, 38_000, "hoa-pham"]], 10_000],
+  ["h2", "Co.opmart Lý Thường Kiệt", 3, 10, [["Gạo ST25", "5kg", 1, 185_000, "do-kho"], ["Dầu ăn Neptune", "1L", 2, 52_000, "gia-vi"], ["Giấy vệ sinh Pulppy", "10 cuộn", 1, 72_000, "hoa-pham"]], 24_000],
+  ["h3", "WinMart gần nhà", 6, 9, [["Bánh mì sandwich", "ổ", 4, 5_000, "do-kho"], ["Sữa chua Vinamilk", "lốc 4", 2, 28_000, "sua"]]],
+  ["h4", "Chợ Bến Thành", 9, 7, [["Thịt heo ba chỉ", "500g", 1, 75_000, "tuoi-song"], ["Rau muống", "bó", 2, 8_000, "tuoi-song"]]],
+  ["h5", "Bách Hóa Xanh", 12, 19, [["Nước mắm Nam Ngư", "750ml", 1, 42_000, "gia-vi"], ["Dầu gội Clear", "650g", 1, 165_000, "ve-sinh"]]],
+  ["h6", "Co.opmart Lý Thường Kiệt", 34, 11, [["Sữa tươi Vinamilk không đường", "1L", 4, 31_000, "sua"], ["Nước giặt Omo", "3.6kg", 1, 189_000, "hoa-pham"]], 15_000],
+  ["h7", "WinMart gần nhà", 38, 17, [["Trứng gà", "hộp 10", 2, 35_000, "tuoi-song"], ["Mì gói Hảo Hảo", "thùng", 1, 115_000, "do-kho"]]],
+  ["h8", "Bách Hóa Xanh", 45, 8, [["Gạo ST25", "5kg", 1, 180_000, "do-kho"]]],
+  ["h9", "Chợ Bến Thành", 52, 7, [["Cá basa", "1kg", 1, 85_000, "tuoi-song"]]],
+  ["h10", "Bách Hóa Xanh", 66, 18, [["Kem đánh răng P/S", "200g", 2, 34_000, "ve-sinh"], ["Sữa tươi Vinamilk không đường", "1L", 2, 30_000, "sua"]]],
+];
+function histDate(daysAgo: number, hour: number) {
+  const d = new Date(today.getTime() - daysAgo * 86_400_000);
+  d.setUTCHours(hour - 7, 15);
+  return d.toISOString();
+}
+function histDetail(id: string): ReceiptDetail | null {
+  if (id === "h-minh") {
+    const lines: ReceiptDetailLine[] = [
+      { name: L ? "Fresh milk" : "Sữa tươi Vinamilk", spec: "900ml", qty: 2, unit_price: 29_000, amount: 58_000, category_key: "sua" },
+      { name: L ? "Toilet paper" : "Giấy vệ sinh Pulppy", spec: "10 cuộn", qty: 1, unit_price: 72_000, amount: 72_000, category_key: "hoa-pham" },
+    ];
+    return { receipt_id: id, store: "Bách Hóa Xanh", purchased_at: histDate(0, 17), total_vnd: 130_000, item_names: [], kind: "delegated", buyer_name: "Minh", plan_name: L ? "Baby shopping" : "Mua đồ cho bé", plans: [{ id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }], lines, subtotal: 130_000, discount: 0 };
+  }
+  const src = HIST_SRC.find((h) => h[0] === id);
+  if (!src) return null;
+  const [rid, store, ago, hour, ls, disc = 0] = src;
+  const lines = ls.map(([name, spec, qty, unit_price, category_key]) => ({ name, spec, qty, unit_price, amount: qty * unit_price, category_key }));
+  const subtotal = lines.reduce((a, l) => a + l.amount, 0);
+  const plans = rid === "h1" ? [{ id: "default", name: L ? "Shopping cart" : "Giỏ mua sắm" }] : rid === "h2" ? [{ id: "default", name: L ? "Shopping cart" : "Giỏ mua sắm" }, { id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }] : [];
+  return { receipt_id: rid, store, purchased_at: histDate(ago, hour), total_vnd: subtotal - disc, item_names: [], kind: "own", plans, lines, subtotal, discount: disc };
+}
+
 function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   const p = url.pathname;
   const body = () => (init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {});
   const notFound = () => json({ code: "not_found", message: L ? "Not found." : "Không tìm thấy." }, 404);
 
+  if (method === "GET" && p === "/receipts/history") {
+    const all = ["h-minh", ...HIST_SRC.map((h) => h[0])].map((id) => histDetail(id)!);
+    return json({ receipts: all.map(({ lines, plans: _p, subtotal: _s, discount: _d, ...r }) => ({ ...r, item_names: lines.map((l) => l.name) })) });
+  }
+  const histM = p.match(/^\/receipts\/(h[\w-]+)$/);
+  if (method === "GET" && histM) {
+    const d = histDetail(decodeURIComponent(histM[1]));
+    return d ? json(d) : json({ code: "not_found", message: "Không tìm thấy." }, 404);
+  }
   if (method === "GET" && p === "/taxonomy") {
     const q = fold(url.searchParams.get("q") ?? "");
     const hits = TAXONOMY.filter((g) => !q || fold(g.labels.vi).includes(q) || g.labels.en.toLowerCase().includes(q));
@@ -878,6 +946,12 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
       }
     });
     return json(a);
+  }
+  // Spec 1.5 mục 2: người được nhờ bấm Mua hàng xong, hoặc từ chối.
+  const runM = p.match(/^\/households\/shopping-assignments\/([^/]+)\/(complete|decline)$/);
+  if (runM && method === "POST" && decodeURIComponent(runM[1]) === incoming.assignment_id) {
+    incoming.status = runM[2] === "complete" ? "completed" : "declined";
+    return json(incoming);
   }
   if (p === "/plan/delegated" && method === "GET") {
     return json({ to_me: incoming.status === "assigned" ? [incoming] : [], from_me: assignments });
