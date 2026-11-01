@@ -130,16 +130,24 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
           <h2 id="cat15" className="h15sec">{m15.spending.byCategory}</h2>
           <div className="box15">
             <ul className="bars15">
-              {shown.map((c) => (
-                <li key={c.key}>
-                  <span className="bars15__label">{categoryLabel(c.key)}</span>
-                  <span className="bars15__value num">{formatVnd(c.amount)}</span>
-                  <span className="bars15__pct">{Math.round(c.pct)}%</span>
-                  <span className="bars15__track" aria-hidden>
-                    <span style={{ width: `${Math.max(2, (c.amount / maxCat) * 100)}%` }} />
-                  </span>
-                </li>
-              ))}
+              {shown.map((c) => {
+                const row = (
+                  <>
+                    <span className="bars15__label">{categoryLabel(c.key)}{c.key === REC && <ChevronRight size={16} aria-hidden />}</span>
+                    <span className="bars15__value num">{formatVnd(c.amount)}</span>
+                    <span className="bars15__pct">{Math.round(c.pct)}%</span>
+                    <span className="bars15__track" aria-hidden>
+                      <span style={{ width: `${Math.max(2, (c.amount / maxCat) * 100)}%` }} />
+                    </span>
+                  </>
+                );
+                // Góp ý 01/11 06:30: dòng Khoản chi định kỳ mở Đồ dùng, phần Khoản chi định kỳ. Các nhóm khác chỉ để xem số.
+                return (
+                  <li key={c.key}>
+                    {c.key === REC ? <Link to="/items?tab=recurring" className="bars15__link">{row}</Link> : row}
+                  </li>
+                );
+              })}
             </ul>
             {cats.length > TOP_CATS && (
               <button type="button" className="link15" aria-expanded={allCats} onClick={() => setAllCats(!allCats)}>

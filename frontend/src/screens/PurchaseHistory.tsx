@@ -2,7 +2,7 @@ import { m15 } from "../i18n/m15";
 import { t } from "../i18n";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ClipboardList, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
 import { useReceiptDetail, useReceiptHistory } from "../api/hooks";
 import type { HistoryReceipt } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
@@ -25,16 +25,18 @@ export function receiptTitle(r: HistoryReceipt) {
   return r.kind === "delegated" ? m15.history.delegated(r.buyer_name ?? "", r.plan_name ?? "") : r.store;
 }
 
-/** Một dòng hóa đơn: dùng ở Sổ chi tiêu (tóm tắt) và màn 4c. */
+/** Một dòng hóa đơn (hoặc khoản định kỳ đã trả, góp ý 01/11): dùng ở Sổ chi tiêu (tóm tắt) và màn 4c. */
 export function ReceiptRow({ r }: { r: HistoryReceipt }) {
-  const Icon = r.kind === "delegated" ? UsersRound : Store;
+  const rec = r.kind === "recurring";
+  const Icon = rec ? CalendarClock : r.kind === "delegated" ? UsersRound : Store;
+  const to = rec ? `/items/recurring/${encodeURIComponent(r.recurring_id ?? "")}` : `/spending/receipt/${encodeURIComponent(r.receipt_id)}`;
   return (
     <li>
-      <Link to={`/spending/receipt/${encodeURIComponent(r.receipt_id)}`} className="ph15__row">
+      <Link to={to} className="ph15__row">
         <span className="ph15__icon"><Icon size={22} aria-hidden /></span>
         <span className="rows15__text">
-          <span>{receiptTitle(r)}</span>
-          <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{dayTime(r.purchased_at)}</small>
+          <span>{receiptTitle(r)}{rec && <span className="tag15 ph15__rectag">{m15.history.recurringTag}</span>}</span>
+          <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{rec ? dayTime(r.purchased_at).split(" · ")[0] : dayTime(r.purchased_at)}</small>
         </span>
         <span className="num">{formatVnd(r.total_vnd)}</span>
         <ChevronRight size={18} aria-hidden />
@@ -114,7 +116,7 @@ export function PurchaseHistory() {
           const shown = open[m] ? rows : rows.slice(0, 3);
           return (
             <section key={m} className="box15 ph15__month" aria-label={label(m)}>
-              <h2>{m15.history.monthHead(label(m), rows.length)}</h2>
+              <h2>{m15.history.monthHead(label(m), rows.filter((r) => r.kind !== "recurring").length, rows.filter((r) => r.kind === "recurring").length)}</h2>
               <ul className="ph15__list">{shown.map((r) => <ReceiptRow key={r.receipt_id} r={r} />)}</ul>
               {rows.length > 3 && !open[m] && (
                 <button type="button" className="link15 ph15__more" onClick={() => setOpen({ ...open, [m]: true })}>

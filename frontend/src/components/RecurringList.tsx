@@ -1,18 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { CalendarClock, Droplet, GraduationCap, House, Pencil, Plus, Smartphone, Tv, Wifi, Zap, type LucideIcon } from "lucide-react";
 import { t } from "../i18n";
-import { m1 } from "../i18n/m1";
 import { m15 } from "../i18n/m15";
-import { ApiError } from "../api/client";
-import { useRecurring, useRecurringActions } from "../api/hooks";
+import { useRecurring } from "../api/hooks";
 import { useKeysInPlans } from "./PlanPicker";
-import type { Recurring, RecurringCycle } from "../api/types";
+import type { Recurring } from "../api/types";
 import { daysUntil } from "../lib/displayUnit";
 import { formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 import { CartButton } from "./CartButton";
 import { Group15 } from "./Group15";
 
-const CYCLES: RecurringCycle[] = ["monthly", "weekly", "quarterly", "yearly"];
 type Tier = "due" | "upcoming" | "later";
 const TIERS: { key: Tier; label: string }[] = [
   { key: "due", label: m15.rec.due },
@@ -32,7 +30,7 @@ export function recurringTier(r: Recurring): Tier {
 /** Khóa dòng Kế hoạch cho một khoản định kỳ (món tự nhập "custom-...", 3.1 mục 3A.4). */
 export const recurringPlanKey = (r: Recurring) => `custom-rec-${r.id}`;
 
-function iconFor(name: string): LucideIcon {
+export function recurringIcon(name: string): LucideIcon {
   const n = normalizeVi(name);
   if (/dien thoai|phone|mobile/.test(n)) return Smartphone;
   if (/dien|electric/.test(n)) return Zap;
@@ -54,7 +52,7 @@ function dueText(r: Recurring): string {
 /** Tab Khoản chi định kỳ ở màn Đồ dùng (ảnh mẫu 3-khoan-chi-dinh-ky.png). */
 export function RecurringList({ term }: { term: string }) {
   const list = useRecurring();
-  const [editing, setEditing] = useState<string | null>(null);
+  const nav = useNavigate();
   const inPlan = useKeysInPlans();
 
   const groups = useMemo(() => {
@@ -68,14 +66,15 @@ export function RecurringList({ term }: { term: string }) {
 
   return (
     <>
-      {list.data && groups.length === 0 && editing !== "new" && <div className="empty"><p>{term ? m15.items.noMatch(term) : m15.rec.empty}</p></div>}
+      {list.data && groups.length === 0 && <div className="empty"><p>{term ? m15.items.noMatch(term) : m15.rec.empty}</p></div>}
       {groups.map((g) => (
         <Group15 key={g.key} id={`rec-${g.key}`} label={g.label} tone={g.key === "due" ? "now" : g.key === "upcoming" ? "soon" : "plenty"} count={g.rows.length}>
             {g.rows.map((r) => {
-              const Icon = iconFor(r.name);
+              const Icon = recurringIcon(r.name);
               return (
                 <li key={r.id} className="card15 card15--wrap">
-                  <button type="button" className="card15__main" aria-expanded={editing === r.id} onClick={() => setEditing(editing === r.id ? null : r.id)}>
+                  {/* Góp ý 01/11 06:34: bấm mở màn chi tiết riêng, như chi tiết món ở Đồ dùng. */}
+                  <button type="button" className="card15__main" onClick={() => nav(`/items/recurring/${encodeURIComponent(r.id)}`)}>
                     <span className="card15__icon"><span className="row__icon" aria-hidden><Icon size={22} strokeWidth={1.8} /></span></span>
                     <span className="card15__text">
                       <span className="card15__name">{r.name}</span>
@@ -84,89 +83,14 @@ export function RecurringList({ term }: { term: string }) {
                     </span>
                   </button>
                   <CartButton planKey={recurringPlanKey(r)} name={r.name} added={inPlan.has(recurringPlanKey(r))} body={{ name: r.name }} />
-                  {editing === r.id && <RecurringEdit r={r} onDone={() => setEditing(null)} />}
                 </li>
               );
             })}
         </Group15>
       ))}
-      {editing === "new" ? (
-        <RecurringEdit onDone={() => setEditing(null)} />
-      ) : (
-        <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => setEditing("new")}>
-          <Plus size={22} aria-hidden /> {m15.rec.add}
-        </button>
-      )}
+      <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => nav("/items/recurring/new")}>
+        <Plus size={22} aria-hidden /> {m15.rec.add}
+      </button>
     </>
-  );
-}
-
-function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Sửa (hoặc thêm) một khoản: tên, số tiền, chu kỳ, hạn kế tiếp; kèm Đã trả kỳ này và Xóa. */
-function RecurringEdit({ r, onDone }: { r?: Recurring; onDone: () => void }) {
-  const act = useRecurringActions();
-  const [name, setName] = useState(r?.name ?? "");
-  const [amount, setAmount] = useState(r ? String(r.amount) : "");
-  const [cycle, setCycle] = useState<RecurringCycle>(r?.cycle ?? "monthly");
-  const [due, setDue] = useState(r?.next_due_at ?? todayIso());
-  const value = Number(amount.replace(/[.,\s]/g, ""));
-  const valid = name.trim() !== "" && Number.isInteger(value) && value > 0 && due !== "";
-  const busy = act.create.isPending || act.update.isPending || act.pay.isPending || act.remove.isPending;
-  const err = act.create.error ?? act.update.error ?? act.pay.error ?? act.remove.error;
-  return (
-    <form
-      className="plan-form edit15"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!valid || busy) return;
-        const patch = { name: name.trim(), amount: value, cycle, next_due_at: due };
-        if (r) act.update.mutate({ id: r.id, patch }, { onSuccess: onDone });
-        else act.create.mutate(patch, { onSuccess: onDone });
-      }}
-    >
-      <label>
-        {m1.recurring.name}
-        <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <div className="plan-form__row">
-        <label>
-          {m1.recurring.amount}
-          <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </label>
-        <label>
-          {m1.recurring.cycle}
-          <select value={cycle} onChange={(e) => setCycle(e.target.value as RecurringCycle)}>
-            {CYCLES.map((c) => (
-              <option key={c} value={c}>{m1.recurring.cycles[c]}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <label>
-        {m1.recurring.nextDue}
-        <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
-      </label>
-      {err && <p className="error" role="alert">{err instanceof ApiError ? err.message : t.common.genericError}</p>}
-      <div className="plan-form__row">
-        <button type="submit" className="btn btn--primary" aria-disabled={!valid || busy || undefined}>{m1.recurring.save}</button>
-        <button type="button" className="btn btn--quiet" onClick={onDone}>{m1.recurring.cancel}</button>
-      </div>
-      {r && (
-        <div className="plan-form__row">
-          {r.current && r.active && (
-            <button type="button" className="btn btn--quiet" aria-disabled={busy || undefined} onClick={() => !busy && act.pay.mutate(r.current!.id, { onSuccess: onDone })}>
-              {m15.rec.paid}
-            </button>
-          )}
-          <button type="button" className="btn btn--quiet btn--danger" aria-disabled={busy || undefined} onClick={() => !busy && act.remove.mutate(r.id, { onSuccess: onDone })}>
-            {m15.rec.remove}
-          </button>
-        </div>
-      )}
-    </form>
   );
 }

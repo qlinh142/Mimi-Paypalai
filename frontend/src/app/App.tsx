@@ -19,6 +19,7 @@ const PlanList = lazy(() => import("../screens/PlanList").then((m) => ({ default
 const PlanDetail = lazy(() => import("../screens/PlanDetail").then((m) => ({ default: m.PlanDetail })));
 const PurchaseHistory = lazy(() => import("../screens/PurchaseHistory").then((m) => ({ default: m.PurchaseHistory })));
 const ReceiptDetailScreen = lazy(() => import("../screens/PurchaseHistory").then((m) => ({ default: m.ReceiptDetailScreen })));
+const RecurringDetail = lazy(() => import("../screens/RecurringDetail").then((m) => ({ default: m.RecurringDetail })));
 const ShoppingRun = lazy(() => import("../screens/ShoppingRun").then((m) => ({ default: m.ShoppingRun })));
 const Spending = lazy(() => import("../screens/Spending").then((m) => ({ default: m.Spending })));
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
@@ -72,6 +73,7 @@ function Gate() {
       <Routes>
         <Route path="/" element={<Home entering={wasSignedOut.current === true} />} />
         <Route path="/items" element={<Items />} />
+        <Route path="/items/recurring/:id" element={<RecurringDetail />} />
         <Route path="/items/:key" element={<ItemDetail />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/spending" element={<Spending />} />
