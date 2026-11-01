@@ -104,7 +104,11 @@ const extraNames = new Map<string, string>();
 type MockPlan = { name: string; status: "active" | "archived"; created: number; cart: Set<string>; lines: Map<string, MockLine>; state: PlanState };
 const namedPlans = new Map<string, MockPlan>([
   ["p-be", {
-    name: L ? "Baby shopping" : "Mua đồ cho bé", status: "active", created: 1, cart: new Set(["sua-tuoi", "giay-ve-sinh"]), lines: new Map(),
+    name: L ? "Baby shopping" : "Mua đồ cho bé", status: "active", created: 1, cart: new Set(["sua-tuoi", "giay-ve-sinh", "nuoc-mam"]), lines: new Map([
+      ["sua-tuoi", { line_status: "assigned", assigned_to_uid: "mock-minh" }],
+      ["giay-ve-sinh", { line_status: "assigned", assigned_to_uid: "mock-minh" }],
+      ["nuoc-mam", { line_status: "assigned", assigned_to_uid: "mock-minh" }],
+    ]),
     state: { buy_date: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10), buy_hour: 18, buy_minute: 0, trip_note: L ? "Bach Hoa Xanh" : "Bách Hóa Xanh" },
   }],
 ]);
@@ -681,13 +685,30 @@ let household: { id: string; name: string; members: { uid: string; display_name:
     { uid: "mock-me", display_name: L ? "Grandma" : "Bà", role: "member", joined_at: iso(today) },
   ],
 };
-type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string }[]; created_at: string; note?: string;
+type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string; qty?: number; unit?: string; unit_price?: number; category_key?: string }[]; created_at: string; note?: string;
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string } };
-const assignments: MockAssignment[] = [];
+// Spec 1.5 mục 2: một lần nhờ Minh mua đang dở, để thấy màn mẹ xem kết quả (tiến độ, ghi chú).
+const assignments: MockAssignment[] = [{
+  assignment_id: "trip-be", owner_uid: ME, owner_display_name: "Lan", buyer_uid: "mock-minh", buyer_display_name: "Minh", plan_id: "p-be",
+  status: "shopping", created_at: iso(today), note: L ? "1L milk was out, got 900ml instead." : "Sữa 1L hết hàng, con lấy loại 900ml.",
+  items: [
+    { consumption_group_key: "sua-tuoi", name_display: L ? "Fresh milk" : "Sữa tươi", status: "done" },
+    { consumption_group_key: "giay-ve-sinh", name_display: L ? "Toilet paper" : "Giấy vệ sinh", status: "done" },
+    { consumption_group_key: "nuoc-mam", name_display: L ? "Fish sauce" : "Nước mắm", status: "assigned" },
+  ],
+}];
 // Một lời nhờ mẫu từ người nhà, để thấy luồng Buyer.
 const incoming: MockAssignment = {
   assignment_id: "trip-mau", owner_uid: "mock-minh", owner_display_name: "Minh", buyer_uid: ME, buyer_display_name: "Lan", plan_id: "default",
-  status: "assigned", created_at: iso(today), items: [{ consumption_group_key: "banh-mi", name_display: L ? "Bread" : "Bánh mì", status: "assigned" }],
+  status: "assigned", created_at: iso(today),
+  // Spec 1.5 mục 2: đủ món, số lượng và đơn giá dự kiến để thấy màn đi mua hộ.
+  items: [
+    { consumption_group_key: "sua-tuoi", name_display: L ? "Unsweetened fresh milk 1L" : "Sữa tươi không đường 1L", status: "assigned", qty: 2, unit: L ? "box" : "hộp", unit_price: 30_000, category_key: "sua" },
+    { consumption_group_key: "trung-ga", name_display: L ? "Chicken eggs (10)" : "Trứng gà hộp 10", status: "assigned", qty: 1, unit: L ? "box" : "hộp", unit_price: 36_000, category_key: "tuoi-song" },
+    { consumption_group_key: "banh-mi", name_display: L ? "Bread" : "Bánh mì", status: "assigned", qty: 4, unit: L ? "pc" : "ổ", unit_price: 5_000, category_key: "do-kho" },
+    { consumption_group_key: "nuoc-rua-chen", name_display: L ? "Dish soap 750ml" : "Nước rửa chén 750ml", status: "assigned", qty: 1, unit: L ? "bottle" : "chai", unit_price: 38_000, category_key: "hoa-pham" },
+    { consumption_group_key: "dau-an", name_display: L ? "Cooking oil 1L" : "Dầu ăn 1L", status: "assigned", qty: 1, unit: L ? "bottle" : "chai", unit_price: 52_000, category_key: "gia-vi" },
+  ],
   trip: { plan_name: L ? "Weekend shopping" : "Mua đồ cuối tuần", buy_date: iso(new Date(today.getTime() + 2 * 86_400_000)), buy_hour: 9, buy_minute: 30, trip_note: L ? "WinMart near home" : "WinMart gần nhà" },
 };
 
@@ -878,6 +899,12 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
       }
     });
     return json(a);
+  }
+  // Spec 1.5 mục 2: người được nhờ bấm Mua hàng xong, hoặc từ chối.
+  const runM = p.match(/^\/households\/shopping-assignments\/([^/]+)\/(complete|decline)$/);
+  if (runM && method === "POST" && decodeURIComponent(runM[1]) === incoming.assignment_id) {
+    incoming.status = runM[2] === "complete" ? "completed" : "declined";
+    return json(incoming);
   }
   if (p === "/plan/delegated" && method === "GET") {
     return json({ to_me: incoming.status === "assigned" ? [incoming] : [], from_me: assignments });

@@ -31,13 +31,17 @@ export function whenText(st: Cart["state"] | undefined): string {
 export function PlanList() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "to-me" ? "to-me" : "mine";
+  const toMe = useDelegated().data?.to_me.length ?? 0;
   return (
     <MainFrame>
       <TopBar title={m15.plan.title} showTitle />
       <div className="page p15">
         <div className="seg seg15" role="group" aria-label={m15.plan.title}>
           <button type="button" aria-pressed={tab === "mine"} onClick={() => setParams({}, { replace: true })}>{m15.plan.mine}</button>
-          <button type="button" aria-pressed={tab === "to-me"} onClick={() => setParams({ tab: "to-me" }, { replace: true })}>{m15.plan.toMe}</button>
+          <button type="button" aria-pressed={tab === "to-me"} onClick={() => setParams({ tab: "to-me" }, { replace: true })}>
+            {m15.plan.toMe}
+            {toMe > 0 && <span className="badge15" aria-label={m15.run.newBadge(toMe)}>{toMe}</span>}
+          </button>
         </div>
         {tab === "mine" ? <Mine /> : <ToMe />}
       </div>
@@ -92,7 +96,7 @@ function Mine() {
                     {isDraft(p.id) ? (
                       <span className="tag15 tag15--draft">{m15.plan.draft}</span>
                     ) : (
-                      <span className="tag15">{m15.plan.phase[c?.phase ?? "planning"]}</span>
+                      <span className="tag15">{m15.plan.phase[buyer && c?.phase !== "reconciled" ? "shopping" : (c?.phase ?? "planning")]}</span>
                     )}
                     {buyer && <span className="tag15 tag15--buyer">{m15.plan.buyer(buyer)}</span>}
                   </span>
@@ -122,9 +126,10 @@ function Mine() {
   );
 }
 
-/** Được nhờ mua: tạm hiện thẻ (chốt 31/10); màn đi mua chi tiết làm sau. */
+/** Được nhờ mua: bấm thẻ mở màn đi mua (Spec 1.5 mục 2). */
 function ToMe() {
   const d = useDelegated();
+  const nav = useNavigate();
   const list = d.data?.to_me ?? [];
   if (d.isPending) return <p className="hint">{t.common.loading}</p>;
   if (list.length === 0) return <p className="hint">{m15.plan.toMeEmpty}</p>;
@@ -135,16 +140,17 @@ function ToMe() {
         const st = a.trip ? { buy_date: a.trip.buy_date ?? "", buy_hour: a.trip.buy_hour ?? null, buy_minute: a.trip.buy_minute ?? 0, trip_note: a.trip.trip_note ?? "" } : undefined;
         return (
           <li key={a.assignment_id}>
-            <div className="plancard15">
+            <button type="button" className="plancard15" onClick={() => nav(`/plan/run/${encodeURIComponent(a.assignment_id)}`)}>
               <span className="plancard15__icon"><UsersRound size={26} aria-hidden /></span>
               <span className="plancard15__body">
                 <span className="plancard15__name">{a.trip?.plan_name && a.trip.plan_name !== "Kế hoạch chính" ? a.trip.plan_name : m15.plan.main}</span>
                 <span className="plancard15__sub">{m15.plan.from(a.owner_display_name)} · {m15.plan.count(n)}</span>
                 <span className="plancard15__sub"><MapPin size={15} aria-hidden /> {st?.trip_note || m15.plan.noStore}</span>
                 <span className="plancard15__sub"><CalendarDays size={15} aria-hidden /> {whenText(st)}</span>
-                <span className="plancard15__sub">{a.items.map((i) => i.name_display).join(", ")}</span>
+                <span className="plancard15__sub">{m15.run.sender(a.owner_display_name)}</span>
               </span>
-            </div>
+              <ChevronRight size={22} aria-hidden className="plancard15__chev" />
+            </button>
           </li>
         );
       })}

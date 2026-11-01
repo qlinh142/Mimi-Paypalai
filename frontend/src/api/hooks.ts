@@ -481,6 +481,17 @@ export function useAssignments() {
         apiSend<Assignment>("POST", "/households/shopping-assignments", { ...v, plan_id: currentPlanId() }),
       onSettled: done,
     }),
+    /** Spec 1.5 mục 2: kết quả đi mua hộ (món đã tick, giá, ghi chú, có quét bill hay không). */
+    complete: useMutation({
+      mutationFn: (v: { id: string; result: unknown }) =>
+        apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(v.id)}/complete`, v.result),
+      onSettled: done,
+    }),
+    /** Spec 1.5 câu 5: người được nhờ từ chối. */
+    decline: useMutation({
+      mutationFn: (id: string) => apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(id)}/decline`),
+      onSettled: done,
+    }),
     cancel: useMutation({
       mutationFn: (id: string) => apiSend<Assignment>("POST", `/households/shopping-assignments/${encodeURIComponent(id)}/cancel`),
       onSettled: done,

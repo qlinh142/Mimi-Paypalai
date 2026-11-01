@@ -8,7 +8,7 @@ import { ApiError } from "../api/client";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
 } from "../api/hooks";
-import type { Cart, CartItem, Item } from "../api/types";
+import type { Assignment, Cart, CartItem, Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
 import { AddAnything, BasketPricesPanel } from "../components/PlanExtras";
@@ -169,7 +169,8 @@ function Detail({ id }: { id: string }) {
           )}
         </section>
 
-        {cart && <Lines cart={cart} onChange={changed} />}
+        {sentTo && <Progress a={sentTo} />}
+        {cart && <Lines cart={cart} onChange={changed} done={new Set((sentTo?.items ?? []).filter((i) => i.status === "done").map((i) => i.consumption_group_key))} />}
         {cart && <Suggestions cart={cart} onChange={changed} />}
         {cart && <Forecast cart={cart} />}
         {cart && (
@@ -237,7 +238,7 @@ function Detail({ id }: { id: string }) {
 }
 
 /* ---------- Danh sách dự kiến mua ---------- */
-function Lines({ cart, onChange }: { cart: Cart; onChange: () => void }) {
+function Lines({ cart, onChange, done }: { cart: Cart; onChange: () => void; done: Set<string> }) {
   const [editing, setEditing] = useState<string | null>(null);
   const h = useHousehold();
   const who = (uid?: string) => h.data?.members.find((m) => m.uid === uid)?.display_name ?? "";
@@ -247,14 +248,14 @@ function Lines({ cart, onChange }: { cart: Cart; onChange: () => void }) {
       {cart.items.length === 0 && <p className="hint">{m15.plan.listEmpty}</p>}
       <ul className="lines15">
         {cart.items.map((i) => (
-          <LineRow key={i.key} line={i} open={editing === i.key} onToggle={() => setEditing(editing === i.key ? null : i.key)} assignee={who(i.assigned_to_uid)} onChange={onChange} />
+          <LineRow key={i.key} line={i} open={editing === i.key} onToggle={() => setEditing(editing === i.key ? null : i.key)} assignee={who(i.assigned_to_uid)} onChange={onChange} bought={done.has(i.key)} />
         ))}
       </ul>
     </section>
   );
 }
 
-function LineRow({ line, open, onToggle, assignee, onChange }: { line: CartItem; open: boolean; onToggle: () => void; assignee: string; onChange: () => void }) {
+function LineRow({ line, open, onToggle, assignee, onChange, bought }: { line: CartItem; open: boolean; onToggle: () => void; assignee: string; onChange: () => void; bought: boolean }) {
   const patch = usePlanLine();
   const edit = usePlanItem();
   const unit = line.unit || savedUnit({ key: line.key, name: line.name });
@@ -272,7 +273,7 @@ function LineRow({ line, open, onToggle, assignee, onChange }: { line: CartItem;
       <div className="line15__row">
         <CategoryIcon category={line.category_key} />
         <span className="line15__text">
-          <span className="line15__name">{line.name}</span>
+          <span className="line15__name">{line.name}{bought && <span className="tag15 tag15--bought">{m15.run.bought}</span>}</span>
           <span className="line15__sub">
             {line.qty} {unitLabel(unit)} · {price}
             {line.line_status === "assigned" && ` · ${m15.plan.assignedTo(assignee || m1.assign.someone)}`}
@@ -298,6 +299,30 @@ function LineRow({ line, open, onToggle, assignee, onChange }: { line: CartItem;
         </div>
       )}
     </li>
+  );
+}
+
+/* ---------- Mẹ xem kết quả mua hộ (Spec 1.5 mục 2): tiến độ và ghi chú, không có hóa đơn của người mua ---------- */
+function Progress({ a }: { a: Assignment }) {
+  const [openNote, setOpenNote] = useState(false);
+  const total = a.items.length;
+  const done = a.items.filter((i) => i.status === "done").length;
+  return (
+    <section className="box15 prog15" aria-label={m15.run.progress(done, total)}>
+      <div className="prog15__top">
+        <span>{m15.run.progress(done, total)}</span>
+        <span className="hint">{m15.plan.buyer(a.buyer_display_name)}</span>
+      </div>
+      <div className="prog15__bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+        <i style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+      </div>
+      {a.note && (
+        <button type="button" className="prog15__note" aria-expanded={openNote} onClick={() => setOpenNote(!openNote)}>
+          <span>{m15.run.noteOf(a.buyer_display_name)}</span> <ChevronRight size={16} aria-hidden />
+        </button>
+      )}
+      {openNote && a.note && <p className="prog15__notetext">{a.note}</p>}
+    </section>
   );
 }
 

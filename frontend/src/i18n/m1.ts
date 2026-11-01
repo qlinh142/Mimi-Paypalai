@@ -66,7 +66,7 @@ const en = {
     locked: "Being bought by someone else",
     fromMe: "Requests you sent",
     status: {
-      assigned: "Waiting", shopping: "Shopping", completed: "Done", closed_partial: "Partly bought", cancelled: "Cancelled",
+      assigned: "Waiting", shopping: "Shopping", completed: "Done", closed_partial: "Partly bought", cancelled: "Cancelled", declined: "Declined",
     },
     noHousehold: "Invite family in Settings to share shopping.",
   },
@@ -258,7 +258,7 @@ const vi: M1 = {
     locked: "Đang được người khác mua",
     fromMe: "Bạn đã nhờ",
     status: {
-      assigned: "Đang chờ", shopping: "Đang mua", completed: "Xong", closed_partial: "Mua một phần", cancelled: "Đã hủy",
+      assigned: "Đang chờ", shopping: "Đang mua", completed: "Xong", closed_partial: "Mua một phần", cancelled: "Đã hủy", declined: "Đã từ chối",
     },
     noHousehold: "Mời người nhà trong Cài đặt để chia việc đi chợ.",
   },

@@ -17,6 +17,7 @@ const ItemDetail = lazy(() => import("../screens/ItemDetail").then((m) => ({ def
 const Scan = lazy(() => import("../screens/Scan").then((m) => ({ default: m.Scan })));
 const PlanList = lazy(() => import("../screens/PlanList").then((m) => ({ default: m.PlanList })));
 const PlanDetail = lazy(() => import("../screens/PlanDetail").then((m) => ({ default: m.PlanDetail })));
+const ShoppingRun = lazy(() => import("../screens/ShoppingRun").then((m) => ({ default: m.ShoppingRun })));
 const Spending = lazy(() => import("../screens/Spending").then((m) => ({ default: m.Spending })));
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
 const lazySet = (k: "SettingsProfile" | "SettingsNotify" | "SettingsLanguage" | "SettingsMembers" | "SettingsMember" | "SettingsPrivacy") =>
@@ -73,6 +74,7 @@ function Gate() {
         <Route path="/scan" element={<Scan />} />
         <Route path="/spending" element={<Spending />} />
         <Route path="/plan" element={<PlanList />} />
+        <Route path="/plan/run/:id" element={<ShoppingRun />} />
         <Route path="/plan/:id" element={<PlanDetail />} />
         <Route path="/plan/online" element={<OnlineBuy />} />
         <Route path="/orders" element={<Orders />} />

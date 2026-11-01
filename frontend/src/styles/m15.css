@@ -333,3 +333,48 @@
 .icon15--ok { color: #fff; background: var(--m15-blue); border-color: var(--m15-blue); }
 .icon15--del { color: #c62828; border-color: #f2c4c4; }
 .icon15[aria-disabled="true"] { opacity: .5; }
+
+/* Spec 1.5 mục 2 · Màn đi mua hộ */
+.badge15 { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; margin-left: 6px; border-radius: 11px; background: #e53935; color: #fff; font-size: 13px; font-weight: 700; }
+.run15 { display: grid; gap: var(--s4); }
+.run15__title { flex: 1; margin: 0; font-size: var(--fs-lg); font-weight: 800; color: var(--m15-blue); min-width: 0; }
+.run15__decline { flex: none; min-height: 40px; padding: 0 var(--s3); border: 1.5px solid #f2c4c4; color: #c62828; background: #fff; border-radius: 10px; font-weight: 700; }
+.run15__sum { grid-template-columns: 1fr 1fr; gap: var(--s2) var(--s3); font-size: var(--fs-sm); color: var(--ink-soft); }
+.run15__sum span { display: flex; align-items: center; gap: 6px; }
+.run15__blockhead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--s2); }
+.run15__blockhead .h15sec { margin: 0; }
+.run15__blockhead .num { font-weight: 800; color: var(--m15-blue); }
+.run15__tick { flex: none; width: 24px; height: 24px; accent-color: var(--m15-blue); }
+.run15__line--on { background: #e3f6e6; }
+.run15__total { font-weight: 700; white-space: nowrap; }
+.run15__edit { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.run15__edit > input, .run15__price { font: inherit; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 10px; min-width: 0; background: #fff; }
+.run15__edit > input:disabled { background: #f3f3f3; color: var(--ink-soft); }
+.run15__price { width: 100px; }
+.run15__note { display: grid; gap: 6px; font-weight: 700; }
+.run15__note textarea { font: inherit; font-weight: 400; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 10px; resize: vertical; }
+.run15__offline { display: grid; gap: var(--s2); padding: var(--s3); border-radius: 12px; background: #fff4e5; color: #8a4b00; }
+.run15__offline p { margin: 0; font-weight: 700; }
+.run15 .pd15__actions { grid-template-columns: 1fr 1fr; }
+.run15__saved { color: #1f7a3a; }
+.run15__done { justify-items: center; text-align: center; }
+.run15__done h1 { margin: 0; font-size: var(--fs-xl, 24px); }
+.run15__done p { margin: 0; }
+.run15__doneicon { color: #fff; background: #2e9e5b; border-radius: 50%; padding: 8px; }
+.run15__big { font-size: 28px; font-weight: 800; color: var(--m15-blue); }
+.run15__split { display: flex; justify-content: space-between; width: 100%; }
+.run15 .pd15__head { display: flex; align-items: center; gap: var(--s2); }
+.run15 .pd15__actions .btn { font-size: var(--fs-md); white-space: nowrap; }
+.run15__editrow { display: flex; align-items: center; gap: var(--s2); }
+.run15__editrow .stepper15 { flex: 1; grid-template-columns: 44px 1fr 44px; }
+.run15__name { flex: 1; font: inherit; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 10px; min-width: 0; background: #fff; }
+.run15__name:disabled { background: #f3f3f3; color: var(--ink-soft); }
+.run15__pricewrap { flex: 1; display: grid; font-size: var(--fs-sm); color: var(--ink-soft); }
+.run15__pricewrap .run15__price { width: auto; }
+.run15 .pd15__actions .btn { padding-inline: 8px; min-width: 0; gap: 6px; }
+.tag15--bought { margin-left: 6px; background: #e3f6e6; color: #1f7a3a; vertical-align: middle; }
+.prog15__top { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; }
+.prog15__bar { height: 10px; border-radius: 5px; background: #e6ecf8; overflow: hidden; }
+.prog15__bar i { display: block; height: 100%; background: #2e9e5b; }
+.prog15__note { display: flex; justify-content: space-between; align-items: center; border: 0; background: #eef4ff; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 700; color: var(--m15-blue); cursor: pointer; }
+.prog15__notetext { margin: 0; padding: 0 4px; }
