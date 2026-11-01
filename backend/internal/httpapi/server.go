@@ -14,6 +14,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
+	"github.com/smartlife-lab/mimi/backend/internal/idem"
 	"github.com/smartlife-lab/mimi/backend/internal/inbox"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
 	"github.com/smartlife-lab/mimi/backend/internal/order"
@@ -168,6 +169,7 @@ type Server struct {
 	ready      ReadinessChecker
 	metrics    Metrics
 	limiter    *windowLimiter
+	idem       idem.Store // nil: không giữ kết quả theo Idempotency-Key
 
 	readTimeout    time.Duration
 	defaultTimeout time.Duration
@@ -221,6 +223,7 @@ func (s *Server) Handler() http.Handler {
 	private := func(pattern string, timeout time.Duration, h http.HandlerFunc) {
 		var chain http.Handler = h
 		chain = s.limitWrites(chain)
+		chain = s.idempotent(chain)
 		chain = s.authenticate(chain)
 		chain = http.TimeoutHandler(chain, timeout, `{"code":"timeout","message":"Hết thời gian xử lý, thử lại."}`)
 		mux.Handle(pattern, s.observe(pattern, chain))

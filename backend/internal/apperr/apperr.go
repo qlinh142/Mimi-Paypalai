@@ -47,6 +47,10 @@ const (
 	CodeInvalidLineTotal    Code = "invalid_line_total"    // fields.line_id, fields.field
 	CodeInvalidQuantity     Code = "invalid_quantity"      // fields.line_id, fields.field
 	CodeTransactionConflict Code = "transaction_conflict"  // ghi đồng thời, thử lại được
+
+	// Idempotency-Key (data model 1.5 thay đổi 5).
+	CodeIdempotencyInFlight Code = "idempotency_in_flight" // cùng key đang xử lý, thử lại được
+	CodeIdempotencyMismatch Code = "idempotency_mismatch"  // key đã dùng cho request khác
 )
 
 var statusByCode = map[Code]int{
@@ -82,12 +86,14 @@ var statusByCode = map[Code]int{
 	CodeInvalidLineTotal:    http.StatusUnprocessableEntity,
 	CodeInvalidQuantity:     http.StatusUnprocessableEntity,
 	CodeTransactionConflict: http.StatusConflict,
+	CodeIdempotencyInFlight: http.StatusConflict,
+	CodeIdempotencyMismatch: http.StatusUnprocessableEntity,
 }
 
 // retryable: lỗi tạm thời, gửi lại đúng request đó là được (client giữ nguyên dữ liệu).
 var retryable = map[Code]bool{
 	CodeInternal: true, CodeAIUnavailable: true, CodeReadFailed: true, CodeTransactionConflict: true,
-	CodeRateLimited: true, CodePaymentUnavailable: true,
+	CodeRateLimited: true, CodePaymentUnavailable: true, CodeIdempotencyInFlight: true,
 }
 
 // Error là lỗi có thể trả thẳng cho client.
