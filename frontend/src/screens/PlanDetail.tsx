@@ -3,7 +3,7 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
@@ -19,6 +19,7 @@ import { formatVnd } from "../lib/text";
 import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
 import { relationOf } from "../lib/relation";
+import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -26,6 +27,8 @@ const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.ge
 /**
  * Chi tiết Kế hoạch (Mimi 1.5, ảnh mẫu 5b, 5c): icon và tên, thời gian và nơi mua, danh sách dự kiến mua,
  * gợi ý mua, dự kiến chi, người mua (Tôi / Gửi cho thành viên / Mimi sắp ra mắt), Lưu Plan.
+ * Spec 1.5 mục 1 (chốt 01/11): chọn người mua chưa gửi ngay; nút Lưu kế hoạch (máy bay giấy) mới gửi,
+ * và phải chọn người mua thì mới bấm được. Sửa mà chưa Lưu thì kế hoạch "Chưa hoàn thành".
  */
 export function PlanDetail() {
   const { id = "default" } = useParams();
@@ -49,6 +52,14 @@ function Detail({ id }: { id: string }) {
   const clearDefault = useClearDefaultPlan();
   const deleting = metaAct.remove.isPending || clearDefault.isPending;
   const saveState = useSavePlanState();
+  usePlanDraftVersion();
+  const me = useMe();
+  const h = useHousehold();
+  const { assign } = useAssignments();
+  const delegated = useDelegated();
+  const sentTo = (delegated.data?.from_me ?? []).find((a) => a.plan_id === id && (a.status === "assigned" || a.status === "shopping"));
+  const buyer: BuyerPick | null = buyerOf(id) ?? (sentTo ? sentTo.buyer_uid : null);
+  const buyerName = buyer && buyer !== "me" && buyer !== me.data?.uid ? (h.data?.members.find((m) => m.uid === buyer)?.display_name ?? sentTo?.buyer_display_name ?? "") : "";
 
   const [name, setName] = useState("");
   const [editName, setEditName] = useState(false);
@@ -80,15 +91,28 @@ function Detail({ id }: { id: string }) {
   }
 
   const Icon = iconOf(icon);
-  const busy = saveState.isPending || metaAct.update.isPending;
+  const busy = saveState.isPending || metaAct.update.isPending || assign.isPending;
+  const changed = () => markDraft(id);
   const save = () => {
-    if (busy || !cart) return;
+    if (busy || !cart || !buyer) return;
     const [h, m] = time ? time.split(":").map(Number) : [null, null];
     const newName = name.trim();
     if (meta && !meta.default && newName && newName !== meta.name) metaAct.update.mutate({ id, name: newName });
     saveState.mutate(
       { buy_date: date, buy_hour: h, buy_minute: m, trip_note: store.trim() },
-      { onSuccess: () => nav("/plan", { state: { saved: true } }) },
+      {
+        onSuccess: () => {
+          const done = (msg: string) => {
+            clearDraft(id);
+            nav("/plan", { state: { saved: msg } });
+          };
+          if (!buyerName) return done(m15.plan.saved);
+          // Gửi cho người mua: lần đầu là gửi, các lần sau là cập nhật (gửi tuần tự, Spec 1.5 mục 1).
+          const keys = cart.items.filter((i) => i.line_status !== "assigned").map((i) => i.key);
+          if (keys.length === 0) return done(sentTo ? m15.plan.updated(buyerName) : m15.plan.saved);
+          assign.mutate({ buyer_uid: buyer, keys }, { onSuccess: () => done(sentTo ? m15.plan.updated(buyerName) : m15.plan.sent(buyerName)) });
+        },
+      },
     );
   };
 
@@ -108,7 +132,7 @@ function Detail({ id }: { id: string }) {
             <Icon size={28} aria-hidden />
           </button>
           {editName && meta && !meta.default ? (
-            <input className="pd15__name" value={name} maxLength={40} aria-label={m15.plan.name} autoFocus onChange={(e) => setName(e.target.value)} onBlur={() => setEditName(false)} />
+            <input className="pd15__name" value={name} maxLength={40} aria-label={m15.plan.name} autoFocus onChange={(e) => { setName(e.target.value); changed(); }} onBlur={() => setEditName(false)} />
           ) : (
             <button
               type="button"
@@ -128,10 +152,10 @@ function Detail({ id }: { id: string }) {
           {editTrip ? (
             <div className="plan-form">
               <div className="plan-form__row">
-                <label>{m15.plan.date}<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-                <label>{m15.plan.time}<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+                <label>{m15.plan.date}<input type="date" value={date} onChange={(e) => { setDate(e.target.value); changed(); }} /></label>
+                <label>{m15.plan.time}<input type="time" value={time} onChange={(e) => { setTime(e.target.value); changed(); }} /></label>
               </div>
-              <label>{m15.plan.store}<input value={store} maxLength={80} placeholder={m15.plan.storePlaceholder} onChange={(e) => setStore(e.target.value)} /></label>
+              <label>{m15.plan.store}<input value={store} maxLength={80} placeholder={m15.plan.storePlaceholder} onChange={(e) => { setStore(e.target.value); changed(); }} /></label>
               <button type="button" className="btn btn--quiet" onClick={() => setEditTrip(false)}>{m15.plan.close}</button>
             </div>
           ) : (
@@ -145,10 +169,17 @@ function Detail({ id }: { id: string }) {
           )}
         </section>
 
-        {cart && <Lines cart={cart} />}
-        {cart && <Suggestions cart={cart} />}
+        {cart && <Lines cart={cart} onChange={changed} />}
+        {cart && <Suggestions cart={cart} onChange={changed} />}
         {cart && <Forecast cart={cart} />}
-        {cart && <Buyer cart={cart} planId={id} onSend={() => setMemberSheet(true)} />}
+        {cart && (
+          <Buyer
+            pick={buyer === me.data?.uid ? "me" : buyer}
+            name={buyerName}
+            onMe={() => { setBuyer(id, "me"); changed(); }}
+            onMember={() => setMemberSheet(true)}
+          />
+        )}
 
         {(saveState.isError || metaAct.update.isError) && <p className="error" role="alert">{errText(saveState.error ?? metaAct.update.error)}</p>}
         {/* Góp ý 31/10 15:43: nút Xóa nằm cạnh Lưu kế hoạch. Xóa không hoàn tác được nên bấm hai lần. */}
@@ -168,10 +199,12 @@ function Detail({ id }: { id: string }) {
           >
             <Trash2 size={18} aria-hidden /> {confirmDel ? m15.plan.deleteConfirm : m15.plan.deleteShort}
           </button>
-          <button type="button" className="btn btn--primary btn--lg" aria-disabled={busy || undefined} onClick={save}>
-            {m15.plan.save}
+          <button type="button" className="btn btn--primary btn--lg" aria-disabled={busy || !buyer || undefined} onClick={save}>
+            <Send size={18} aria-hidden /> {sentTo ? m15.plan.saveUpdate : m15.plan.save}
           </button>
         </div>
+        {!buyer && <p className="hint" role="status">{m15.plan.needBuyer}</p>}
+        {assign.isError && <p className="error" role="alert">{errText(assign.error)}</p>}
         {confirmDel && <p className="hint" role="status">{m15.plan.deleteAsk}</p>}
         {(metaAct.remove.isError || clearDefault.isError) && <p className="error" role="alert">{errText(metaAct.remove.error ?? clearDefault.error)}</p>}
       </div>
@@ -184,16 +217,27 @@ function Detail({ id }: { id: string }) {
             setIcon(k);
             setPlanIcon(id, k);
             setIconSheet(false);
+            changed();
           }}
         />
       )}
-      {memberSheet && cart && <MemberSheet cart={cart} onClose={() => setMemberSheet(false)} />}
+      {memberSheet && (
+        <MemberSheet
+          value={buyer && buyer !== "me" ? buyer : ""}
+          onClose={() => setMemberSheet(false)}
+          onPick={(uid) => {
+            setBuyer(id, uid);
+            changed();
+            setMemberSheet(false);
+          }}
+        />
+      )}
     </MainFrame>
   );
 }
 
 /* ---------- Danh sách dự kiến mua ---------- */
-function Lines({ cart }: { cart: Cart }) {
+function Lines({ cart, onChange }: { cart: Cart; onChange: () => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const h = useHousehold();
   const who = (uid?: string) => h.data?.members.find((m) => m.uid === uid)?.display_name ?? "";
@@ -203,14 +247,14 @@ function Lines({ cart }: { cart: Cart }) {
       {cart.items.length === 0 && <p className="hint">{m15.plan.listEmpty}</p>}
       <ul className="lines15">
         {cart.items.map((i) => (
-          <LineRow key={i.key} line={i} open={editing === i.key} onToggle={() => setEditing(editing === i.key ? null : i.key)} assignee={who(i.assigned_to_uid)} />
+          <LineRow key={i.key} line={i} open={editing === i.key} onToggle={() => setEditing(editing === i.key ? null : i.key)} assignee={who(i.assigned_to_uid)} onChange={onChange} />
         ))}
       </ul>
     </section>
   );
 }
 
-function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boolean; onToggle: () => void; assignee: string }) {
+function LineRow({ line, open, onToggle, assignee, onChange }: { line: CartItem; open: boolean; onToggle: () => void; assignee: string; onChange: () => void }) {
   const patch = usePlanLine();
   const edit = usePlanItem();
   const unit = line.unit || savedUnit({ key: line.key, name: line.name });
@@ -221,7 +265,7 @@ function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boo
   const saveQty = () => {
     if (patch.isPending) return;
     if (qty === line.qty) return onToggle();
-    patch.mutate({ key: line.key, patch: { qty } }, { onSuccess: onToggle });
+    patch.mutate({ key: line.key, patch: { qty } }, { onSuccess: () => { onChange(); onToggle(); } });
   };
   return (
     <li className="line15">
@@ -248,7 +292,7 @@ function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boo
           <button type="button" className="icon15 icon15--ok" aria-label={m15.plan.saveLine(line.name)} aria-disabled={patch.isPending || undefined} onClick={saveQty}>
             <Check size={22} aria-hidden />
           </button>
-          <button type="button" className="icon15 icon15--del" aria-label={m15.plan.removeLineOf(line.name)} aria-disabled={edit.isPending || undefined} onClick={() => !edit.isPending && edit.mutate({ key: line.key, add: false })}>
+          <button type="button" className="icon15 icon15--del" aria-label={m15.plan.removeLineOf(line.name)} aria-disabled={edit.isPending || undefined} onClick={() => !edit.isPending && edit.mutate({ key: line.key, add: false }, { onSuccess: onChange })}>
             <Trash2 size={22} aria-hidden />
           </button>
         </div>
@@ -264,7 +308,7 @@ function daysText(i: Item) {
   return m15.plan.leftDays(Math.max(0, i.days_left));
 }
 
-function Suggestions({ cart }: { cart: Cart }) {
+function Suggestions({ cart, onChange }: { cart: Cart; onChange: () => void }) {
   const all = useItems({ tab: "active", horizon: 7 });
   const edit = usePlanItem();
   const nav = useNavigate();
@@ -281,7 +325,7 @@ function Suggestions({ cart }: { cart: Cart }) {
           <span className="line15__name">{i.name}</span>
           <span className="line15__sub">{daysText(i)}</span>
         </span>
-        <button type="button" className="btn btn--outline add15" aria-disabled={busy === i.key || undefined} onClick={() => busy !== i.key && edit.mutate({ key: i.key, add: true })}>
+        <button type="button" className="btn btn--outline add15" aria-disabled={busy === i.key || undefined} onClick={() => busy !== i.key && edit.mutate({ key: i.key, add: true }, { onSuccess: onChange })}>
           <Plus size={18} aria-hidden /> {m15.plan.add}
         </button>
       </div>
@@ -338,17 +382,15 @@ function Forecast({ cart }: { cart: Cart }) {
 }
 
 /* ---------- Người mua ---------- */
-function Buyer({ cart, planId, onSend }: { cart: Cart; planId: string; onSend: () => void }) {
-  const d = useDelegated();
-  const sentTo = (d.data?.from_me ?? []).find((a) => a.plan_id === planId && (a.status === "assigned" || a.status === "shopping"));
-  const assigned = !!sentTo || cart.items.some((i) => i.line_status === "assigned");
+function Buyer({ pick, name, onMe, onMember }: { pick: BuyerPick | null; name: string; onMe: () => void; onMember: () => void }) {
+  const member = !!pick && pick !== "me";
   return (
     <section aria-labelledby="pd-buyer">
       <h2 id="pd-buyer" className="h15sec">{m15.plan.buyerTitle}</h2>
       <div className="buyer15" role="group" aria-labelledby="pd-buyer">
-        <button type="button" aria-pressed={!assigned}>{m15.plan.me}</button>
-        <button type="button" aria-pressed={assigned} onClick={onSend}>
-          {sentTo ? sentTo.buyer_display_name : m15.plan.sendMember}
+        <button type="button" aria-pressed={pick === "me"} onClick={onMe}>{m15.plan.me}</button>
+        <button type="button" aria-pressed={member} onClick={onMember}>
+          {member && name ? name : m15.plan.sendMember}
         </button>
         <button type="button" disabled aria-disabled="true" className="buyer15__soon">
           {m15.plan.mimi}<small>{m15.plan.soon}</small>
@@ -380,24 +422,19 @@ function IconSheet({ value, onCancel, onSave }: { value: string; onCancel: () =>
   );
 }
 
-/* ---------- Bảng chọn thành viên (Gửi Plan) ---------- */
-function MemberSheet({ cart, onClose }: { cart: Cart; onClose: () => void }) {
+/* ---------- Bảng chọn thành viên: chỉ chọn người mua, chưa gửi (Spec 1.5 mục 1) ---------- */
+function MemberSheet({ value, onClose, onPick }: { value: string; onClose: () => void; onPick: (uid: string) => void }) {
   const me = useMe();
   const h = useHousehold();
-  const { assign } = useAssignments();
   const others = (h.data?.members ?? []).filter((m) => m.uid !== me.data?.uid);
-  const [pick, setPick] = useState(others[0]?.uid ?? "");
-  const [sent, setSent] = useState("");
-  const keys = cart.items.filter((i) => i.line_status !== "assigned").map((i) => i.key);
+  const [pick, setPick] = useState(value || others[0]?.uid || "");
   // Danh sách người nhà tải sau /me: luôn chọn sẵn người đầu tiên còn hợp lệ.
   useEffect(() => {
     if (others.length && !others.some((m) => m.uid === pick)) setPick(others[0].uid);
   }, [others, pick]);
   return (
     <Sheet title={m15.plan.memberTitle} sub={m15.plan.memberSub} onClose={onClose}>
-      {sent ? (
-        <p className="sent15" role="status">{sent}</p>
-      ) : others.length === 0 ? (
+      {others.length === 0 ? (
         <p className="hint">{m15.plan.noMember}</p>
       ) : (
         <ul className="members15" role="radiogroup" aria-label={m15.plan.memberTitle}>
@@ -415,26 +452,12 @@ function MemberSheet({ cart, onClose }: { cart: Cart; onClose: () => void }) {
           ))}
         </ul>
       )}
-      {!sent && keys.length === 0 && others.length > 0 && <p className="hint">{m15.plan.nothingToSend}</p>}
-      {assign.isError && <p className="error" role="alert">{errText(assign.error)}</p>}
       <div className="sheet15__btns">
-        <button type="button" className="btn btn--outline" onClick={onClose}>{sent ? m15.plan.close : m15.plan.cancel}</button>
-        {!sent && (
-          <button
-            type="button"
-            className="btn btn--primary"
-            aria-disabled={!pick || keys.length === 0 || assign.isPending || undefined}
-            onClick={() => {
-              if (!pick || keys.length === 0 || assign.isPending) return;
-              const who = others.find((m) => m.uid === pick)?.display_name ?? "";
-              assign.mutate({ buyer_uid: pick, keys }, { onSuccess: () => setSent(m15.plan.sent(who)) });
-            }}
-          >
-            {m15.plan.send}
-          </button>
-        )}
+        <button type="button" className="btn btn--outline" onClick={onClose}>{m15.plan.cancel}</button>
+        <button type="button" className="btn btn--primary" aria-disabled={!pick || undefined} onClick={() => pick && onPick(pick)}>
+          {m15.plan.choose}
+        </button>
       </div>
     </Sheet>
   );
 }
-

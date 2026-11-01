@@ -215,6 +215,7 @@
 .plancard15__chev { align-self: center; color: var(--m15-blue); }
 .tag15 { display: inline-block; padding: 3px 10px; border-radius: var(--r-pill); background: #dde8ff; color: var(--m15-blue); font-size: var(--fs-xs); font-weight: 600; }
 .tag15--buyer { background: #fff0dc; color: #9a4a0b; }
+.tag15--draft { background: #fdecec; color: #a32121; }
 
 .pd15 { gap: var(--s3); }
 .pd15__head { display: grid; grid-template-columns: 32px 60px 1fr; gap: var(--s2); align-items: center; }

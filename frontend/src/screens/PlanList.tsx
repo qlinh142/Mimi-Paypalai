@@ -1,6 +1,6 @@
 import { m15 } from "../i18n/m15";
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CalendarDays, ChevronRight, Info, MapPin, Plus, UsersRound } from "lucide-react";
 import { useDelegated, usePlanCarts, usePlanMeta, usePlans } from "../api/hooks";
 import type { Cart, PlanMeta } from "../api/types";
@@ -8,6 +8,7 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { setCurrentPlanId } from "../lib/currentPlan";
 import { visiblePlans } from "../components/PlanPicker";
 import { iconOf, planIcon } from "../lib/planIcon";
+import { isDraft, usePlanDraftVersion } from "../lib/planDraft";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { t } from "../i18n";
 
@@ -53,6 +54,8 @@ function Mine() {
   const list = visiblePlans(plans.data);
   const carts = usePlanCarts(list.map((p) => p.id));
   const [err, setErr] = useState(false);
+  usePlanDraftVersion();
+  const saved = (useLocation().state as { saved?: unknown } | null)?.saved;
 
   const open = (id: string) => {
     setCurrentPlanId(id);
@@ -63,6 +66,7 @@ function Mine() {
 
   return (
     <>
+      {typeof saved === "string" && <p className="sent15" role="status">{saved}</p>}
       {list.length === 0 && <p className="hint">{m15.plan.mineEmpty}</p>}
       <ul className="plans15">
         {list.map((p, i) => {
@@ -85,7 +89,11 @@ function Mine() {
                   <span className="plancard15__sub"><MapPin size={15} aria-hidden /> {c?.state.trip_note || m15.plan.noStore}</span>
                   <span className="plancard15__sub"><CalendarDays size={15} aria-hidden /> {whenText(c?.state)}</span>
                   <span className="plancard15__tags">
-                    <span className="tag15">{m15.plan.phase[c?.phase ?? "planning"]}</span>
+                    {isDraft(p.id) ? (
+                      <span className="tag15 tag15--draft">{m15.plan.draft}</span>
+                    ) : (
+                      <span className="tag15">{m15.plan.phase[c?.phase ?? "planning"]}</span>
+                    )}
                     {buyer && <span className="tag15 tag15--buyer">{m15.plan.buyer(buyer)}</span>}
                   </span>
                 </span>
