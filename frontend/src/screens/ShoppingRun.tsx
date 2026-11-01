@@ -2,7 +2,9 @@ import { m15 } from "../i18n/m15";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CalendarDays, Camera, Check, ChevronLeft, MapPin, Minus, Pencil, Plus, ReceiptText, Trash2, UserRound } from "lucide-react";
-import { useAssignments, useDelegated } from "../api/hooks";
+import { qk, useAssignments, useDelegated } from "../api/hooks";
+import { apiSendQueued } from "../api/client";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Assignment } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { formatVnd } from "../lib/text";
@@ -61,16 +63,20 @@ export function ShoppingRun() {
   const { id = "" } = useParams();
   const d = useDelegated();
   const a = d.data?.to_me.find((x) => x.assignment_id === id);
-  const [doneView, setDoneView] = useState<{ scanned: boolean; ask: number; mine: number; plan: string; owner: string } | null>(null);
+  const [doneView, setDoneView] = useState<DoneInfo | null>(null);
   if (doneView) return <Done {...doneView} />;
   if (d.isPending) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><p className="hint">…</p></div></MainFrame>;
   if (!a) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><p className="hint">{m15.run.gone}</p></div></MainFrame>;
   return <RunList a={a} onDone={setDoneView} />;
 }
 
-function RunList({ a, onDone }: { a: Assignment; onDone: (v: { scanned: boolean; ask: number; mine: number; plan: string; owner: string }) => void }) {
+type DoneInfo = { scanned: boolean; ask: number; mine: number; plan: string; owner: string; queued: boolean; left: number };
+
+function RunList({ a, onDone }: { a: Assignment; onDone: (v: DoneInfo) => void }) {
   const nav = useNavigate();
-  const { complete, decline } = useAssignments();
+  const { decline } = useAssignments();
+  const qc = useQueryClient();
+  const [finishing, setFinishing] = useState(false);
   const [run, setRun] = useState<Run>(() => loadRun(a));
   const [editing, setEditing] = useState<string | null>(null);
   const [scanState, setScanState] = useState<"" | "reading" | "offline">("");
@@ -94,18 +100,20 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: { scanned: boolean;
       setScanState("");
     }, 900);
   };
-  const finish = () => {
-    if (complete.isPending) return;
+  // Mua hàng xong: ghi một lần. Mất mạng thì lưu vào hộp thư đi, có mạng tự gửi (Spec 1.5 mục 2, 8).
+  const finish = async () => {
+    if (finishing) return;
+    setFinishing(true);
     const result = { scanned: run.scanned, note: run.note, lines: run.lines.filter((l) => l.ticked) };
-    complete.mutate(
-      { id: a.assignment_id, result },
-      {
-        onSuccess: () => {
-          saveRun(a.assignment_id, null);
-          onDone({ scanned: run.scanned, ask: sum(ask), mine: sum(mine), plan: planName, owner });
-        },
-      },
-    );
+    try {
+      const r = await apiSendQueued("POST", `/households/shopping-assignments/${encodeURIComponent(a.assignment_id)}/complete`, result, m15.run.queueLabel(owner));
+      saveRun(a.assignment_id, null);
+      qc.invalidateQueries({ queryKey: qk.plan });
+      // Câu 3: món trong kế hoạch chưa tick thì sang kế hoạch "· còn lại" của người nhờ.
+      onDone({ scanned: run.scanned, ask: sum(ask), mine: sum(mine), plan: planName, owner, queued: r === "queued", left: ask.filter((l) => !l.ticked).length });
+    } finally {
+      setFinishing(false);
+    }
   };
 
   const block = (title: string, ls: RunLine[]) => (
@@ -173,7 +181,7 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: { scanned: boolean;
           <button type="button" className="btn btn--outline btn--lg" aria-disabled={scanState === "reading" || undefined} onClick={scan}>
             <Camera size={18} aria-hidden /> {m15.run.scan}
           </button>
-          <button type="button" className="btn btn--primary btn--lg" aria-disabled={complete.isPending || undefined} onClick={finish}>
+          <button type="button" className="btn btn--primary btn--lg" aria-disabled={finishing || undefined} onClick={finish}>
             <Check size={18} aria-hidden /> {m15.run.finish}
           </button>
         </div>
@@ -237,7 +245,7 @@ function Line({ l, open, onToggle, onSet }: { l: RunLine; open: boolean; onToggl
   );
 }
 
-function Done({ scanned, ask, mine, plan, owner }: { scanned: boolean; ask: number; mine: number; plan: string; owner: string }) {
+function Done({ scanned, ask, mine, plan, owner, queued, left }: DoneInfo) {
   const nav = useNavigate();
   const total = useMemo(() => ask + mine, [ask, mine]);
   return (
@@ -256,7 +264,12 @@ function Done({ scanned, ask, mine, plan, owner }: { scanned: boolean; ask: numb
               <p className="run15__split"><span>{m15.run.mineShort}</span><span className="num">{formatVnd(mine)}</span></p>
             </>
           )}
-          <p className="sent15" role="status">{m15.run.sentTo(owner)}</p>
+          {queued ? (
+            <p className="run15__offline" role="status">{m15.run.queued(owner)}</p>
+          ) : (
+            <p className="sent15" role="status">{m15.run.sentTo(owner)}</p>
+          )}
+          {left > 0 && <p className="hint">{m15.run.leftover(left, plan, owner)}</p>}
         </section>
         <button type="button" className="btn btn--primary btn--lg btn--block" onClick={() => nav("/plan?tab=to-me")}>{m15.run.backToPlans}</button>
       </div>

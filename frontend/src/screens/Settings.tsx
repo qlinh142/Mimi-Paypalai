@@ -12,7 +12,8 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useAuth } from "../lib/auth";
-import { clearQueue } from "../lib/offlineQueue";
+import { clearQueue, useQueue } from "../lib/offlineQueue";
+import { flushQueue } from "../api/client";
 import { RELATIONS, relationOf, setRelation } from "../lib/relation";
 import { formatDayMonth } from "../lib/text";
 import { queryClient, queryPersister } from "../app/queryClient";
@@ -96,6 +97,8 @@ export function Settings() {
           </span>
           <ChevronRight size={22} aria-hidden />
         </Link>
+
+        <SyncBox />
 
         <Group title={S.general}>
           <Row to="/settings/notify" Icon={Bell} label={S.notify} sub={s ? S.notifySub(s.digest_time ?? "08:00", s.lead_days ?? 7, s.remind_enabled ?? true) : undefined} />
@@ -498,5 +501,27 @@ function MandateForm({ initial }: { initial: Mandate }) {
         {save.isPending ? t.confirm.saving : save.isSuccess ? t.mandate.saved : t.mandate.save}
       </button>
     </form>
+  );
+}
+
+/** Spec 1.5 mục 8: "Đang chờ đồng bộ (N)", từng việc kèm giờ, nút Thử lại. Ẩn khi không còn gì chờ. */
+function SyncBox() {
+  const q = useQueue();
+  const [busy, setBusy] = useState(false);
+  if (q.length === 0) return null;
+  const hm = (ms: number) => new Date(ms).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  return (
+    <section className="box15 sync15" aria-label={m15.sync.title(q.length)}>
+      <h2>{m15.sync.title(q.length)}</h2>
+      <ul>
+        {q.map((w) => (
+          <li key={w.key}><span>{w.label ?? m15.sync.generic}</span><small>{hm(w.queuedAt)}</small></li>
+        ))}
+      </ul>
+      <button type="button" className="btn btn--outline" aria-disabled={busy || undefined} onClick={async () => { setBusy(true); try { await flushQueue(); } finally { setBusy(false); } }}>
+        {m15.sync.retry}
+      </button>
+      <p className="hint">{m15.sync.note}</p>
+    </section>
   );
 }

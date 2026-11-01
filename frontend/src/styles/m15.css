@@ -410,3 +410,12 @@
 .ph15 > * { min-width: 0; }
 .ph15__list > li { display: block; padding: 0; }
 .ph15 .line15 { display: block; }
+
+/* Spec 1.5 mục 8 · Đang chờ đồng bộ */
+.nav__ico { position: relative; }
+.nav__dot { position: absolute; top: -2px; right: -4px; width: 10px; height: 10px; border-radius: 50%; background: #e53935; border: 2px solid #fff; }
+.sync15 { border-color: #f5c58a; background: #fff8ee; }
+.sync15 h2 { margin: 0; font-size: var(--fs-md); color: #8a4b00; }
+.sync15 ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sync15 li { display: flex; justify-content: space-between; gap: var(--s2); }
+.sync15 li small { color: var(--ink-soft); }

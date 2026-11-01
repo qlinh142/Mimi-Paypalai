@@ -80,6 +80,8 @@ function Mine() {
             (a) => a.plan_id === p.id && (a.status === "assigned" || a.status === "shopping"),
           )?.buyer_display_name;
           const count = c?.item_count ?? p.item_count;
+          // Câu 5: người được nhờ đã từ chối mà chưa gửi cho ai khác.
+          const declined = !buyer && (delegated.data?.from_me ?? []).some((x) => x.plan_id === p.id && x.status === "declined");
           return (
             <li key={p.id}>
               <button type="button" className="plancard15" onClick={() => open(p.id)} aria-label={m15.plan.open(planName(p))}>
@@ -99,6 +101,7 @@ function Mine() {
                       <span className="tag15">{m15.plan.phase[buyer && c?.phase !== "reconciled" ? "shopping" : (c?.phase ?? "planning")]}</span>
                     )}
                     {buyer && <span className="tag15 tag15--buyer">{m15.plan.buyer(buyer)}</span>}
+                    {declined && <span className="tag15 tag15--draft">{m15.plan.noBuyer}</span>}
                   </span>
                 </span>
                 <ChevronRight size={22} aria-hidden className="plancard15__chev" />

@@ -206,7 +206,7 @@ function Detail({ id }: { id: string }) {
         </div>
         {!buyer && <p className="hint" role="status">{m15.plan.needBuyer}</p>}
         {assign.isError && <p className="error" role="alert">{errText(assign.error)}</p>}
-        {confirmDel && <p className="hint" role="status">{m15.plan.deleteAsk}</p>}
+        {confirmDel && <p className="hint" role="status">{sentTo ? m15.plan.deleteAskSent(sentTo.buyer_display_name) : m15.plan.deleteAsk}</p>}
         {(metaAct.remove.isError || clearDefault.isError) && <p className="error" role="alert">{errText(metaAct.remove.error ?? clearDefault.error)}</p>}
       </div>
 

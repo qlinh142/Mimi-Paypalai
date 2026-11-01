@@ -119,14 +119,20 @@ export async function apiSendQueued(
   method: QueuedWrite["method"],
   path: string,
   body?: unknown,
+  label?: string,
 ): Promise<"sent" | "queued"> {
   const key = crypto.randomUUID();
+  // Spec 1.5 mục 8: biết chắc mất mạng thì lưu vào hộp thư đi luôn, không chờ lỗi.
+  if (!navigator.onLine) {
+    await enqueue({ key, method, path, body, label });
+    return "queued";
+  }
   try {
     await apiSend(method, path, body, key);
     return "sent";
   } catch (e) {
     if (e instanceof OfflineError) {
-      await enqueue({ key, method, path, body });
+      await enqueue({ key, method, path, body, label });
       return "queued";
     }
     throw e;
