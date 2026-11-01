@@ -3,7 +3,10 @@ import { m15 } from "../i18n/m15";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Camera, ImagePlus, X } from "lucide-react";
-import { toSaveRequest, useDelegated, useReadReceipt, useSaveReceipt } from "../api/hooks";
+import { toSaveRequest, useDelegated, usePlanCarts, usePlans, useReadReceipt, useSaveReceipt } from "../api/hooks";
+import { allocate, planNeeds } from "../lib/allocate";
+import { visiblePlans } from "../components/PlanPicker";
+import { planName } from "./PlanList";
 import { m1 } from "../i18n/m1";
 import { currentPlanId } from "../lib/currentPlan";
 import type { ReceiptDraft } from "../api/types";
@@ -40,6 +43,7 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   const [cameraFailed, setCameraFailed] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   // BUG-05 mục 8B: chụp lại riêng một ảnh lỗi, ảnh mới thay đúng vị trí (1-based).
   const [replaceAt, setReplaceAt] = useState<number | null>(null);
@@ -118,6 +122,8 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   }
 
   function finish() {
+    // Spec 1.5 mục 8: quét cần AI nên phải có mạng; mất mạng thì báo ngay, mời nhập thủ công.
+    if (!navigator.onLine) return setOffline(true);
     stream?.getTracks().forEach((t) => t.stop());
     // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện.
     // Gửi lại sau khi chụp lại một ảnh: backend nhớ kết quả các ảnh đã đọc được (theo nội dung
@@ -256,6 +262,12 @@ function ScanSession({ onNext }: { onNext: () => void }) {
         }}
       />
 
+      {offline && (
+        <div className="run15__offline scan15__offline" role="alert">
+          <p>{m15.run.offline}</p>
+          <button type="button" className="btn btn--outline" onClick={() => nav("/plan")}>{m15.run.manual}</button>
+        </div>
+      )}
       {photos.length > 0 && (
         <div className="scan__done">
           <button type="button" className="btn btn--primary btn--block btn--lg" onClick={finish} aria-disabled={busy || undefined}>
@@ -285,6 +297,11 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
   const delegated = useDelegated();
   const toMe = delegated.data?.to_me ?? [];
   const [assignmentId, setAssignmentId] = useState("");
+  // Spec 1.5 mục 3: mỗi món trừ vào kế hoạch có ngày sớm nhất trước; người dùng đổi được.
+  const plans = visiblePlans(usePlans().data);
+  const carts = usePlanCarts(plans.map((p) => p.id)).map((q) => q.data);
+  const [override, setOverride] = useState<Record<string, string>>({});
+  const [pickPlan, setPickPlan] = useState<string | null>(null);
   // Bản nháp người dùng sửa: lỗi lưu không làm mất chỉnh sửa (BUG-06 mục 10).
   const [lines, setLines] = useState<EditLine[]>(draft.lines);
   const [localError, setLocalError] = useState("");
@@ -296,6 +313,36 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
   // Tổng lệch chỉ là cảnh báo, không chặn lưu (BUG-06 mục 5.1).
   const mismatch = edited && draft.currency === "VND" && printed != null ? Math.abs(printed - sum) > 1000 : draft.total_mismatch;
   const matches = !!draft.total_printed && !mismatch;
+  const alloc = allocate(kept.map((l) => ({ id: l.line_id, key: l.group_key, qty: l.qty })), planNeeds(plans, carts, planName));
+  const planLine = (l: EditLine) => {
+    const o = override[l.line_id];
+    const text = o === "none"
+      ? m15.scanPlan.none
+      : o
+        ? `→ ${planName(plans.find((p) => p.id === o) ?? { default: false, name: "" })}`
+        : (alloc.get(l.line_id) ?? []).length
+          ? `→ ${(alloc.get(l.line_id) ?? []).map((a, _i, all) => (all.length > 1 ? `${a.name} (${a.qty})` : a.name)).join(", ")}`
+          : m15.scanPlan.none;
+    return (
+      <span className="scan15__plan">
+        <button type="button" className="link15" aria-expanded={pickPlan === l.line_id} onClick={() => setPickPlan(pickPlan === l.line_id ? null : l.line_id)}>{text}</button>
+        {pickPlan === l.line_id && (
+          <select
+            aria-label={m15.scanPlan.choose}
+            value={o ?? ""}
+            onChange={(e) => {
+              setOverride((m) => ({ ...m, [l.line_id]: e.target.value }));
+              setPickPlan(null);
+            }}
+          >
+            <option value="">{m15.scanPlan.auto}</option>
+            {plans.map((p) => <option key={p.id} value={p.id}>{planName(p)}</option>)}
+            <option value="none">{m15.scanPlan.noneOpt}</option>
+          </select>
+        )}
+      </span>
+    );
+  };
   const change = (id: string, patch: Partial<EditLine>) => {
     setLocalError("");
     setLines((ls) => ls.map((l) => (l.line_id === id ? { ...l, ...patch } : l)));
@@ -381,7 +428,7 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
           </label>
         </div>
         {draft.unreadable_pages > 0 && <p className="check warn">{t.confirm.unreadablePages(draft.unreadable_pages)}</p>}
-        <ReceiptLines lines={lines} currency={draft.currency} badLine={badLine} onChange={change} />
+        <ReceiptLines lines={lines} currency={draft.currency} badLine={badLine} onChange={change} extra={planLine} />
         <p className={`check ${matches ? "ok" : "warn"}`}>
           {!draft.total_printed
             ? t.confirm.noTotal(formatVnd(sum))

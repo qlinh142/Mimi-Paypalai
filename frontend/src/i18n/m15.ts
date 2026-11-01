@@ -230,6 +230,12 @@ const vi = {
       "Mimi không bán hay chia sẻ dữ liệu của mẹ cho bên nào khác.",
     ],
   },
+  scanPlan: {
+    none: "Không thuộc kế hoạch nào",
+    noneOpt: "Không thuộc kế hoạch nào",
+    auto: "Tự chọn (kế hoạch sớm nhất trước)",
+    choose: "Trừ vào kế hoạch",
+  },
   run: {
     gone: "Lần nhờ mua này không còn nữa.",
     decline: "Từ chối",
@@ -493,6 +499,12 @@ const en: typeof vi = {
       "Each person's receipts, inventory and spending are private. Family only see the shopping plans you send them.",
       "Mimi does not sell or share your data with anyone else.",
     ],
+  },
+  scanPlan: {
+    none: "Not in any plan",
+    noneOpt: "Not in any plan",
+    auto: "Automatic (earliest plan first)",
+    choose: "Count toward plan",
   },
   run: {
     gone: "This request is no longer available.",

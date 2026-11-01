@@ -378,3 +378,7 @@
 .prog15__bar i { display: block; height: 100%; background: #2e9e5b; }
 .prog15__note { display: flex; justify-content: space-between; align-items: center; border: 0; background: #eef4ff; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 700; color: var(--m15-blue); cursor: pointer; }
 .prog15__notetext { margin: 0; padding: 0 4px; }
+.scan15__plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.scan15__plan .link15 { border: 0; background: #eef4ff; border-radius: 8px; padding: 4px 8px; font-weight: 700; color: var(--m15-blue); }
+.scan15__plan select { font: inherit; padding: 6px; border-radius: 8px; border: 1.5px solid var(--m15-line); }
+.scan15__offline { margin: var(--s3); }

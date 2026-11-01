@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
 import { useTaxonomyLabels, useTaxonomySearch } from "../api/hooks";
@@ -22,9 +22,11 @@ export function parseAmount(s: string, currency: string): number | null {
  * (BUG-06) được tô và mở sẵn để sửa.
  */
 export function ReceiptLines({
-  lines, currency, badLine, onChange,
+  lines, currency, badLine, onChange, extra,
 }: {
   lines: EditLine[];
+  /** Spec 1.5 mục 3: dòng "→ [kế hoạch]" dưới mỗi món. */
+  extra?: (l: EditLine) => ReactNode;
   currency: string;
   badLine?: string;
   onChange: (id: string, patch: Partial<EditLine>) => void;
@@ -58,6 +60,7 @@ export function ReceiptLines({
                     ].filter(Boolean).join(" · ")}
             </span>
             {l.detail_name && l.detail_name !== l.name && !l.removed && <span className="sub" style={{ gridColumn: "1 / -1" }}>{l.name}</span>}
+            {extra && !l.removed && !l.discount && <span style={{ gridColumn: "1 / -1" }}>{extra(l)}</span>}
 
             <div className="plan-form__row" style={{ gridColumn: "1 / -1" }}>
               {l.removed ? (
