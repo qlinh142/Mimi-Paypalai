@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const email = emailOverride ?? localStorage.getItem(EMAIL_KEY) ?? "ban@example.com";
           const s = { uid: "mock-uid", email };
           localStorage.setItem(MOCK_KEY, JSON.stringify(s));
-          history.replaceState(null, "", "/");
+          history.replaceState(null, "", location.pathname);
           setSession(s);
           return "ok";
         }
@@ -90,12 +90,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await signInWithEmailLink(auth, email, location.href);
           localStorage.removeItem(EMAIL_KEY);
-          history.replaceState(null, "", "/");
+          history.replaceState(null, "", location.pathname);
           return "ok";
         } catch (e: unknown) {
           const code = (e as { code?: string }).code ?? "";
           if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") {
-            history.replaceState(null, "", "/");
+            history.replaceState(null, "", location.pathname);
             return "expired";
           }
           throw e;

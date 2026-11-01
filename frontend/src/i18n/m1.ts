@@ -38,7 +38,7 @@ const en = {
   },
   plans: {
     label: "Shopping plans",
-    main: "Main plan",
+    main: "Shopping cart",
     new: "New plan",
     namePlaceholder: "e.g. Weekend party",
     create: "Create",
@@ -46,7 +46,7 @@ const en = {
     restore: "Restore",
     remove: "Delete plan",
     archived: "Archived",
-    onlineMainOnly: "Online ordering uses the main plan.",
+    onlineMainOnly: "Online ordering uses the shopping cart.",
   },
   add: {
     title: "Add something new",
@@ -230,7 +230,7 @@ const vi: M1 = {
   },
   plans: {
     label: "Các kế hoạch",
-    main: "Kế hoạch chính",
+    main: "Giỏ mua sắm",
     new: "Kế hoạch mới",
     namePlaceholder: "Ví dụ: Tiệc cuối tuần",
     create: "Tạo",
@@ -238,7 +238,7 @@ const vi: M1 = {
     restore: "Dùng lại",
     remove: "Xóa kế hoạch",
     archived: "Đã lưu trữ",
-    onlineMainOnly: "Mua online dùng Kế hoạch chính.",
+    onlineMainOnly: "Mua online dùng Giỏ mua sắm.",
   },
   add: {
     title: "Thêm món mới",

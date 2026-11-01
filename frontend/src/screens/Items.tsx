@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Pencil, Search } from "lucide-react";
 import { OfflineError } from "../api/client";
-import { useItems, usePlan } from "../api/hooks";
+import { useItems } from "../api/hooks";
 import type { Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CartButton } from "../components/CartButton";
+import { useKeysInPlans } from "../components/PlanPicker";
 import { Group15 } from "../components/Group15";
 import { CategoryIcon } from "../components/ItemRow";
 import { RecurringList } from "../components/RecurringList";
@@ -65,8 +66,7 @@ export function Items() {
 
 function Goods({ term }: { term: string }) {
   const items = useItems({ tab: "active", horizon: 7 });
-  const plan = usePlan();
-  const inPlan = useMemo(() => new Set((plan.data?.items ?? []).map((i) => i.key)), [plan.data]);
+  const inPlan = useKeysInPlans();
 
   const groups = useMemo(() => {
     const q = normalizeVi(term);

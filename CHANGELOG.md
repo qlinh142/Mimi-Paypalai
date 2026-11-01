@@ -5,6 +5,23 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-10-31 · Mimi 1.5: màn 0–6 theo ảnh mẫu và các góp ý sau Cổng 3
+
+- PR #2 (đã gộp, `8ecf6a8`): màn 0–6 theo ảnh mẫu đã duyệt.
+- PR #3 (chờ gộp): prototype một file, Giỏ mua sắm, bảng "Thêm vào kế hoạch nào?", xóa kế hoạch, sửa dòng món bằng dấu tích và thùng rác, Lịch sử mua hàng đủ mọi hóa đơn.
+- Mô tả app đúng như đang chạy: `notes/mimi-1-5-tong-the.md` (Project files). Mục 11 của file này ghi từng góp ý và thay đổi theo giờ.
+- Bản đồ màn → file: `notes/ban-do-frontend.md` (Project files).
+
+### Cách kiểm tra
+- `go test ./...` và `npm run build` đều qua.
+- Chạy thử từng màn bằng trình duyệt tự động trên dữ liệu mẫu, không có lỗi console. Ảnh nằm ở `assets/mimi15-man-0-4`, `man-5`, `man-6`.
+
+### Còn lại
+- Bước 6: 4 việc P1 (`notes/buoc-6-de-xuat.md`).
+- Bước 8: 3 thay đổi dữ liệu (`notes/data-model-1-5.md`).
+
+---
+
 ## 2026-10-30 · Mimi 1.0: bù các chỗ còn thiếu sau khi đối chiếu lại 10 file spec
 
 - Nhánh: `feat/mimi1-specs` → `feat/mimi2-core-demo`

@@ -68,6 +68,10 @@ const receiptScanLimit = 500
 
 const listSize = 3
 
+// historySize: Lịch sử mua hàng của tháng (Mimi 1.5, góp ý 31/10 16:32) liệt kê mọi hóa đơn
+// (nơi mua, ngày, số tiền) chứ không chỉ 3 hóa đơn gần nhất; màn Địa điểm mua hàng cũng gộp từ đây.
+const historySize = 200
+
 type Service struct{ store Store }
 
 func New(store Store) *Service { return &Service{store: store} }
@@ -137,7 +141,7 @@ func Build(month string, cur, prev Month, rows []ReceiptRow) Report {
 		}
 		return recent[a].ID > recent[b].ID
 	})
-	r.RecentReceipts = append(r.RecentReceipts, recent[:min(listSize, len(recent))]...)
+	r.RecentReceipts = append(r.RecentReceipts, recent[:min(historySize, len(recent))]...)
 
 	var saving []ReceiptRow
 	for _, row := range rows {

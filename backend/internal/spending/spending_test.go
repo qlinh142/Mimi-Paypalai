@@ -56,7 +56,7 @@ func TestBuild(t *testing.T) {
 		}
 		return strings.Join(s, ",")
 	}
-	if got := ids(r.RecentReceipts); got != "e,b,c" {
+	if got := ids(r.RecentReceipts); got != "e,b,c,d,a" { // mọi hóa đơn của tháng, mới nhất trước
 		t.Fatalf("recent %s", got)
 	}
 	if got := ids(r.TopSavingReceipts); got != "c,a,e" {

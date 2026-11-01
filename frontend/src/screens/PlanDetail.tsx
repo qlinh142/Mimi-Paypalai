@@ -3,10 +3,10 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
-  useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState,
+  useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
 } from "../api/hooks";
 import type { Cart, CartItem, Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
@@ -17,6 +17,7 @@ import { setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { PLAN_ICONS, iconOf, planIcon, setPlanIcon } from "../lib/planIcon";
 import { formatVnd } from "../lib/text";
 import { planName } from "./PlanList";
+import { Sheet } from "../components/Sheet15";
 import { relationOf } from "../lib/relation";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -44,6 +45,9 @@ function Detail({ id }: { id: string }) {
   const cart = plan.data;
   const nav = useNavigate();
   const metaAct = usePlanMeta();
+  const [confirmDel, setConfirmDel] = useState(false);
+  const clearDefault = useClearDefaultPlan();
+  const deleting = metaAct.remove.isPending || clearDefault.isPending;
   const saveState = useSavePlanState();
 
   const [name, setName] = useState("");
@@ -147,18 +151,29 @@ function Detail({ id }: { id: string }) {
         {cart && <Buyer cart={cart} planId={id} onSend={() => setMemberSheet(true)} />}
 
         {(saveState.isError || metaAct.update.isError) && <p className="error" role="alert">{errText(saveState.error ?? metaAct.update.error)}</p>}
-        <button type="button" className="btn btn--primary btn--block btn--lg" aria-disabled={busy || undefined} onClick={save}>
-          {m15.plan.save}
-        </button>
-        {meta && !meta.default && (
+        {/* Góp ý 31/10 15:43: nút Xóa nằm cạnh Lưu kế hoạch. Xóa không hoàn tác được nên bấm hai lần. */}
+        <div className="pd15__actions">
           <button
             type="button"
-            className="btn btn--quiet btn--block btn--danger"
-            onClick={() => metaAct.remove.mutate(id, { onSuccess: () => { setCurrentPlanId("default"); nav("/plan", { replace: true }); } })}
+            className={`btn btn--lg pd15__del${confirmDel ? " pd15__del--confirm" : ""}`}
+            aria-disabled={!meta || deleting || undefined}
+            onClick={() => {
+              if (!meta || deleting) return;
+              if (!confirmDel) return setConfirmDel(true);
+              const back = () => { setCurrentPlanId("default"); nav("/plan", { replace: true }); };
+              // Giỏ mua sắm (mặc định) không xóa hẳn được ở máy chủ: làm trống thì nó tự ẩn (góp ý 31/10 16:04).
+              if (meta.default) clearDefault.mutate((cart?.items ?? []).map((i) => i.key), { onSuccess: back });
+              else metaAct.remove.mutate(id, { onSuccess: back });
+            }}
           >
-            <Trash2 size={18} aria-hidden /> {m15.plan.delete}
+            <Trash2 size={18} aria-hidden /> {confirmDel ? m15.plan.deleteConfirm : m15.plan.deleteShort}
           </button>
-        )}
+          <button type="button" className="btn btn--primary btn--lg" aria-disabled={busy || undefined} onClick={save}>
+            {m15.plan.save}
+          </button>
+        </div>
+        {confirmDel && <p className="hint" role="status">{m15.plan.deleteAsk}</p>}
+        {(metaAct.remove.isError || clearDefault.isError) && <p className="error" role="alert">{errText(metaAct.remove.error ?? clearDefault.error)}</p>}
       </div>
 
       {iconSheet && (
@@ -200,7 +215,14 @@ function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boo
   const edit = usePlanItem();
   const unit = line.unit || savedUnit({ key: line.key, name: line.name });
   const price = line.unit_price != null ? formatVnd(line.unit_price * line.qty) : m15.plan.noPrice;
-  const setQty = (q: number) => q >= 1 && !patch.isPending && patch.mutate({ key: line.key, patch: { qty: q } });
+  // Góp ý 31/10 16:28: −/+ chỉ đổi số trên màn; bấm dấu tích mới lưu. Bỏ món bằng biểu tượng thùng rác.
+  const [qty, setQty] = useState(line.qty);
+  useEffect(() => setQty(line.qty), [line.qty, open]);
+  const saveQty = () => {
+    if (patch.isPending) return;
+    if (qty === line.qty) return onToggle();
+    patch.mutate({ key: line.key, patch: { qty } }, { onSuccess: onToggle });
+  };
   return (
     <li className="line15">
       <div className="line15__row">
@@ -219,12 +241,15 @@ function LineRow({ line, open, onToggle, assignee }: { line: CartItem; open: boo
       {open && (
         <div className="line15__edit">
           <div className="stepper15">
-            <button type="button" aria-label={m15.detail.minus} onClick={() => setQty(line.qty - 1)}><Minus size={18} aria-hidden /></button>
-            <input readOnly value={line.qty} aria-label={m15.detail.qtyTitle} />
-            <button type="button" aria-label={m15.detail.plus} onClick={() => setQty(line.qty + 1)}><Plus size={18} aria-hidden /></button>
+            <button type="button" aria-label={m15.detail.minus} onClick={() => qty > 1 && setQty(qty - 1)}><Minus size={18} aria-hidden /></button>
+            <input readOnly value={qty} aria-label={m15.detail.qtyTitle} />
+            <button type="button" aria-label={m15.detail.plus} onClick={() => setQty(qty + 1)}><Plus size={18} aria-hidden /></button>
           </div>
-          <button type="button" className="btn btn--quiet btn--danger" onClick={() => edit.mutate({ key: line.key, add: false })}>
-            <Trash2 size={18} aria-hidden /> {m15.plan.removeLine}
+          <button type="button" className="icon15 icon15--ok" aria-label={m15.plan.saveLine(line.name)} aria-disabled={patch.isPending || undefined} onClick={saveQty}>
+            <Check size={22} aria-hidden />
+          </button>
+          <button type="button" className="icon15 icon15--del" aria-label={m15.plan.removeLineOf(line.name)} aria-disabled={edit.isPending || undefined} onClick={() => !edit.isPending && edit.mutate({ key: line.key, add: false })}>
+            <Trash2 size={22} aria-hidden />
           </button>
         </div>
       )}
@@ -242,12 +267,11 @@ function daysText(i: Item) {
 function Suggestions({ cart }: { cart: Cart }) {
   const all = useItems({ tab: "active", horizon: 7 });
   const edit = usePlanItem();
-  const [checkAll, setCheckAll] = useState(false);
+  const nav = useNavigate();
   const [adding, setAdding] = useState(false);
   const inCart = useMemo(() => new Set(cart.items.map((i) => i.key)), [cart.items]);
   const rest = (all.data ?? []).filter((i) => !inCart.has(i.key));
   const sugg = rest.filter((i) => goodsTier(i) !== "plenty").sort((a, b) => (a.days_left ?? 999) - (b.days_left ?? 999));
-  const others = rest.filter((i) => goodsTier(i) === "plenty");
   const busy = edit.isPending ? edit.variables?.key : undefined;
   const row = (i: Item) => (
     <li key={i.key} className="line15">
@@ -271,15 +295,15 @@ function Suggestions({ cart }: { cart: Cart }) {
         <ul className="lines15">{sugg.map(row)}</ul>
       </section>
       <div className="pd15__two">
-        <button type="button" className="btn btn--outline" aria-expanded={checkAll} onClick={() => setCheckAll(!checkAll)}>
+        {/* Góp ý 31/10 16:22: bấm thì mở thẳng tab Đồ dùng. */}
+        <button type="button" className="btn btn--outline" onClick={() => nav("/items")}>
           <House size={20} aria-hidden /> <span>{m15.plan.checkHome}</span>
-          {checkAll ? <ChevronDown size={18} aria-hidden /> : <ChevronRight size={18} aria-hidden />}
+          <ChevronRight size={18} aria-hidden />
         </button>
         <button type="button" className="btn btn--outline" aria-expanded={adding} onClick={() => setAdding(!adding)}>
           <CirclePlus size={20} aria-hidden /> <span>{m15.plan.addProduct}</span>
         </button>
       </div>
-      {checkAll && <ul className="lines15">{others.map(row)}</ul>}
       {adding && <AddAnything cart={cart} />}
     </>
   );
@@ -414,25 +438,3 @@ function MemberSheet({ cart, onClose }: { cart: Cart; onClose: () => void }) {
   );
 }
 
-function Sheet({ title, sub, onClose, children }: { title: string; sub: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div className="sheet15" role="presentation" onClick={onClose}>
-      <div className="sheet15__panel" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
-        <span className="sheet15__grip" aria-hidden />
-        <div className="sheet15__head">
-          <div>
-            <h2>{title}</h2>
-            <p>{sub}</p>
-          </div>
-          <button type="button" className="icon-btn" aria-label={m15.plan.close} onClick={onClose}><X size={24} aria-hidden /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}

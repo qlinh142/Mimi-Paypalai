@@ -6,6 +6,7 @@ import { useDelegated, usePlanCarts, usePlanMeta, usePlans } from "../api/hooks"
 import type { Cart, PlanMeta } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { setCurrentPlanId } from "../lib/currentPlan";
+import { visiblePlans } from "../components/PlanPicker";
 import { iconOf, planIcon } from "../lib/planIcon";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { t } from "../i18n";
@@ -48,7 +49,8 @@ function Mine() {
   const meta = usePlanMeta();
   const nav = useNavigate();
   const delegated = useDelegated();
-  const list = (plans.data ?? []).filter((p) => p.status === "active");
+  // Giỏ mua sắm (mặc định) ẩn khi trống (chốt 31/10 15:58).
+  const list = visiblePlans(plans.data);
   const carts = usePlanCarts(list.map((p) => p.id));
   const [err, setErr] = useState(false);
 
@@ -128,7 +130,7 @@ function ToMe() {
             <div className="plancard15">
               <span className="plancard15__icon"><UsersRound size={26} aria-hidden /></span>
               <span className="plancard15__body">
-                <span className="plancard15__name">{a.trip?.plan_name || m15.plan.main}</span>
+                <span className="plancard15__name">{a.trip?.plan_name && a.trip.plan_name !== "Kế hoạch chính" ? a.trip.plan_name : m15.plan.main}</span>
                 <span className="plancard15__sub">{m15.plan.from(a.owner_display_name)} · {m15.plan.count(n)}</span>
                 <span className="plancard15__sub"><MapPin size={15} aria-hidden /> {st?.trip_note || m15.plan.noStore}</span>
                 <span className="plancard15__sub"><CalendarDays size={15} aria-hidden /> {whenText(st)}</span>

@@ -311,3 +311,24 @@
 .house15__code { margin-top: var(--s2); font-weight: 800; letter-spacing: .06em; color: var(--m15-blue); }
 .house15__copy { grid-column: 1 / -1; }
 .members15__rel { display: block; color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 400; }
+.pd15__actions { display: grid; grid-template-columns: 1fr 2fr; gap: var(--s3); }
+.pd15__del { white-space: nowrap; gap: 6px; padding-inline: var(--s3); border: 1.5px solid #c62828; color: #c62828; background: #fff; }
+.pd15__del--confirm { background: #c62828; color: #fff; }
+.pd15__del[aria-disabled="true"] { opacity: .45; }
+.pick15list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.pick15list__row { display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: 64px; padding: var(--s2) var(--s3); border: 1.5px solid var(--m15-line); border-radius: 14px; background: #fff; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.pick15list__row[aria-disabled="true"] { cursor: default; background: #f6f8fd; }
+.pick15list__row--new { border-style: dashed; color: var(--m15-blue); }
+.pick15list__text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.pick15list__text small { color: var(--ink-soft); font-size: var(--fs-sm); display: flex; align-items: center; gap: 4px; }
+/* Thêm món mới (góp ý 31/10 16:23): nút + Thêm nhỏ gọn bên phải, tên món chiếm phần còn lại. */
+.add15__row { grid-template-columns: 1fr auto; }
+.add15__row .plan-row__name { white-space: normal; overflow: visible; text-overflow: clip; }
+.add15__btn { flex: none; width: auto; min-height: 40px; padding: 0 14px; font-size: var(--fs-sm); gap: 4px; }
+/* Góp ý 31/10 16:28: nút chỉ có biểu tượng, dấu tích để lưu, thùng rác để bỏ. */
+.line15__edit { display: flex; align-items: center; gap: var(--s2); }
+.line15__edit .stepper15 { flex: 1; }
+.icon15 { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 12px; border: 1.5px solid var(--m15-line); background: #fff; cursor: pointer; }
+.icon15--ok { color: #fff; background: var(--m15-blue); border-color: var(--m15-blue); }
+.icon15--del { color: #c62828; border-color: #f2c4c4; }
+.icon15[aria-disabled="true"] { opacity: .5; }

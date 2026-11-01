@@ -1,5 +1,8 @@
 import { lazy, Suspense, useEffect, useRef } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
+
+// Bản prototype một file (vite.proto.config.ts) dùng HashRouter vì không có máy chủ trả mọi đường dẫn về index.html.
+const Router = import.meta.env.VITE_ROUTER === "hash" ? HashRouter : BrowserRouter;
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { configureApi, flushQueue } from "../api/client";
 import { UndoProvider, UpdateBanner } from "../components/AppShell";
@@ -94,12 +97,12 @@ export function App() {
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister, maxAge: 7 * 24 * 60 * 60 * 1000 }}>
       <AuthProvider>
-        <BrowserRouter>
+        <Router>
           <UndoProvider>
             <Gate />
             <UpdateBanner />
           </UndoProvider>
-        </BrowserRouter>
+        </Router>
       </AuthProvider>
     </PersistQueryClientProvider>
   );

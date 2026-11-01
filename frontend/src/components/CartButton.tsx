@@ -1,29 +1,27 @@
+import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { m15 } from "../i18n/m15";
-import { usePlanItem } from "../api/hooks";
-import { useUndo } from "./AppShell";
+import { PlanPicker } from "./PlanPicker";
 
-/** Nút giỏ hàng tròn: thêm vào Kế hoạch. Đã có trong Kế hoạch thì tô đặc. */
+/**
+ * Nút giỏ hàng tròn (góp ý 31/10 15:58): bấm thì mở bảng chọn Kế hoạch để thêm món.
+ * Tô đặc khi món đã nằm trong một Kế hoạch nào đó; bấm vẫn mở bảng để thêm vào Kế hoạch khác.
+ */
 export function CartButton({ planKey, name, added, body }: { planKey: string; name: string; added: boolean; body?: { name?: string } }) {
-  const edit = usePlanItem();
-  const showUndo = useUndo();
-  const on = added || edit.isSuccess;
+  const [open, setOpen] = useState(false);
   return (
-    <button
-      type="button"
-      className="cart15"
-      aria-pressed={on}
-      aria-label={on ? m15.items.inPlan(name) : m15.items.addToPlan(name)}
-      aria-disabled={edit.isPending || undefined}
-      onClick={() => {
-        if (on || edit.isPending) return;
-        edit.mutate(
-          { key: planKey, add: true, body },
-          { onSuccess: () => showUndo({ message: m15.items.added(name), onUndo: () => edit.mutate({ key: planKey, add: false }, { onSuccess: () => edit.reset() }) }) },
-        );
-      }}
-    >
-      <ShoppingCart size={22} aria-hidden />
-    </button>
+    <>
+      <button
+        type="button"
+        className="cart15"
+        aria-pressed={added}
+        aria-haspopup="dialog"
+        aria-label={added ? m15.items.inPlan(name) : m15.items.addToPlan(name)}
+        onClick={() => setOpen(true)}
+      >
+        <ShoppingCart size={22} aria-hidden />
+      </button>
+      {open && <PlanPicker planKey={planKey} name={name} body={body} onClose={() => setOpen(false)} />}
+    </>
   );
 }
