@@ -8,7 +8,7 @@ import {
 } from "../api/hooks";
 import type { Assignment, Cart, MarketPrice } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
-import { formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
+import { formatDateTime, formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : t.common.genericError;
@@ -302,6 +302,7 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
   const refresh = useRefreshMarketPrices();
   if (!mp.data || cart.item_count === 0) return null;
   const done = refresh.data;
+  const st = done?.refresh ?? mp.data.refresh;
   // Mỗi món lấy giá thấp hơn giữa giá online và giá nhà mình từng mua (mẹ chốt 02/11): chưa có
   // giá online, hoặc online đắt hơn, thì hiện giá nhà mình. Giá nhà mình đọc từ lịch sử của chính
   // tài khoản, chỉ hiện ở đây, không ghi vào bảng giá chung.
@@ -356,7 +357,9 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
           ? errText(refresh.error)
           : done
             ? done.looked > 0 ? m1.marketPrices.refreshed(done.looked, done.found) : m1.marketPrices.upToDate
-            : m1.marketPrices.refreshHint}
+            : null}
+        {st && <>{(refresh.isError || done) && <br />}{m1.marketPrices.refreshHint(st.left, st.daily)}</>}
+        {st?.last_at && <><br />{m1.marketPrices.lastRefresh(formatDateTime(st.last_at))}</>}
       </p>
       <p className="hint">{m1.marketPrices.disclaimer}</p>
     </section>

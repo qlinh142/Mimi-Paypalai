@@ -72,6 +72,11 @@ func (f *fakePriceRefresh) Refresh(_ context.Context, _, day string, items []mar
 	return market.Result{Looked: 2, Found: 1, Fresh: 0}, nil
 }
 
+func (f *fakePriceRefresh) Status(context.Context, string, string) (market.RefreshStatus, error) {
+	at := time.Date(2026, 11, 2, 15, 45, 0, 0, time.UTC)
+	return market.RefreshStatus{Daily: 3, Left: 2, LastAt: &at}, nil
+}
+
 func TestPlanMarketPricesRefresh(t *testing.T) {
 	ps := &fakePlanStore{lines: map[string]plan.Line{
 		"sua-tuoi": {Key: "sua-tuoi", Name: "Sữa tươi", Status: "open"},
@@ -104,5 +109,13 @@ func TestPlanMarketPricesRefresh(t *testing.T) {
 	}
 	if items, _ := body["items"].([]any); len(items) != 1 {
 		t.Fatalf("%s", rec.Body)
+	}
+	if st, _ := body["refresh"].(map[string]any); st["left"] != float64(2) || st["last_at"] == nil {
+		t.Fatalf("%s", rec.Body)
+	}
+	// GET cũng trả trạng thái nút để app hiện "Lần cập nhật gần nhất".
+	rec, body = do(s.Handler(), "GET", "/api/plan/market-prices", "owner-tok", "")
+	if st, _ := body["refresh"].(map[string]any); rec.Code != 200 || st["daily"] != float64(3) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 }

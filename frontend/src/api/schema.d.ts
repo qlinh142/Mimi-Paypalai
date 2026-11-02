@@ -1714,7 +1714,7 @@ export interface paths {
         put?: never;
         /**
          * Nút Cập nhật giá: tra lại giá các món trong Kế hoạch, không chờ job đêm
-         * @description Bỏ qua món đã tra trong 12 giờ, tối đa 12 món mỗi lần, 5 lần mỗi người mỗi ngày. Không có món nào cần tra thì không tốn lượt.
+         * @description Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, 3 lần mỗi người mỗi ngày (mẹ chốt 02/11). Không có món nào cần tra thì không tốn lượt.
          */
         post: {
             parameters: {
@@ -3327,10 +3327,22 @@ export interface components {
             looked: number;
             /** @description Số món tra ra giá */
             found: number;
-            /** @description Số món vừa có giá trong 12 giờ nên giữ nguyên */
+            /** @description Số món vừa có giá trong 24 giờ nên giữ nguyên */
             fresh: number;
         };
+        MarketRefreshStatus: {
+            /** @description Số lần bấm Cập nhật giá mỗi ngày */
+            daily: number;
+            /** @description Số lần còn lại hôm nay */
+            left: number;
+            /**
+             * Format: date-time
+             * @description Lần bấm gần nhất; vắng khi chưa bấm lần nào
+             */
+            last_at?: string;
+        };
         MarketPrices: {
+            refresh?: components["schemas"]["MarketRefreshStatus"];
             items: {
                 /** @description Khóa dòng Kế hoạch */
                 key: string;

@@ -12,10 +12,10 @@ import (
 // đang mở, không phải chờ job đêm. Chỉ tra món của kế hoạch đó, bỏ qua món vừa có giá, và
 // giới hạn số lần bấm mỗi ngày vì mỗi món là một lượt Gemini có Google Search.
 const (
-	DefaultRefreshFresh    = 12 * time.Hour // món đã tra trong 12 giờ thì giữ giá đó
+	DefaultRefreshFresh    = 24 * time.Hour // món đã tra trong 24 giờ thì giữ giá đó (mẹ chốt 02/11)
 	DefaultRefreshMax      = 12             // tối đa số món mỗi lần bấm
 	DefaultRefreshParallel = 6              // tra song song để kịp trong giới hạn 60 s của Hosting
-	DefaultRefreshDaily    = 5              // số lần bấm mỗi người mỗi ngày
+	DefaultRefreshDaily    = 3              // số lần bấm mỗi người mỗi ngày (mẹ chốt 02/11)
 )
 
 // RefreshStore là bảng giá chung kèm thời điểm tra gần nhất của từng món (kể cả món tra
@@ -25,9 +25,27 @@ type RefreshStore interface {
 	Touched(ctx context.Context, keys []string) (map[string]time.Time, error)
 }
 
-// RefreshQuota đếm số lần bấm mỗi ngày. Hết lượt: trả lỗi quota_exceeded.
+// RefreshQuota đếm số lần bấm mỗi ngày và nhớ lần bấm gần nhất. Hết lượt: trả lỗi quota_exceeded.
 type RefreshQuota interface {
-	ReservePriceRefresh(ctx context.Context, uid, day string, limit int) error
+	ReservePriceRefresh(ctx context.Context, uid, day string, limit int, at time.Time) error
+	PriceRefreshStatus(ctx context.Context, uid, day string) (used int, last time.Time, err error)
+}
+
+// RefreshStatus là phần app hiện dưới nút: còn mấy lần hôm nay, lần bấm gần nhất.
+type RefreshStatus struct {
+	Daily  int        `json:"daily"`
+	Left   int        `json:"left"`
+	LastAt *time.Time `json:"last_at,omitempty"`
+}
+
+// Status đọc lượt còn lại trong ngày và lần bấm gần nhất của một người.
+func (r *Refresher) Status(ctx context.Context, uid, day string) (RefreshStatus, error) {
+	used, last, err := r.quota.PriceRefreshStatus(ctx, uid, day)
+	st := RefreshStatus{Daily: r.o.Daily, Left: max(r.o.Daily-used, 0)}
+	if !last.IsZero() {
+		st.LastAt = &last
+	}
+	return st, err
 }
 
 type RefreshOptions struct {
@@ -101,7 +119,7 @@ func (r *Refresher) Refresh(ctx context.Context, uid, day string, items []Wanted
 	if len(todo) == 0 {
 		return res, nil
 	}
-	if err := r.quota.ReservePriceRefresh(ctx, uid, day, r.o.Daily); err != nil {
+	if err := r.quota.ReservePriceRefresh(ctx, uid, day, r.o.Daily, now); err != nil {
 		return res, err
 	}
 	stamp := now.Format("2006-01-02")

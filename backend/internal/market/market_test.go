@@ -125,14 +125,21 @@ func (f *fakeRefreshStore) SaveEntry(ctx context.Context, e Entry) error {
 	return f.fakeStore.SaveEntry(ctx, e)
 }
 
-type fakeQuota struct{ used, limit int }
+type fakeQuota struct {
+	used int
+	last time.Time
+}
 
-func (q *fakeQuota) ReservePriceRefresh(_ context.Context, _, _ string, limit int) error {
+func (q *fakeQuota) ReservePriceRefresh(_ context.Context, _, _ string, limit int, at time.Time) error {
 	if q.used >= limit {
 		return errors.New("quota")
 	}
 	q.used++
+	q.last = at
 	return nil
+}
+func (q *fakeQuota) PriceRefreshStatus(context.Context, string, string) (int, time.Time, error) {
+	return q.used, q.last, nil
 }
 
 type safeSource struct {
@@ -151,8 +158,8 @@ func (s *safeSource) Lookup(_ context.Context, w Wanted) ([]Price, error) {
 
 func TestRefreshSkipsRecentAndCountsQuota(t *testing.T) {
 	st := &fakeRefreshStore{touched: map[string]time.Time{
-		"sua-hat": now.Add(-2 * time.Hour),  // vừa tra: giữ
-		"trung":   now.Add(-20 * time.Hour), // cũ: tra lại
+		"sua-hat": now.Add(-20 * time.Hour), // trong 24 giờ: giữ
+		"trung":   now.Add(-30 * time.Hour), // quá 24 giờ: tra lại
 	}}
 	src := &safeSource{prices: map[string][]Price{"trung": {{Store: "WinMart", PriceVND: 29_000}}}}
 	q := &fakeQuota{}
@@ -175,5 +182,8 @@ func TestRefreshSkipsRecentAndCountsQuota(t *testing.T) {
 	st.touched = map[string]time.Time{"sua-hat": now, "trung": now, "gao": now}
 	if res, err := r.Refresh(context.Background(), "u1", "2026-11-03", items); err != nil || res.Fresh != 3 {
 		t.Fatalf("%+v %v", res, err)
+	}
+	if st, err := r.Status(context.Background(), "u1", "2026-11-03"); err != nil || st.Left != 0 || st.Daily != 1 || st.LastAt == nil || !st.LastAt.Equal(now) {
+		t.Fatalf("%+v %v", st, err)
 	}
 }
