@@ -83,6 +83,7 @@ func (s *Store) Month(ctx context.Context, uid, month string) (spending.Month, e
 		Receipts:    asInt64(d["receipts"]),
 		ByCategory:  map[string]int64{},
 		OnlineVND:   asInt64(d["online_vnd"]), OnlineOrders: asInt64(d["online_orders"]), RefundVND: asInt64(d["refund_vnd"]),
+		DelegatedVND: asInt64(d["delegated_vnd"]),
 	}
 	if cats, ok := d["by_category"].(map[string]any); ok {
 		for k, v := range cats {
@@ -109,7 +110,44 @@ func (s *Store) MonthReceipts(ctx context.Context, uid, month string, limit int)
 		r.PurchasedOn, _ = m["purchased_on"].(string)
 		out = append(out, r)
 	}
-	return out, nil
+	// B4: món người nhà mua hộ nằm trong purchases của mình, không có receipts. Gom theo hóa đơn.
+	pdocs, err := s.user(uid).Collection("purchases").
+		Where("purchased_on", ">=", month+"-01").
+		Where("purchased_on", "<=", month+"-31").
+		Limit(limit * 4).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("month delegated: %w", err)
+	}
+	var lines []map[string]any
+	for _, d := range pdocs {
+		lines = append(lines, d.Data())
+	}
+	return append(out, delegatedRows(lines, uid)...), nil
+}
+
+// delegatedRows gom các dòng purchases do người khác trả tiền thành từng hóa đơn "d-{receipt}".
+func delegatedRows(lines []map[string]any, uid string) []spending.ReceiptRow {
+	rows := map[string]*spending.ReceiptRow{}
+	for _, m := range lines {
+		payer, _ := m["payer_uid"].(string)
+		rid, _ := m["receipt_id"].(string)
+		if payer == "" || payer == uid || rid == "" {
+			continue
+		}
+		r := rows[rid]
+		if r == nil {
+			r = &spending.ReceiptRow{ID: "d-" + rid, Delegated: true}
+			r.Store, _ = m["store"].(string)
+			r.PurchasedOn, _ = m["purchased_on"].(string)
+			rows[rid] = r
+		}
+		r.TotalVND += asInt64(m["line_total_vnd"])
+	}
+	out := make([]spending.ReceiptRow, 0, len(rows))
+	for _, k := range sortedKeys(rows) {
+		out = append(out, *rows[k])
+	}
+	return out
 }
 
 // UpdateSettings đọc rồi ghi trong một transaction để hai lần lưu gần nhau không đè nhau.

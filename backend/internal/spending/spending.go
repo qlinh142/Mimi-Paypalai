@@ -1,6 +1,6 @@
 // Package spending dựng Sổ chi tiêu theo tháng (GET /spending, chỉ chủ giỏ).
 // Tổng tháng lấy từ months/{YYYY-MM} (cập nhật trong transaction lưu hóa đơn);
-// danh sách hóa đơn lấy từ receipts của tháng đó.
+// danh sách hóa đơn lấy từ receipts của tháng đó, cộng phần người nhà mua hộ (B4).
 package spending
 
 import (
@@ -23,6 +23,8 @@ type Month struct {
 	OnlineVND    int64
 	OnlineOrders int64
 	RefundVND    int64
+	// DelegatedVND: phần người nhà mua hộ cho mình (B4), đã nằm trong SpentVND.
+	DelegatedVND int64
 }
 
 // ReceiptRow là một hóa đơn trong danh sách của Sổ chi tiêu.
@@ -32,6 +34,8 @@ type ReceiptRow struct {
 	PurchasedOn string `json:"purchased_on"` // YYYY-MM-DD
 	TotalVND    int64  `json:"total_vnd"`
 	DiscountVND int64  `json:"discount_vnd"`
+	// Delegated: dòng này là phần người nhà mua hộ (id "d-{receipt}"), TotalVND chỉ gồm món của mình.
+	Delegated bool `json:"delegated,omitempty"`
 }
 
 type Store interface {
@@ -54,9 +58,10 @@ type Report struct {
 	Saved             int64           `json:"saved"`
 	SavedRatio        *float64        `json:"saved_ratio"` // discount / (spent + discount); null khi không có giảm giá
 	ReceiptCount      int64           `json:"receipt_count"`
-	OnlineSpent       int64           `json:"online_spent"`  // chi qua PayPal, net sau refund
-	OnlineOrders      int64           `json:"online_orders"` // số đơn PayPal đã thanh toán
-	Refunded          int64           `json:"refunded"`      // tổng refund PayPal trong tháng
+	OnlineSpent       int64           `json:"online_spent"`    // chi qua PayPal, net sau refund
+	OnlineOrders      int64           `json:"online_orders"`   // số đơn PayPal đã thanh toán
+	Refunded          int64           `json:"refunded"`        // tổng refund PayPal trong tháng
+	DelegatedSpent    int64           `json:"delegated_spent"` // người nhà mua hộ, đã nằm trong spent (B4)
 	ByCategory        []CategoryShare `json:"by_category"`
 	TopSavingReceipts []ReceiptRow    `json:"top_saving_receipts"`
 	RecentReceipts    []ReceiptRow    `json:"recent_receipts"`
@@ -103,7 +108,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, month string) (Rep
 func Build(month string, cur, prev Month, rows []ReceiptRow) Report {
 	r := Report{
 		Month: month, Spent: cur.SpentVND, Saved: cur.DiscountVND, ReceiptCount: cur.Receipts,
-		OnlineSpent: cur.OnlineVND, OnlineOrders: cur.OnlineOrders, Refunded: cur.RefundVND,
+		OnlineSpent: cur.OnlineVND, OnlineOrders: cur.OnlineOrders, Refunded: cur.RefundVND, DelegatedSpent: cur.DelegatedVND,
 		ByCategory: []CategoryShare{}, TopSavingReceipts: []ReceiptRow{}, RecentReceipts: []ReceiptRow{},
 	}
 	if prev.SpentVND > 0 {

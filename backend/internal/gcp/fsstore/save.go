@@ -22,7 +22,7 @@ import (
 //   - receipts/{id} của người lưu (payer) và purchases cho từng dòng;
 //   - tồn kho + dự đoán của từng nhóm bị ảnh hưởng, theo người nhận hàng (inventory owner):
 //     dòng mua hộ vào tồn kho của Owner, dòng còn lại vào tồn kho của người lưu (4.1 Rule 4);
-//   - months/{YYYY-MM} của người lưu (Spending theo payer, 4.1 mục 12);
+//   - months/{YYYY-MM}: mỗi người chỉ cộng phần món của mình (B4), người lưu cộng phần còn lại;
 //   - dòng Kế hoạch của đúng Plan đang đối chiếu (3.1 mục 3A.6), hoặc Plan của Owner khi mua hộ;
 //   - vòng mua hộ: món đã mua → done, món chưa mua → trả về Owner, vòng kết thúc (4.1 mục 10);
 //   - kỳ thanh toán định kỳ khớp hóa đơn → matched, tạo kỳ sau (2.1 Rule R3);
@@ -268,26 +268,28 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 			}
 		}
 
-		// Tổng tháng của người trả tiền. Increment để không phải đọc; job cleanup đối chiếu lại
-		// hằng đêm bằng cách tính lại từ receipts (dữ liệu suy ra phải tính lại được).
-		monthDoc := map[string]any{
-			"spent_vnd":    firestore.Increment(int64(r.TotalVND)),
-			"discount_vnd": firestore.Increment(int64(r.DiscountVND)),
-			"receipts":     firestore.Increment(1),
-		}
-		byCat := map[string]int64{}
-		for _, l := range lines {
-			if l.VND != nil {
-				byCat[catOrOther(l.CategoryKey)] += int64(*l.VND)
+		// Tổng tháng (B4): mỗi người chỉ cộng phần của mình. Người trả tiền cộng phần còn lại của
+		// hóa đơn (kể cả giảm giá); người được mua hộ cộng tổng các món của họ, ghi thêm delegated_vnd.
+		// Increment để không phải đọc; số liệu này tính lại được từ receipts và purchases.
+		payerVND, ownerVND := splitSpend(lines, uid, int64(r.TotalVND))
+		cats := splitCategories(lines, uid)
+		for _, owner := range sortedKeys(cats) {
+			monthDoc := map[string]any{"receipts": firestore.Increment(1)}
+			if owner == uid {
+				monthDoc["spent_vnd"] = firestore.Increment(payerVND)
+				monthDoc["discount_vnd"] = firestore.Increment(int64(r.DiscountVND))
+			} else {
+				monthDoc["spent_vnd"] = firestore.Increment(ownerVND[owner])
+				monthDoc["delegated_vnd"] = firestore.Increment(ownerVND[owner])
 			}
-		}
-		cat := map[string]any{}
-		for c, v := range byCat {
-			cat[c] = firestore.Increment(v)
-		}
-		monthDoc["by_category"] = cat
-		if err := tx.Set(u.Collection("months").Doc(r.PurchasedOn.Month()), monthDoc, firestore.MergeAll); err != nil {
-			return err
+			cat := map[string]any{}
+			for c, v := range cats[owner] {
+				cat[c] = firestore.Increment(v)
+			}
+			monthDoc["by_category"] = cat
+			if err := tx.Set(s.user(owner).Collection("months").Doc(r.PurchasedOn.Month()), monthDoc, firestore.MergeAll); err != nil {
+				return err
+			}
 		}
 
 		// Reconcile (3.1 mục 15, Mimi 2.0 mục 19): mua đủ số lượng thì dòng xong; mua thiếu
@@ -389,6 +391,50 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		return receipt.SaveOutcome{}, err
 	}
 	return out, nil
+}
+
+// splitSpend chia tổng hóa đơn theo người nhận món (B4). Người được mua hộ nhận đúng tổng các món
+// của họ; người trả tiền nhận phần còn lại, nên giảm giá cả hóa đơn trừ vào phần người trả.
+// Nếu giảm giá lớn hơn phần người trả thì phần người được mua hộ thu nhỏ theo tỉ lệ để tổng vẫn khớp.
+func splitSpend(lines []receipt.Line, uid string, total int64) (int64, map[string]int64) {
+	others := map[string]int64{}
+	var sum int64
+	for _, l := range lines {
+		if owner := ownerOf(l, uid); owner != uid && l.VND != nil {
+			others[owner] += int64(*l.VND)
+			sum += int64(*l.VND)
+		}
+	}
+	if sum <= total {
+		return total - sum, others
+	}
+	var given int64
+	keys := sortedKeys(others)
+	for i, k := range keys {
+		if i == len(keys)-1 {
+			others[k] = total - given
+			break
+		}
+		others[k] = others[k] * total / sum
+		given += others[k]
+	}
+	return 0, others
+}
+
+// splitCategories: tiền theo nhóm của từng người. Người trả tiền luôn có mục (để đếm hóa đơn),
+// người được mua hộ có mục khi có ít nhất một món.
+func splitCategories(lines []receipt.Line, uid string) map[string]map[string]int64 {
+	out := map[string]map[string]int64{uid: {}}
+	for _, l := range lines {
+		owner := ownerOf(l, uid)
+		if out[owner] == nil {
+			out[owner] = map[string]int64{}
+		}
+		if l.VND != nil {
+			out[owner][catOrOther(l.CategoryKey)] += int64(*l.VND)
+		}
+	}
+	return out
 }
 
 func ownerOf(l receipt.Line, uid string) string {
