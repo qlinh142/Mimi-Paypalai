@@ -5,6 +5,19 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Dữ liệu mẫu cho buổi demo (V5)
+
+- `mimi job seed-demo` ghi 7 hóa đơn mẫu của nhà chị Lan vào tài khoản demo (`DEMO_UID`): Co.opmart, Bách Hóa Xanh, WinMart trong khoảng 5 tuần, tính lùi từ ngày chạy.
+- Hóa đơn đi qua đúng đường lưu thật nên Đồ dùng, dự đoán ngày hết, Sổ chi tiêu, lịch sử giá đều có số liệu như khi quét bill.
+- Lịch mua được chọn để ngày demo khớp kịch bản cảnh 3a: Sữa tươi còn khoảng 2 ngày, Trứng gà sắp hết, Dầu gội còn khoảng 5 ngày. Giá chênh nhẹ giữa các cửa hàng để màn so sánh giá có nơi rẻ hơn.
+- Không còn ngày cố định 16/10 ở đâu nữa (bản chạy thử trên máy đã dùng ngày thật từ trước).
+- README: cách chạy job, và bảng lịch cho các job `digest`, `fx-sync`, `cleanup`.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestSeedDatesFollowToday`, `TestDemoSeedEmulator` (lưu thật trên emulator, kiểm tra dự đoán Sữa tươi và chạy lại không ghi trùng).
+
+---
+
 ## 2026-11-02 · Job fx-sync hằng ngày: tỷ giá cho hóa đơn ngoại tệ (Đợt 4)
 
 - `mimi job fx-sync` lấy tỷ giá mỗi ngày từ open.er-api.com (miễn phí, không cần khóa) và ghi `fx_rates/{ngoại tệ}_{ngày}` cho 12 ngoại tệ hay gặp (USD, EUR, JPY, KRW, CNY, THB, SGD, GBP, AUD, TWD, HKD, MYR).

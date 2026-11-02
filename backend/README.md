@@ -35,8 +35,32 @@ gcloud run deploy mimi-api --image ... --args serve-api --service-account sa-api
   --region asia-southeast1 --no-traffic --tag canary
 gcloud run deploy mimi-worker --image ... --args serve-worker --ingress internal --no-allow-unauthenticated
 gcloud run jobs deploy mimi-job-digest --image ... --args job,digest
+gcloud run jobs deploy mimi-job-fx-sync --image ... --args job,fx-sync
+gcloud run jobs deploy mimi-job-cleanup --image ... --args job,cleanup
 firebase deploy --only firestore:rules,firestore:indexes
 ```
+
+Các job Cloud Scheduler gọi:
+
+| Job | Lịch gợi ý (giờ Việt Nam) | Làm gì |
+|---|---|---|
+| `digest` | mỗi 15 phút | Gửi thư tóm tắt đúng giờ mỗi người chọn |
+| `fx-sync` | 06:00 hằng ngày | Lấy tỷ giá từ open.er-api.com vào `fx_rates` (cần ra Internet) |
+| `cleanup` | 03:00 hằng ngày | Gỡ mã mời hết hạn, xóa thông báo quá 90 ngày |
+| `migrate` | chạy tay sau deploy có bước chuyển dữ liệu | Xem mục Phiên bản dữ liệu |
+
+### Dữ liệu demo (`seed-demo`)
+
+Ghi khoảng 5 tuần lịch sử mua sắm của nhà chị Lan (7 hóa đơn, tính lùi từ hôm nay) vào một tài khoản, đi qua đúng đường lưu hóa đơn thật:
+
+1. Mở app, đăng nhập tài khoản demo một lần (để có `users/{uid}`). Lấy uid trong Firebase console → Authentication.
+2. Chạy job với `DEMO_UID`:
+
+```bash
+gcloud run jobs execute mimi-job-seed --update-env-vars DEMO_UID=<uid> --args job,seed-demo
+```
+
+Nên chạy 1 đến 2 ngày trước buổi demo: Sữa tươi khi đó còn khoảng 2 ngày, Trứng gà sắp hết, Dầu gội còn khoảng 5 ngày. Chạy lại cùng ngày không ghi trùng.
 
 Bản mới deploy với `--no-traffic --tag canary` nên chưa ai dùng tới. Thử ở URL `canary` rồi mới chuyển traffic:
 
