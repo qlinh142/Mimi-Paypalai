@@ -3,7 +3,7 @@ import { categoryLabel } from "../i18n";
 import { ApiError, apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
 import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
-  Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
+  Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, MarketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
   ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
   QuickStock, ReceiptDraft, ReceiptDraftLine, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
   SpendingReport, TaxonomyGroup,
@@ -426,6 +426,17 @@ export function useBasketPrices(enabled: boolean) {
     queryKey: ["plan", "price-history", id],
     queryFn: () => apiGet<BasketPrices>(`/plan/price-history${planQuery(id)}`),
     enabled,
+  });
+}
+
+/** ADR-004: giá đang bán của các món trong Kế hoạch (bảng giá chung, cập nhật mỗi đêm). */
+export function useMarketPrices(enabled: boolean) {
+  const id = useCurrentPlanId();
+  return useQuery({
+    queryKey: ["plan", "market-prices", id],
+    queryFn: () => apiGet<MarketPrices>(`/plan/market-prices${planQuery(id)}`),
+    enabled,
+    staleTime: 30 * 60_000, // bảng chỉ đổi mỗi đêm
   });
 }
 

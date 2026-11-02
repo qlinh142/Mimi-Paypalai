@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/household"
+	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/recurring"
 	"github.com/smartlife-lab/mimi/backend/internal/taxonomy"
@@ -156,6 +158,39 @@ func (s *Server) deletePlan(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getPlanPriceHistory(w http.ResponseWriter, r *http.Request) {
 	r = withPlan(r)
 	out, err := s.pricing.Basket(r.Context(), principalFrom(r.Context()))
+	s.reply(w, r, http.StatusOK, out, err)
+}
+
+// MarketItem là giá đang bán của một dòng Kế hoạch, đọc từ bảng giá chung.
+type MarketItem struct {
+	Key       string         `json:"key"` // khóa dòng Kế hoạch (group_key)
+	Name      string         `json:"name"`
+	Prices    []market.Price `json:"prices"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+// getPlanMarketPrices: GET /plan/market-prices (ADR-004). Chỉ trả món đã có giá; món mới
+// thêm vào Kế hoạch có giá sau lượt price-sync đêm đó.
+func (s *Server) getPlanMarketPrices(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
+	cart, err := s.plan.Get(r.Context(), principalFrom(r.Context()))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	keys := make([]string, 0, len(cart.Items))
+	for _, it := range cart.Items {
+		keys = append(keys, market.Key(it.Name))
+	}
+	entries, err := s.market.Entries(r.Context(), keys)
+	out := struct {
+		Items []MarketItem `json:"items"`
+	}{Items: []MarketItem{}}
+	for i, it := range cart.Items {
+		if e, ok := entries[keys[i]]; ok {
+			out.Items = append(out.Items, MarketItem{Key: it.Key, Name: it.Name, Prices: e.Prices, UpdatedAt: e.UpdatedAt})
+		}
+	}
 	s.reply(w, r, http.StatusOK, out, err)
 }
 

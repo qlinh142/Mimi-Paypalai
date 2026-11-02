@@ -1,0 +1,63 @@
+package httpapi
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"testing"
+	"time"
+
+	"github.com/smartlife-lab/mimi/backend/internal/authz"
+	"github.com/smartlife-lab/mimi/backend/internal/market"
+	"github.com/smartlife-lab/mimi/backend/internal/plan"
+	"github.com/smartlife-lab/mimi/backend/internal/spending"
+	"github.com/smartlife-lab/mimi/backend/internal/user"
+)
+
+type fakeMarket map[string]market.Entry
+
+func (f fakeMarket) Entries(_ context.Context, keys []string) (map[string]market.Entry, error) {
+	out := map[string]market.Entry{}
+	for _, k := range keys {
+		if e, ok := f[k]; ok {
+			out[k] = e
+		}
+	}
+	return out, nil
+}
+
+func TestPlanMarketPrices(t *testing.T) {
+	ps := &fakePlanStore{lines: map[string]plan.Line{
+		"sua-tuoi": {Key: "sua-tuoi", Name: "Sữa tươi", Status: "open"},
+		"trung":    {Key: "trung", Name: "Trứng gà", Status: "open"}, // chưa có giá
+	}}
+	s, err := New(Deps{
+		Log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Tokens:     fakeTokens{"owner-tok": "u1"},
+		AppCheck:   fakeAppCheck{},
+		Principals: fakePrincipals{"u1": {UID: "u1", Role: authz.RoleOwner}},
+		Profiles:   fakeProfiles{}, Receipts: &fakeReceipts{}, Items: fakeItems{}, Ready: fakeReady{},
+		Home: fakeHome{}, Spending: spending.New(fakeSpendingStore{}), Settings: user.NewSettingsService(fakeSettingsStore{}, nil),
+		Plan:  plan.New(ps, fakePlanItems{}, nil),
+		Notes: fakeNotes{},
+		Market: fakeMarket{market.Key("Sữa tươi"): {
+			Prices:    []market.Price{{Store: "WinMart", PriceVND: 32_000, Source: "gemini_search", On: "2026-11-03"}},
+			UpdatedAt: time.Date(2026, 11, 3, 2, 0, 0, 0, time.UTC),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, body := do(s.Handler(), "GET", "/api/plan/market-prices", "owner-tok", "")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("%s", rec.Body)
+	}
+	it := items[0].(map[string]any)
+	if it["key"] != "sua-tuoi" || it["prices"].([]any)[0].(map[string]any)["price_vnd"] != float64(32_000) {
+		t.Fatalf("%s", rec.Body)
+	}
+}

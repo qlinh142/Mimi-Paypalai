@@ -1662,6 +1662,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plan/market-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ADR-004: giá đang bán của các món trong Kế hoạch, đọc từ bảng giá chung (chỉ nguồn công khai)
+         * @description Chỉ trả món đã có giá. Món mới thêm có giá sau lượt price-sync 2 giờ sáng. Giá trên hóa đơn của nhà mình không nằm ở đây.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MarketPrices"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plan/delegated": {
         parameters: {
             query?: never;
@@ -3226,6 +3267,29 @@ export interface components {
             other_dimension_count?: number;
             history?: components["schemas"]["PriceObservation"][];
             window_days?: number;
+        };
+        MarketPrice: {
+            store: string;
+            /** Format: int64 */
+            price_vnd: number;
+            /** @description Quy cách nguồn ghi (1L */
+            size?: string;
+            /** @description gemini_search hoặc partner_... */
+            source: string;
+            url?: string;
+            /** Format: date */
+            on: string;
+        };
+        MarketPrices: {
+            items: {
+                /** @description Khóa dòng Kế hoạch */
+                key: string;
+                name: string;
+                /** @description Rẻ trước */
+                prices: components["schemas"]["MarketPrice"][];
+                /** Format: date-time */
+                updated_at: string;
+            }[];
         };
         BasketPrices: {
             /** @description Số ngày lịch sử giá đã xét (90) */

@@ -5,6 +5,18 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Giá online: bảng giá chung và job price-sync
+
+Nhánh `feat/gia-online`. Theo ADR-004 (mẹ duyệt 02/11): bảng giá chung chỉ từ nguồn công khai; giá trên hóa đơn của nhà nào chỉ dùng cho nhà đó.
+
+- `internal/market`: bảng giá chung, `Sync` gom món đang nằm trong Kế hoạch của mọi nhà (chỉ tên món), gộp trùng, bỏ món đã có giá trong 3 ngày, món nhiều nhà cần tra trước, tối đa `PRICE_SYNC_LIMIT` (mặc định 200) món mỗi đêm, dừng sớm khi nguồn lỗi 5 lần liền. Nguồn cắm thêm theo thứ tự ưu tiên; đối tác thêm vào trước Gemini khi có.
+- `gemini.PriceSearch`: Gemini + Google Search, chỉ nhận giá thấy trong kết quả tìm kiếm; `market.Clean` bỏ giá vô lý, link lạ, gộp trùng nơi bán.
+- Firestore `market_prices/{key}` (+ `history/{ngày}`), không trường nào trỏ tới người dùng.
+- `GET /plan/market-prices` và khối "Giá đang bán" ở Kế hoạch (cạnh "Ước tính theo lịch sử giá").
+- Deploy: job `mimi-job-price-sync` (60 phút), lịch 2 giờ sáng, `sa-jobs` thêm quyền Vertex AI.
+- Kiểm tra: test `market`, `gemini.parsePrices`, handler, OpenAPI; giao diện chạy trên bản thử.
+- Chưa có: dọn lịch sử quá 90 ngày; mã món chuẩn (hiện khóa là tên món bỏ dấu).
+
 ## 2026-11-02 · Bật App Check (reCAPTCHA Enterprise)
 
 Nhánh `deploy/app-check`, xếp chồng lên PR #36.

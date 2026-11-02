@@ -18,6 +18,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/idem"
 	"github.com/smartlife-lab/mimi/backend/internal/inbox"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
+	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/order"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/pricing"
@@ -110,6 +111,10 @@ type (
 		History(ctx context.Context, p authz.Principal) ([]history.Entry, error)
 		Detail(ctx context.Context, p authz.Principal, id string) (history.Detail, error)
 	}
+	// Market là bảng giá chung (ADR-004), chỉ từ nguồn công khai.
+	Market interface {
+		Entries(ctx context.Context, keys []string) (map[string]market.Entry, error)
+	}
 	Pricing interface {
 		Item(ctx context.Context, p authz.Principal, key string) (pricing.ItemHistory, error)
 		Basket(ctx context.Context, p authz.Principal) (pricing.Basket, error)
@@ -160,6 +165,7 @@ type Deps struct {
 	Recurring  Recurring  // nil: các route khoản định kỳ trả 501
 	Households Households // nil: các route nhà trả 501
 	Pricing    Pricing    // nil: các route lịch sử giá trả 501
+	Market     Market     // nil: không có route giá đang bán
 	History    History    // nil: lịch sử mua hàng trả 404
 	Accounts   Accounts   // nil: DELETE /me trả 501
 	SignIn     SignInChecker
@@ -186,6 +192,7 @@ type Server struct {
 	recurring  Recurring
 	households Households
 	pricing    Pricing
+	market     Market
 	history    History
 	ready      ReadinessChecker
 	metrics    Metrics
@@ -218,7 +225,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		log: d.Log, tokens: d.Tokens, accounts: d.Accounts, signIn: d.SignIn, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
-		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, history: d.History,
+		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, history: d.History,
 		limiter: newWindowLimiter(60), readTimeout: 55 * time.Second, defaultTimeout: 10 * time.Second,
 	}
 	if s.metrics == nil {
@@ -312,6 +319,9 @@ func (s *Server) Handler() http.Handler {
 	if s.pricing != nil {
 		private("GET /items/{key}/price-history", s.defaultTimeout, s.getItemPriceHistory)
 		private("GET /plan/price-history", s.defaultTimeout, s.getPlanPriceHistory)
+	}
+	if s.market != nil {
+		private("GET /plan/market-prices", s.defaultTimeout, s.getPlanMarketPrices)
 	}
 
 	if s.orders != nil {
