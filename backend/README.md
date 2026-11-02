@@ -57,7 +57,7 @@ Ghi khoảng 5 tuần lịch sử mua sắm của nhà chị Lan (7 hóa đơn, 
 2. Chạy job với `DEMO_UID`:
 
 ```bash
-gcloud run jobs execute mimi-job-seed --update-env-vars DEMO_UID=<uid> --args job,seed-demo
+gcloud run jobs execute mimi-job-seed-demo --region asia-southeast1 --update-env-vars DEMO_UID=<uid> --wait
 ```
 
 Nên chạy 1 đến 2 ngày trước buổi demo: Sữa tươi khi đó còn khoảng 2 ngày, Trứng gà sắp hết, Dầu gội còn khoảng 5 ngày. Chạy lại cùng ngày không ghi trùng.
