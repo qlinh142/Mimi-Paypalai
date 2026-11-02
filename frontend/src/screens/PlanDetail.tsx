@@ -21,7 +21,7 @@ import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
 import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
-import { type CalendarEvent, downloadIcs, googleCalendarUrl } from "../lib/calendar";
+import { type CalendarEvent, IOS_NOT_SAFARI, googleCalendarUrl, openIcs } from "../lib/calendar";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -427,10 +427,11 @@ function AddToCalendar({ ev, uid }: { ev: CalendarEvent; uid: string }) {
         <a className="btn btn--quiet" href={googleCalendarUrl(ev)} target="_blank" rel="noopener noreferrer">
           <CalendarPlus size={18} aria-hidden /> {m15.plan.calGoogle}
         </a>
-        <button type="button" className="btn btn--quiet" onClick={() => downloadIcs(ev, uid)}>
+        <button type="button" className="btn btn--quiet" onClick={() => openIcs(ev, uid)}>
           {m15.plan.calIcs}
         </button>
       </div>
+      {IOS_NOT_SAFARI && <p className="hint" role="note">{m15.plan.calSafari(window.location.host)}</p>}
       <p className="hint">{m15.plan.calHint}</p>
     </div>
   );

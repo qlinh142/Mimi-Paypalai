@@ -77,3 +77,26 @@ export function downloadIcs(ev: CalendarEvent, uid: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** iPhone, iPad (iPadOS báo là MacIntel có cảm ứng). */
+export const IS_IOS =
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+/**
+ * Trình duyệt khác Safari trên iPhone (Chrome, Firefox, Edge, app Google, Facebook, Zalo...):
+ * chỉ tải file .ics về, không mở được app Lịch (mẹ thử Chrome 02/11).
+ */
+export const IOS_NOT_SAFARI = IS_IOS && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|FBAN|FBAV|Instagram|Line\/|Zalo/i.test(navigator.userAgent);
+
+/**
+ * Nút "Lịch trên iPhone". Safari trên iPhone mở thẳng bảng "Thêm vào Lịch" khi đi tới file lịch
+ * (không tải về); máy khác tải file .ics để mở bằng app lịch của máy.
+ */
+export function openIcs(ev: CalendarEvent, uid: string) {
+  if (IS_IOS && !IOS_NOT_SAFARI) {
+    window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsText(ev, uid))}`;
+    return;
+  }
+  downloadIcs(ev, uid);
+}
