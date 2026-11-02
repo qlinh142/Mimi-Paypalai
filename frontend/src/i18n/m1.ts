@@ -127,7 +127,7 @@ const en = {
     refreshing: "Looking up prices… (about 30 seconds)",
     refreshed: (looked: number, found: number) => `Looked up ${looked} items, found prices for ${found}.`,
     upToDate: "Prices were updated in the last 24 hours, nothing to look up.",
-    refreshHint: (left: number, daily: number) => `${left}/${daily} updates left today. Items updated in the last 24 hours are kept.`,
+    refreshHint: (left: number, daily: number) => `${left}/${daily} updates left today.`,
     lastRefresh: (when: string) => `Prices last updated: ${when}`,
   },
   priceHistory: {
@@ -336,7 +336,7 @@ const vi: M1 = {
     refreshing: "Mimi đang tra giá… (khoảng 30 giây)",
     refreshed: (looked, found) => `Đã tra ${looked} món, có giá ${found} món.`,
     upToDate: "Giá vừa cập nhật trong 24 giờ qua, chưa cần tra lại.",
-    refreshHint: (left, daily) => `Hôm nay còn ${left}/${daily} lần cập nhật. Món đã có giá trong 24 giờ thì giữ nguyên.`,
+    refreshHint: (left, daily) => `Hôm nay còn ${left}/${daily} lần cập nhật.`,
     lastRefresh: (when) => `Lần cập nhật giá gần nhất: ${when}`,
   },
   priceHistory: {
