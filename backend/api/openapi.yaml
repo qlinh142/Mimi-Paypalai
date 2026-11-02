@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Mimi API
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
-  version: 0.1.0
+  version: 0.2.0
   description: |
     API của Mimi V2 (backend Go trên Cloud Run, gọi qua Firebase Hosting tại /api).
 
@@ -12,6 +12,11 @@ info:
     - Lỗi luôn có dạng Error với `code` ổn định; client dựa vào `code`, không dựa vào `message`.
     - Thao tác ghi có thể gửi lại an toàn: hóa đơn dùng `receipt_id` do client sinh,
       sửa tồn dùng `acted_at`, các thao tác còn lại là PUT/DELETE theo khóa cố định.
+    - Header `Idempotency-Key` (8–128 ký tự `A-Za-z0-9_-`, thường là UUID sinh lúc người dùng bấm)
+      cho mọi thao tác ghi gửi JSON. Gửi lại cùng key và cùng nội dung trong 24 giờ thì nhận lại
+      đúng kết quả lần đầu, kèm header `Idempotent-Replayed: true`, máy chủ không ghi lần hai.
+      Cùng key nhưng khác route hoặc khác nội dung: 422 `idempotency_mismatch`. Cùng key đang
+      xử lý dở: 409 `idempotency_in_flight` (retryable). Lỗi tạm thời không được giữ theo key.
     - Thành viên nhà (role=member) không bao giờ nhận trường giá hay chi tiêu.
     - Mục `x-status: planned` là endpoint đã thiết kế nhưng khung server trả 501.
 servers:
@@ -717,7 +722,8 @@ components:
                  quota_exceeded, rate_limited, receipt_unreadable, ai_unavailable, not_implemented, internal, timeout,
                  mandate_blocked, approval_required, invalid_state, payment_failed, payment_not_enabled, payment_unavailable,
                  too_many_images, image_too_large, unreadable_image, no_items, read_failed, invalid_purchase_date,
-                 invalid_line_total, invalid_quantity, transaction_conflict]
+                 invalid_line_total, invalid_quantity, transaction_conflict,
+                 idempotency_in_flight, idempotency_mismatch]
         retryable: { type: boolean, description: "true: thử lại cùng yêu cầu có thể thành công (lỗi tạm thời, xung đột transaction)" }
         message: { type: string, description: "Câu tiếng Việt ngắn, an toàn để hiển thị" }
         fields: { type: object, additionalProperties: true }
