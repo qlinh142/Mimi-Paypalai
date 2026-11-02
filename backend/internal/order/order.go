@@ -76,6 +76,8 @@ type Basket struct {
 	TotalVND   int64     `json:"total_vnd"`
 	AmountUSD  string    `json:"amount_usd"`
 	VNDPerUSD  int64     `json:"vnd_per_usd"`
+	RateSource string    `json:"rate_source,omitempty"` // tỷ giá lấy từ đâu
+	RateAsOf   string    `json:"rate_as_of,omitempty"`  // tỷ giá của ngày nào, YYYY-MM-DD
 	SnapshotAt time.Time `json:"snapshot_at"`
 	Decision   Decision  `json:"decision"`
 }
@@ -105,6 +107,8 @@ type Order struct {
 	TotalVND           int64      `json:"total_vnd"`
 	AmountUSD          string     `json:"amount_usd"`
 	VNDPerUSD          int64      `json:"vnd_per_usd"`
+	RateSource         string     `json:"rate_source,omitempty"`
+	RateAsOf           string     `json:"rate_as_of,omitempty"`
 	Decision           Decision   `json:"decision"`
 	ApprovedByUser     bool       `json:"approved_by_user"` // người dùng duyệt đơn ASK
 	PayPalOrderID      string     `json:"paypal_order_id"`
@@ -175,6 +179,8 @@ type Service struct {
 	payments  Payments // nil: chưa cấu hình PayPal
 	verifier  Verifier // nil: chỉ cho nhập tay
 	vndPerUSD int64
+	rateSrc   string
+	rateAsOf  string
 	log       *slog.Logger
 	now       func() time.Time
 }
@@ -187,6 +193,12 @@ func New(store Store, plans PlanLines, catalog Catalog, payments Payments, verif
 		now = time.Now
 	}
 	return &Service{store: store, plans: plans, catalog: catalog, payments: payments, verifier: verifier, vndPerUSD: vndPerUSD, log: log, now: now}, nil
+}
+
+// WithRateInfo ghi nguồn và ngày của tỷ giá vào mỗi giỏ và đơn hàng (vấn đề 44).
+func (s *Service) WithRateInfo(source, asOf string) *Service {
+	s.rateSrc, s.rateAsOf = source, asOf
+	return s
 }
 
 // ToUSD quy đồng sang USD 2 chữ số thập phân, làm tròn nửa lên. PayPal không nhận VND.
@@ -241,6 +253,7 @@ func (s *Service) Basket(ctx context.Context, p authz.Principal, keys []string) 
 	today := domain.Today(s.now(), domain.Location(p.Timezone))
 	b := buildBasket(s.catalog, lines, keys, today)
 	b.VNDPerUSD, b.AmountUSD = s.vndPerUSD, ToUSD(b.TotalVND, s.vndPerUSD)
+	b.RateSource, b.RateAsOf = s.rateSrc, s.rateAsOf
 	m, err := s.store.Mandate(ctx, p.UID)
 	if err != nil {
 		return Basket{}, err
@@ -371,7 +384,7 @@ func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutR
 	now := s.now()
 	o := Order{
 		ID: newID(), State: StateAwaitingPayment, Merchant: b.Merchant, Lines: b.Lines,
-		TotalVND: b.TotalVND, AmountUSD: b.AmountUSD, VNDPerUSD: b.VNDPerUSD, Decision: b.Decision,
+		TotalVND: b.TotalVND, AmountUSD: b.AmountUSD, VNDPerUSD: b.VNDPerUSD, RateSource: b.RateSource, RateAsOf: b.RateAsOf, Decision: b.Decision,
 		ApprovedByUser: b.Decision.Result == Ask, Refunds: []Refund{}, CreatedAt: now, UpdatedAt: now,
 		Events: []Event{{State: StateAwaitingPayment, At: now}},
 	}

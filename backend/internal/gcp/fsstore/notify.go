@@ -47,6 +47,7 @@ func (n *NotifyStore) DueUsers(ctx context.Context, now time.Time, limit int) ([
 			if tz, _ := st["timezone"].(string); tz != "" {
 				u.Timezone = tz
 			}
+			u.DigestTime, _ = st["digest_time"].(string)
 		}
 		u.Name, _ = d.Data()["display_name"].(string)
 		if email, err := n.emails.Email(ctx, u.UID); err == nil {
@@ -76,14 +77,42 @@ func (n *NotifyStore) BuildDigest(ctx context.Context, uid string, today domain.
 	return notify.Content{Subject: fmt.Sprintf("Mimi: %d món sắp hết", len(lines)), Lines: lines}, true, nil
 }
 
-func (n *NotifyStore) ClaimDigest(ctx context.Context, uid, id string) (bool, error) {
-	_, err := n.user(uid).Collection("digests").Doc(id).Create(ctx, map[string]any{
-		"status": "sending", "created_at": time.Now(),
+// sendingStale: bản tin kẹt ở "sending" lâu hơn chừng này (job chết giữa chừng) thì được gửi lại.
+const sendingStale = 30 * time.Minute
+
+func (n *NotifyStore) ClaimDigest(ctx context.Context, uid, id string, now time.Time) (bool, error) {
+	ref := n.user(uid).Collection("digests").Doc(id)
+	claimed := false
+	err := n.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		claimed = false
+		snap, err := tx.Get(ref)
+		switch {
+		case status.Code(err) == codes.NotFound:
+			claimed = true
+			return tx.Create(ref, map[string]any{"status": "sending", "attempts": int64(1), "created_at": now, "updated_at": now})
+		case err != nil:
+			return err
+		}
+		d := snap.Data()
+		st, _ := d["status"].(string)
+		attempts, _ := d["attempts"].(int64)
+		if attempts == 0 {
+			attempts = 1 // tài liệu cũ chưa có attempts
+		}
+		updated, _ := d["updated_at"].(time.Time)
+		if updated.IsZero() {
+			updated, _ = d["created_at"].(time.Time)
+		}
+		retry := st == "retry" || (st == "sending" && now.Sub(updated) > sendingStale)
+		if !retry || attempts >= notify.MaxAttempts {
+			return nil
+		}
+		claimed = true
+		return tx.Update(ref, []firestore.Update{
+			{Path: "status", Value: "sending"}, {Path: "attempts", Value: attempts + 1}, {Path: "updated_at", Value: now},
+		})
 	})
-	if status.Code(err) == codes.AlreadyExists {
-		return false, nil
-	}
-	return err == nil, err
+	return claimed, err
 }
 
 func (n *NotifyStore) MarkDigest(ctx context.Context, uid, id, st string) error {

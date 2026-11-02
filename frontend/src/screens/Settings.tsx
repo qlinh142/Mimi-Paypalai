@@ -12,11 +12,11 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useAuth } from "../lib/auth";
-import { clearQueue, useQueue } from "../lib/offlineQueue";
+import { useQueue } from "../lib/offlineQueue";
 import { flushQueue } from "../api/client";
 import { RELATIONS, relationOf, setRelation } from "../lib/relation";
 import { formatDayMonth } from "../lib/text";
-import { queryClient, queryPersister } from "../app/queryClient";
+import { wipeDeviceData } from "../lib/localData";
 
 const S = m15.settings;
 const LEAD_DAYS = [1, 2, 3, 5, 7, 10, 14, 21, 30];
@@ -123,8 +123,7 @@ export function Settings() {
               type="button"
               className="set15__row set15__row--danger"
               onClick={async () => {
-                queryClient.clear();
-                await Promise.all([queryPersister.removeClient(), clearQueue()]);
+                await wipeDeviceData();
                 await auth.signOut();
               }}
             >

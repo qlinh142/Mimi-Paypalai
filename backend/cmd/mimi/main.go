@@ -118,6 +118,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	if err != nil {
 		return err
 	}
+	orders.WithRateInfo(cfg.VNDRateSource, cfg.VNDRateAsOf)
 	api, err := httpapi.New(httpapi.Deps{
 		Log: log, Tokens: auth, AppCheck: appCheck, Principals: store, Profiles: store,
 		Receipts: receipts, Items: items, Ready: store,

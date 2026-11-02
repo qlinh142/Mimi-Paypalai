@@ -2,8 +2,7 @@ import { t } from "../i18n";
 import { Link } from "react-router-dom";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { useAuth } from "../lib/auth";
-import { clearQueue } from "../lib/offlineQueue";
-import { queryPersister } from "../app/queryClient";
+import { wipeDeviceData } from "../lib/localData";
 
 /** Màn khung: đã có route và vị trí trong điều hướng, nội dung làm theo spec ở bước sau. */
 export function Stub({ title, section, sub = false }: { title: string; section: string; sub?: boolean }) {
@@ -31,7 +30,7 @@ export function Account() {
           className="btn btn--quiet"
           onClick={async () => {
             // Đăng xuất phải dọn cả cache dữ liệu và hàng đợi ghi trên máy.
-            await Promise.all([queryPersister.removeClient(), clearQueue()]);
+            await wipeDeviceData();
             await auth.signOut();
           }}
         >

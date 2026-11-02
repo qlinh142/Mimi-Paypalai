@@ -21,7 +21,17 @@ type DueUser struct {
 	Timezone string
 	Email    string // lấy từ Firebase Auth lúc chạy, không lưu ở Firestore
 	Name     string
+	// DigestTime "HH:MM" theo giờ người dùng (settings.digest_time); rỗng: giờ mặc định.
+	DigestTime string
 }
+
+// RetryAfter: gửi lỗi tạm thời thì thử lại sau chừng này; MaxAttempts: số lần gửi tối đa
+// mỗi bản tin, sau đó bỏ và chờ ngày hôm sau (vấn đề 58: job bị bỏ qua phải có catch-up,
+// vấn đề 8: retry phải có giới hạn).
+const (
+	RetryAfter  = 15 * time.Minute
+	MaxAttempts = 3
+)
 
 type Content struct {
 	Subject string
@@ -32,8 +42,10 @@ type Store interface {
 	DueUsers(ctx context.Context, now time.Time, limit int) ([]DueUser, error)
 	// BuildDigest trả nội dung; ok=false nếu không có gì đáng gửi.
 	BuildDigest(ctx context.Context, uid string, today domain.Date) (Content, bool, error)
-	// ClaimDigest tạo digests/{date}_{kind} nếu chưa có. false: đã gửi hoặc đang gửi.
-	ClaimDigest(ctx context.Context, uid, id string) (bool, error)
+	// ClaimDigest giành quyền gửi digests/{date}_{kind}: được khi chưa có, hoặc lần trước
+	// lỗi tạm thời ("retry") và chưa quá MaxAttempts, hoặc lần trước kẹt ở "sending" quá lâu.
+	// false: đã gửi, đang gửi, bị từ chối hẳn hoặc hết lượt thử.
+	ClaimDigest(ctx context.Context, uid, id string, now time.Time) (bool, error)
 	MarkDigest(ctx context.Context, uid, id, status string) error
 	Reschedule(ctx context.Context, uid string, next time.Time) error
 }
@@ -120,8 +132,12 @@ func (j *DigestJob) one(ctx context.Context, u DueUser, now time.Time) string {
 		return "skipped"
 	}
 	today := domain.Today(now, loc)
-	// Lượt tiếp theo: 8h sáng mai theo giờ người dùng. Bản thật đọc settings.digest_time.
-	next := today.AddDays(1).At(8, 0, loc)
+	// Lượt tiếp theo: đúng giờ người dùng chọn trong Cài đặt (mặc định 8:00), theo giờ của họ.
+	h, m := domain.DefaultDigestHour, domain.DefaultDigestMinute
+	if hh, mm, ok := domain.ParseClock(u.DigestTime); ok {
+		h, m = hh, mm
+	}
+	next := domain.NextDigestAt(now, loc, h, m)
 
 	content, ok, err := j.store.BuildDigest(ctx, u.UID, today)
 	if err != nil {
@@ -133,7 +149,7 @@ func (j *DigestJob) one(ctx context.Context, u DueUser, now time.Time) string {
 		return "skipped"
 	}
 	id := today.String() + "_daily"
-	claimed, err := j.store.ClaimDigest(ctx, u.UID, id)
+	claimed, err := j.store.ClaimDigest(ctx, u.UID, id, now)
 	if err != nil || !claimed {
 		_ = j.store.Reschedule(ctx, u.UID, next)
 		return "skipped"
@@ -146,6 +162,15 @@ func (j *DigestJob) one(ctx context.Context, u DueUser, now time.Time) string {
 			status = "bounced"
 		}
 		_ = j.store.MarkDigest(ctx, u.UID, id, status)
+		// Lỗi tạm thời: hẹn thử lại sớm (ClaimDigest tự dừng sau MaxAttempts lần).
+		// Bị từ chối hẳn: chờ lượt ngày mai.
+		retryAt := next
+		if status == "retry" {
+			retryAt = domain.NextAllowed(now.Add(RetryAfter), loc)
+		}
+		if err := j.store.Reschedule(ctx, u.UID, retryAt); err != nil {
+			j.log.ErrorContext(ctx, "reschedule failed", "err", err)
+		}
 		j.log.WarnContext(ctx, "digest send failed", "status", status, "err", err)
 		return "failed"
 	}

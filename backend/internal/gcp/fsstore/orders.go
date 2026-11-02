@@ -175,6 +175,7 @@ func (s *Store) RecordPayment(ctx context.Context, uid string, o order.Order, tz
 		return tx.Set(u.Collection("payments").Doc(o.ID), map[string]any{
 			"provider": "paypal", "paypal_order_id": o.PayPalOrderID, "paypal_capture_id": o.CaptureID,
 			"amount_vnd": o.TotalVND, "amount_usd": o.AmountUSD, "vnd_per_usd": o.VNDPerUSD,
+			"rate_source": o.RateSource, "rate_as_of": o.RateAsOf,
 			"merchant": o.Merchant, "paid_at": paidAt, "month": month, "refunds": []any{},
 		})
 	})
