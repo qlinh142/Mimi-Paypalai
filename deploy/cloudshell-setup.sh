@@ -11,6 +11,7 @@ set -euo pipefail
 PROJECT="${1:?Cách dùng: bash deploy/cloudshell-setup.sh <project-id>}"
 REGION="asia-southeast1"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.8-flash}" # dòng 2.5 đã bị Google tắt ngày 20/10/2026
+GEMINI_THINKING="${GEMINI_THINKING:-LOW}" # MINIMAL nhanh nhất, LOW cân bằng; đổi: GEMINI_THINKING=MINIMAL bash deploy/cloudshell-setup.sh <project>
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 say() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
@@ -38,7 +39,7 @@ APP_CHECK="$(gcloud run services describe mimi-api --region "$REGION" --format=j
 try: e=json.load(sys.stdin)["spec"]["template"]["spec"]["containers"][0].get("env",[])
 except Exception: e=[]
 print(next((x.get("value","") for x in e if x.get("name")=="APP_CHECK_REQUIRED"),"false"))' || echo false)"
-ENV_VARS="GOOGLE_CLOUD_PROJECT=$PROJECT,MIMI_ENV=dev,APP_CHECK_REQUIRED=$APP_CHECK,GEMINI_MODEL=$GEMINI_MODEL,GEMINI_LOCATION=global,PAYPAL_MODE=off"
+ENV_VARS="GOOGLE_CLOUD_PROJECT=$PROJECT,MIMI_ENV=dev,APP_CHECK_REQUIRED=$APP_CHECK,GEMINI_MODEL=$GEMINI_MODEL,GEMINI_THINKING=$GEMINI_THINKING,GEMINI_LOCATION=global,PAYPAL_MODE=off"
 gcloud run deploy mimi-api --source "$ROOT/backend" --region "$REGION" \
   --service-account "sa-api@$PROJECT.iam.gserviceaccount.com" \
   --set-env-vars "$ENV_VARS" --args serve-api \
