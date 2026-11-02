@@ -85,8 +85,24 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 1. Mọi thay đổi dữ liệu phải để **code cũ vẫn đọc được**: chỉ thêm ô mới, không đổi tên hay xóa ô cũ trong cùng một lần deploy.
    Đổi tên thì làm hai lần: lần 1 ghi cả ô cũ lẫn ô mới, lần 2 (khi đã chắc không cần quay lại) mới bỏ ô cũ.
-2. Bước chuyển dữ liệu (`mimi job migrate`, khi có) chạy **sau** khi code mới đã ổn định, không chạy cùng lúc deploy.
+2. Bước chuyển dữ liệu (`mimi job migrate`) chạy **sau** khi code mới đã ổn định, không chạy cùng lúc deploy.
 3. Sau khi quay lại, ghi vào `CHANGELOG.md`: giờ quay lại, revision nào, vì sao.
+
+### Phiên bản dữ liệu (`schema_version`)
+
+Mỗi `users/{uid}` có ô `schema_version`, cho biết dữ liệu của người đó đang ở phiên bản nào (hiện là 1).
+Mỗi người dùng chỉ có một ô số này, nên dữ liệu không phình ra.
+Danh sách bước chuyển nằm ở `internal/gcp/fsstore/migrate.go`.
+
+- **Khi đổi cách lưu:** thêm một bước có `Version` tiếp theo. Bước đó phải chạy lại nhiều lần được mà không hỏng.
+- **Khi bước chạy:** lúc người dùng đăng nhập mà dữ liệu còn ở bản cũ. Người lâu không đăng nhập thì chạy job:
+
+```bash
+gcloud run jobs deploy mimi-job-migrate --image ... --args job,migrate   # một lần
+gcloud run jobs execute mimi-job-migrate --region asia-southeast1
+```
+
+- **Sau khi quay lại bản cũ:** code cũ gặp dữ liệu có phiên bản mới hơn thì để nguyên, không hạ phiên bản.
 
 **Diễn tập:** làm thử một lần trên project dev trước demo: deploy bản mới, quay lại revision cũ,
 kiểm tra app vẫn mở và dữ liệu còn nguyên.

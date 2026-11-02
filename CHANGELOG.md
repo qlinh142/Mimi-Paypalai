@@ -5,6 +5,18 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Số phiên bản dữ liệu và bước chuyển dữ liệu (A4)
+
+- Mỗi `users/{uid}` có ô `schema_version`. Người dùng mới được ghi phiên bản hiện tại (1). Dữ liệu cũ chưa có ô này được coi là bản 0 và được nâng lên 1 ở lần đăng nhập tới. Mỗi người chỉ có một ô số, nên dữ liệu không phình ra.
+- `internal/gcp/fsstore/migrate.go` giữ danh sách bước chuyển. Bước 1 chỉ làm mốc, không đổi dữ liệu. Các thay đổi sau này (ví dụ B3, gắn kế hoạch cho từng dòng hóa đơn) thêm bước 2, 3...
+- Bước chuyển chạy lúc đăng nhập, và chạy bằng job `mimi job migrate` cho người lâu không đăng nhập. Không bao giờ hạ phiên bản, nên quay lại bản cũ vẫn an toàn.
+- README có mục "Phiên bản dữ liệu".
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...` qua. Test mới: `TestMigrationsOrdered`, `TestPendingMigrations`.
+
+---
+
 ## 2026-11-02 · README: các bước quay lại bản cũ (A6)
 
 - `backend/README.md` thêm mục "Quay lại bản cũ": khi nào quay lại, lệnh cho Cloud Run (api, worker, job), Firebase Hosting, Firestore rules, và luật thay đổi dữ liệu để quay lại không hỏng dữ liệu.
