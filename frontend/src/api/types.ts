@@ -446,6 +446,8 @@ export type ItemPriceHistory = {
 /** ADR-004: giá đang bán từ bảng giá chung (chỉ nguồn công khai). */
 export type MarketPrice = { store: string; price_vnd: number; size?: string; source: string; url?: string; on: string };
 export type MarketPrices = { items: { key: string; name: string; prices: MarketPrice[]; updated_at: string }[] };
+/** Nút "Cập nhật giá": bảng giá mới kèm số món vừa tra. */
+export type MarketRefresh = MarketPrices & { looked: number; found: number; fresh: number };
 
 export type BasketPrices = {
   basket_item_count: number;

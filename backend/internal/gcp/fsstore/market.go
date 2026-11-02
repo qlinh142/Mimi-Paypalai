@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	_ market.Store  = (*Store)(nil)
-	_ market.Demand = (*Store)(nil)
+	_ market.Store        = (*Store)(nil)
+	_ market.RefreshStore = (*Store)(nil)
+	_ market.RefreshQuota = (*Store)(nil)
+	_ market.Demand       = (*Store)(nil)
 )
 
 // Bảng giá chung (ADR-004): market_prices/{key} {name, group_key, prices[], updated_at}.
@@ -72,11 +74,29 @@ func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
 	return nil
 }
 
-func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.Entry, error) {
-	out := map[string]market.Entry{}
-	if len(keys) == 0 {
+// Touched trả lần tra gần nhất của từng món, kể cả món tra không ra giá.
+func (s *Store) Touched(ctx context.Context, keys []string) (map[string]time.Time, error) {
+	out := map[string]time.Time{}
+	refs := s.marketRefs(keys)
+	if len(refs) == 0 {
 		return out, nil
 	}
+	snaps, err := s.c.GetAll(ctx, refs)
+	if err != nil {
+		return nil, fmt.Errorf("market touched: %w", err)
+	}
+	for _, d := range snaps {
+		if !d.Exists() {
+			continue
+		}
+		if t, ok := d.Data()["updated_at"].(time.Time); ok {
+			out[d.Ref.ID] = t
+		}
+	}
+	return out, nil
+}
+
+func (s *Store) marketRefs(keys []string) []*firestore.DocumentRef {
 	refs := make([]*firestore.DocumentRef, 0, len(keys))
 	seen := map[string]bool{}
 	for _, k := range keys {
@@ -85,6 +105,15 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 		}
 		seen[k] = true
 		refs = append(refs, s.marketPrices().Doc(k))
+	}
+	return refs
+}
+
+func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.Entry, error) {
+	out := map[string]market.Entry{}
+	refs := s.marketRefs(keys)
+	if len(refs) == 0 {
+		return out, nil
 	}
 	snaps, err := s.c.GetAll(ctx, refs)
 	if err != nil {

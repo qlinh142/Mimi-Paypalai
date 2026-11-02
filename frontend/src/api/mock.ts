@@ -799,6 +799,15 @@ function histDetail(id: string): ReceiptDetail | null {
   return { receipt_id: rid, store, purchased_at: histDate(ago, hour), total_vnd: subtotal - disc, item_names: [], kind: "own", plans, lines, subtotal, discount: disc };
 }
 
+function mockMarketItems() {
+  return mockCart().items.filter((i) => MOCK_PRICES[i.key]).map((i) => ({
+    key: i.key, name: i.name, updated_at: new Date().toISOString(),
+    prices: Object.entries(MOCK_PRICES[i.key])
+      .map(([store, v]) => ({ store, price_vnd: Math.round((v * 0.97) / 100) * 100, source: "gemini_search", on: new Date().toISOString().slice(0, 10) }))
+      .sort((a, b) => a.price_vnd - b.price_vnd),
+  }));
+}
+
 function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   const p = url.pathname;
   const body = () => (init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {});
@@ -875,14 +884,14 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   }
   if (p === "/plan/market-prices" && method === "GET") {
     // Bản thử: giá "tra trên mạng" giả, lệch nhẹ so với giá hóa đơn mẫu.
-    return inPlan(url.searchParams.get("plan_id"), () => json({
-      items: mockCart().items.filter((i) => MOCK_PRICES[i.key]).map((i) => ({
-        key: i.key, name: i.name, updated_at: new Date().toISOString(),
-        prices: Object.entries(MOCK_PRICES[i.key])
-          .map(([store, v]) => ({ store, price_vnd: Math.round((v * 0.97) / 100) * 100, source: "gemini_search", on: new Date().toISOString().slice(0, 10) }))
-          .sort((a, b) => a.price_vnd - b.price_vnd),
-      })),
-    }));
+    return inPlan(url.searchParams.get("plan_id"), () => json({ items: mockMarketItems() }));
+  }
+  if (p === "/plan/market-prices/refresh" && method === "POST") {
+    // Bản thử: không tra thật, trả lại bảng giá giả như vừa tra xong.
+    return inPlan(url.searchParams.get("plan_id"), () => {
+      const items = mockMarketItems();
+      return json({ items, looked: mockCart().items.length, found: items.length, fresh: 0 });
+    });
   }
   if (p === "/plan/price-history" && method === "GET") {
     return inPlan(url.searchParams.get("plan_id"), () => {

@@ -132,7 +132,22 @@ func (s *Store) Profile(ctx context.Context, p authz.Principal) (user.Profile, e
 
 // Reserve tăng quota/{day} trong transaction: nhiều instance cùng chạy vẫn đếm đúng.
 func (s *Store) Reserve(ctx context.Context, uid, day string, limit int) error {
-	ref := s.user(uid).Collection("quota").Doc(day)
+	return s.reserve(ctx, uid, day, limit, func() error {
+		return apperr.New(apperr.CodeQuotaExceeded, fmt.Sprintf("Hôm nay bạn đã đọc %d hóa đơn, mai đọc tiếp nhé.", limit)).
+			With("limit", limit)
+	})
+}
+
+// ReservePriceRefresh đếm số lần bấm "Cập nhật giá" trong ngày, tách khỏi lượt đọc hóa đơn.
+func (s *Store) ReservePriceRefresh(ctx context.Context, uid, day string, limit int) error {
+	return s.reserve(ctx, uid, "price-"+day, limit, func() error {
+		return apperr.New(apperr.CodeQuotaExceeded, fmt.Sprintf("Hôm nay bạn đã cập nhật giá %d lần, mai cập nhật tiếp nhé. Mimi vẫn tự tra giá mỗi đêm.", limit)).
+			With("limit", limit)
+	})
+}
+
+func (s *Store) reserve(ctx context.Context, uid, doc string, limit int, full func() error) error {
+	ref := s.user(uid).Collection("quota").Doc(doc)
 	return s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		used := int64(0)
 		snap, err := tx.Get(ref)
@@ -145,8 +160,7 @@ func (s *Store) Reserve(ctx context.Context, uid, day string, limit int) error {
 			return err
 		}
 		if used >= int64(limit) {
-			return apperr.New(apperr.CodeQuotaExceeded, fmt.Sprintf("Hôm nay bạn đã đọc %d hóa đơn, mai đọc tiếp nhé.", limit)).
-				With("limit", limit)
+			return full()
 		}
 		return tx.Set(ref, map[string]any{
 			"used":      used + 1,

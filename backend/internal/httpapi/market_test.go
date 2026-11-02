@@ -61,3 +61,48 @@ func TestPlanMarketPrices(t *testing.T) {
 		t.Fatalf("%s", rec.Body)
 	}
 }
+
+type fakePriceRefresh struct {
+	day   string
+	items []market.Wanted
+}
+
+func (f *fakePriceRefresh) Refresh(_ context.Context, _, day string, items []market.Wanted) (market.Result, error) {
+	f.day, f.items = day, items
+	return market.Result{Looked: 2, Found: 1, Fresh: 0}, nil
+}
+
+func TestPlanMarketPricesRefresh(t *testing.T) {
+	ps := &fakePlanStore{lines: map[string]plan.Line{
+		"sua-tuoi": {Key: "sua-tuoi", Name: "Sữa tươi", Status: "open"},
+		"trung":    {Key: "trung", Name: "Trứng gà", Status: "open"},
+	}}
+	fr := &fakePriceRefresh{}
+	s, err := New(Deps{
+		Log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Tokens:     fakeTokens{"owner-tok": "u1"},
+		AppCheck:   fakeAppCheck{},
+		Principals: fakePrincipals{"u1": {UID: "u1", Role: authz.RoleOwner}},
+		Profiles:   fakeProfiles{}, Receipts: &fakeReceipts{}, Items: fakeItems{}, Ready: fakeReady{},
+		Home: fakeHome{}, Spending: spending.New(fakeSpendingStore{}), Settings: user.NewSettingsService(fakeSettingsStore{}, nil),
+		Plan:  plan.New(ps, fakePlanItems{}, nil),
+		Notes: fakeNotes{},
+		Market: fakeMarket{market.Key("Trứng gà"): {
+			Prices: []market.Price{{Store: "WinMart", PriceVND: 29_000, Source: "gemini_search", On: "2026-11-03"}},
+		}},
+		PriceRefresh: fr,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, body := do(s.Handler(), "POST", "/api/plan/market-prices/refresh", "owner-tok", "")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if len(fr.items) != 2 || fr.day == "" || body["looked"] != float64(2) || body["found"] != float64(1) {
+		t.Fatalf("%+v %s", fr, rec.Body)
+	}
+	if items, _ := body["items"].([]any); len(items) != 1 {
+		t.Fatalf("%s", rec.Body)
+	}
+}

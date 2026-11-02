@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
 import { ApiError } from "../api/client";
 import {
-  useAssignments, useBasketPrices, useDelegated, useHousehold, useMarketPrices, useMe, usePlanItem, usePlanMeta, usePlans, useTaxonomySearch,
+  useAssignments, useBasketPrices, useDelegated, useHousehold, useMarketPrices, useMe, usePlanItem, useRefreshMarketPrices, usePlanMeta, usePlans, useTaxonomySearch,
 } from "../api/hooks";
 import type { Assignment, Cart } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
@@ -299,7 +299,9 @@ export function BasketPricesPanel({ cart }: { cart: Cart }) {
 /** ADR-004: giá đang bán (tra trên mạng mỗi đêm), cạnh giá nhà mình đã trả. */
 export function MarketPricesPanel({ cart }: { cart: Cart }) {
   const mp = useMarketPrices(cart.item_count > 0);
+  const refresh = useRefreshMarketPrices();
   if (!mp.data || cart.item_count === 0) return null;
+  const done = refresh.data;
   const rows = mp.data.items.filter((i) => i.prices.length > 0);
   return (
     <section className="plan-sec" aria-labelledby="plan-market">
@@ -322,6 +324,22 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
         );
       })}
       {rows.length < cart.item_count && <p className="hint">{m1.marketPrices.noneYet}</p>}
+      <button
+        type="button"
+        className="btn btn--quiet btn--block"
+        aria-disabled={refresh.isPending || undefined}
+        onClick={() => !refresh.isPending && refresh.mutate()}
+      >
+        <RefreshCw size={18} aria-hidden className={refresh.isPending ? "spin" : undefined} />{" "}
+        {refresh.isPending ? m1.marketPrices.refreshing : m1.marketPrices.refresh}
+      </button>
+      <p className="hint" role="status">
+        {refresh.isError
+          ? errText(refresh.error)
+          : done
+            ? done.looked > 0 ? m1.marketPrices.refreshed(done.looked, done.found) : m1.marketPrices.upToDate
+            : m1.marketPrices.refreshHint}
+      </p>
       <p className="hint">{m1.marketPrices.disclaimer}</p>
     </section>
   );
