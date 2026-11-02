@@ -32,7 +32,7 @@ Dữ liệu chia theo **từng người** (`users/{uid}/…`) và theo **cả nh
 | 2 | **Kế hoạch thêm ô `icon`** (bag, family, kid, gift, home, food) | Hiện chỉ lưu trên máy (câu 6) | 5a, 5b' | P2 |
 | 3 | **Tên gọi người nhà là riêng từng tài khoản** (chốt 01/11 04:20): không lưu chung ở thành viên. Lưu trong tài khoản người đặt (chốt 04:22), ví dụ `users/{uid}/contacts/{uid_khác}.relation`. Hệ thống làm việc bằng mã tài khoản (uid) | Mỗi người tự đặt tên gọi cho người khác | 6c, 5c | P2 |
 | 4 | **Kế hoạch đã gửi có số phiên bản**: mỗi lần bấm Lưu (máy bay giấy) thì lưu một bản chụp kèm giờ gửi | Kế hoạch đã gửi là cố định, cập nhật tuần tự; bản Minh chưa nhận trước khi Mua hàng xong thì tách thành kế hoạch mới (việc 4) | 5b, 5c, Được nhờ mua | P1 |
-| 5 | **Lưu `Idempotency-Key` ở máy chủ cho mọi thao tác ghi** (hiện chỉ có ở orders) | Chống gửi trùng khi mạng đứt (việc 4 mục 6) | Mọi màn | P1 |
+| 5 | ✅ **Lưu `Idempotency-Key` ở máy chủ cho mọi thao tác ghi**: `users/{uid}/idempotency/{key}`, TTL 24 giờ (đã làm, PR #6, 02/11) | Chống gửi trùng khi mạng đứt (việc 4 mục 6) | Mọi màn | P1 |
 | 6 | **Hóa đơn chia theo từng món cho nhiều người**: món trong kế hoạch vào Đồ dùng và Sổ chi tiêu của người nhờ, món "Của tôi" vào của người mua; giảm giá chung chia theo tỉ lệ | Hiện cả bill cộng vào sổ của người quét (việc 3) | 2, 4, Được nhờ mua | P1 |
 | 7 | **Hóa đơn trừ vào nhiều kế hoạch**: mỗi dòng hóa đơn ghi `plan_id` riêng, trừ dần theo kế hoạch có ngày sớm nhất | Hiện một hóa đơn chỉ gắn một kế hoạch (việc 1) | 2, 4d, 5 | P1 |
 | 8 | **Chi tiêu ước tính** khi mua thủ công: theo giá lần trước, hoặc 0đ kèm nhắc nhập giá | Việc 3, nhập thủ công | 4, Được nhờ mua | P1 |
