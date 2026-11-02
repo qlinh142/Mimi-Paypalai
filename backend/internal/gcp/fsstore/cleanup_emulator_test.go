@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Job cleanup: gỡ mã mời hết hạn, giữ mã còn hạn; xóa thông báo quá 90 ngày, giữ cái mới.
+// Job cleanup: mã nhà cố định nên không bị gỡ (kể cả mã cũ còn invite_expires_at); xóa thông báo quá 90 ngày, giữ cái mới.
 func TestCleanupEmulator(t *testing.T) {
 	s, c, uid := emulator(t)
 	ctx := context.Background()
@@ -25,11 +25,11 @@ func TestCleanupEmulator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Invites < 1 || res.Events < 1 {
+	if res.Events < 1 {
 		t.Fatalf("%+v", res)
 	}
-	if snap, _ := old.Get(ctx); snap.Data()["invite_code"] != nil {
-		t.Fatal("mã hết hạn còn")
+	if snap, _ := old.Get(ctx); snap.Data()["invite_code"] != "OLD1" {
+		t.Fatal("mã nhà cũ bị gỡ")
 	}
 	if snap, _ := fresh.Get(ctx); snap.Data()["invite_code"] != "NEW1" {
 		t.Fatal("mã còn hạn bị gỡ")

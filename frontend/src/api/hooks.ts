@@ -484,7 +484,7 @@ export function useHouseholdActions() {
     qc.invalidateQueries({ queryKey: qk.me });
   };
   return {
-    invite: useMutation({ mutationFn: () => apiSend<{ code: string; expires_at: string }>("POST", "/households/invites"), onSettled: done }),
+    invite: useMutation({ mutationFn: () => apiSend<{ code: string }>("POST", "/households/invites"), onSettled: done }),
     join: useMutation({ mutationFn: (code: string) => apiSend<Household>("POST", "/households/join", { code }), onSettled: done }),
     leave: useMutation({ mutationFn: () => apiSend<void>("POST", "/households/leave"), onSettled: () => qc.invalidateQueries() }),
     rename: useMutation({ mutationFn: (name: string) => apiSend<Household>("PATCH", "/households", { name }), onSettled: done }),

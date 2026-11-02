@@ -2374,7 +2374,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Tạo mã mời 8 ký tự, hết hạn 48 giờ (mã cũ hết hiệu lực) */
+        /** Tạo mã nhà 8 ký tự, cố định không hết hạn. Gọi lại là đổi mã, mã cũ hết hiệu lực */
         post: {
             parameters: {
                 query?: never;
@@ -2392,8 +2392,6 @@ export interface paths {
                     content: {
                         "application/json": {
                             code?: string;
-                            /** Format: date-time */
-                            expires_at?: string;
                         };
                     };
                 };
@@ -3267,8 +3265,6 @@ export interface components {
             }[];
             invite?: {
                 code?: string;
-                /** Format: date-time */
-                expires_at?: string;
             };
         };
         Assignment: {

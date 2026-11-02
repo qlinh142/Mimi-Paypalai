@@ -24,9 +24,6 @@ import (
 // MaxMembers: số người tối đa của một nhà.
 const MaxMembers = 8
 
-// InviteTTL: mã mời hết hạn sau 48 giờ.
-const InviteTTL = 48 * time.Hour
-
 // MaxAssignmentItems: số món tối đa một vòng mua hộ.
 const MaxAssignmentItems = 60
 
@@ -37,9 +34,9 @@ type Member struct {
 	JoinedAt    time.Time `json:"joined_at"`
 }
 
+// Invite: mã nhà cố định (mẹ chốt 03/11), không hết hạn. Chủ nhà đổi mã khi lỡ lộ, mã cũ hết hiệu lực.
 type Invite struct {
-	Code      string    `json:"code"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Code string `json:"code"`
 }
 
 // Household là phản hồi GET /households. Nhà một người (chưa mời ai) có ID rỗng.
@@ -166,7 +163,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, me Member) (Househ
 		return Household{}, err
 	}
 	h.MyRole = p.Role.String()
-	if h.OwnerUID != p.UID || (h.Invite != nil && h.Invite.ExpiresAt.Before(s.now())) {
+	if h.OwnerUID != p.UID {
 		h.Invite = nil
 	}
 	return h, nil
@@ -180,7 +177,8 @@ func cleanName(n string) (string, error) {
 	return n, nil
 }
 
-// Invite tạo mã mời mới (mã cũ hết hiệu lực). Nhà một người được tạo nhà ngay lúc mời.
+// Invite tạo mã nhà mới (mã cũ hết hiệu lực). App chỉ gọi khi nhà chưa có mã hoặc chủ nhà bấm
+// "Đổi mã"; mã đã có thì app chép lại mã đó. Nhà một người được tạo nhà ngay lúc mời.
 func (s *Service) Invite(ctx context.Context, p authz.Principal, me Member) (Invite, error) {
 	if err := authz.Can(p, authz.ActionInviteMember); err != nil {
 		return Invite{}, err
@@ -194,7 +192,7 @@ func (s *Service) Invite(ctx context.Context, p authz.Principal, me Member) (Inv
 		}
 		hid = id
 	}
-	inv := Invite{Code: newCode(), ExpiresAt: s.now().Add(InviteTTL)}
+	inv := Invite{Code: newCode()}
 	if err := s.store.SetInvite(ctx, hid, inv); err != nil {
 		return Invite{}, err
 	}

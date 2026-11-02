@@ -242,7 +242,7 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 	case "cleanup":
 		var res fsstore.CleanupResult
 		res, err = store.Cleanup(ctx, time.Now(), log)
-		log.InfoContext(ctx, "cleanup done", "invites", res.Invites, "events", res.Events)
+		log.InfoContext(ctx, "cleanup done", "events", res.Events)
 	case "fx-sync":
 		var rates []fx.Rate
 		rates, err = fx.Sync(ctx, fx.ERAPI{}, store, time.Now())

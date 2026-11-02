@@ -20,7 +20,7 @@ var (
 )
 
 // Nhà: households/{hid} {name, owner_uid, members: {uid: {display_name, role, joined_at}},
-// invite_code, invite_expires_at}. users/{uid}.household_id và .role trỏ ngược lại.
+// invite_code}. Mã nhà cố định, không hết hạn (mẹ chốt 03/11); invite_expires_at là trường cũ, bỏ qua. users/{uid}.household_id và .role trỏ ngược lại.
 // Vòng mua hộ: households/{hid}/shopping_assignments/{id}
 // {owner_uid, buyer_uid, plan_id, status, note, items: {group_key: {...}}, created_at, closed_at}.
 
@@ -49,8 +49,7 @@ func decodeHousehold(snap *firestore.DocumentSnapshot) household.Household {
 		return h.Members[i].JoinedAt.Before(h.Members[j].JoinedAt)
 	})
 	if code, _ := m["invite_code"].(string); code != "" {
-		exp, _ := m["invite_expires_at"].(time.Time)
-		h.Invite = &household.Invite{Code: code, ExpiresAt: exp}
+		h.Invite = &household.Invite{Code: code}
 	}
 	return h
 }
@@ -103,7 +102,7 @@ func (s *Store) EnsureHousehold(ctx context.Context, owner household.Member, nam
 
 func (s *Store) SetInvite(ctx context.Context, hid string, inv household.Invite) error {
 	_, err := s.household(hid).Update(ctx, []firestore.Update{
-		{Path: "invite_code", Value: inv.Code}, {Path: "invite_expires_at", Value: inv.ExpiresAt},
+		{Path: "invite_code", Value: inv.Code}, {Path: "invite_expires_at", Value: firestore.Delete},
 	})
 	if err != nil {
 		return fmt.Errorf("household invite: %w", err)
@@ -122,8 +121,8 @@ func (s *Store) Join(ctx context.Context, m household.Member, code string, now t
 			return apperr.New(apperr.CodeNotFound, "Mã mời không đúng.").With("field", "code")
 		}
 		h := decodeHousehold(docs[0])
-		if h.Invite == nil || h.Invite.ExpiresAt.Before(now) {
-			return apperr.New(apperr.CodeInvalidState, "Mã mời đã hết hạn. Nhờ chủ nhà tạo mã mới.")
+		if h.Invite == nil {
+			return apperr.New(apperr.CodeNotFound, "Mã mời không đúng.").With("field", "code")
 		}
 		hid = h.ID
 		for _, x := range h.Members {

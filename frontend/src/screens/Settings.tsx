@@ -15,7 +15,6 @@ import { useAuth } from "../lib/auth";
 import { useQueue } from "../lib/offlineQueue";
 import { flushQueue } from "../api/client";
 import { RELATIONS, useRelations } from "../lib/relation";
-import { formatDayMonth } from "../lib/text";
 import { wipeDeviceData } from "../lib/localData";
 
 const S = m15.settings;
@@ -278,6 +277,7 @@ export function SettingsMembers() {
   const [copied, setCopied] = useState(false);
   const [soon, setSoon] = useState(false);
   const [code, setCode] = useState("");
+  const [confirmRenew, setConfirmRenew] = useState(false);
   const { relationOf } = useRelations();
   const data = h.data;
   if (!data) return <Sub title={S.members}><p className="hint">{t.common.loading}</p></Sub>;
@@ -295,7 +295,7 @@ export function SettingsMembers() {
           {invite ? (
             <>
               <span className="house15__code">{S.houseCode(invite.code)}</span>
-              <small>{S.codeValid(formatDayMonth(invite.expires_at.slice(0, 10)))}</small>
+              <small>{S.codeFixed}</small>
             </>
           ) : (
             isOwner && <small>{S.noCode}</small>
@@ -334,10 +334,27 @@ export function SettingsMembers() {
         })}
       </ul>
 
-      {isOwner && (
+      {isOwner && !invite && (
         <button type="button" className="btn btn--primary btn--block btn--lg" aria-disabled={act.invite.isPending || undefined} onClick={() => !act.invite.isPending && act.invite.mutate()}>
           <Plus size={22} aria-hidden /> {S.invite}
         </button>
+      )}
+      {isOwner && invite && (
+        <>
+          <button
+            type="button"
+            className={`btn btn--quiet btn--block${confirmRenew ? " pd15__del--confirm" : ""}`}
+            aria-disabled={act.invite.isPending || undefined}
+            onClick={() => {
+              if (act.invite.isPending) return;
+              if (!confirmRenew) return setConfirmRenew(true);
+              act.invite.mutate(undefined, { onSettled: () => { setConfirmRenew(false); setCopied(false); } });
+            }}
+          >
+            {confirmRenew ? S.renewConfirm : S.renew}
+          </button>
+          {confirmRenew && <p className="hint" role="status">{S.renewAsk}</p>}
+        </>
       )}
       {act.invite.isError && <p className="error" role="alert">{errText(act.invite.error)}</p>}
 
