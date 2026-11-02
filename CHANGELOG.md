@@ -5,6 +5,19 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Danh mục chi tiêu một nguồn (V2)
+
+- 27 danh mục chi tiêu (khóa và nhãn tiếng Việt, tiếng Anh) cùng hai danh mục hệ thống `hoa-don-dinh-ky`, `chua-phan-loai` nay nằm ở một file: `backend/internal/taxonomy/categories.json`.
+- Backend đọc danh sách cho AI từ file này (`taxonomy.SpendingKeys`), bỏ danh sách "KHÓA TẠM" trong `cmd/mimi`. Hai danh mục hệ thống dùng hằng số thay cho chuỗi viết tay.
+- Frontend lấy nhãn từ bản chép `frontend/src/i18n/categories.json`, bỏ hai bảng nhãn lặp trong `vi.ts` và `en.ts`. Chữ hiển thị không đổi.
+- Thêm hoặc đổi danh mục: sửa file backend rồi chép sang frontend. Test sẽ báo nếu quên chép.
+
+### Cách kiểm tra
+- `go test ./...` qua; test mới `TestSpendingKeys`, `TestSpendingByParentKnown` (danh mục mặc định theo nhóm cha đều có thật), `TestCategoriesFrontendCopy` (hai file giống hệt).
+- Frontend `tsc -b` và `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Dữ liệu mẫu cho buổi demo (V5)
 
 - `mimi job seed-demo` ghi 7 hóa đơn mẫu của nhà chị Lan vào tài khoản demo (`DEMO_UID`): Co.opmart, Bách Hóa Xanh, WinMart trong khoảng 5 tuần, tính lùi từ ngày chạy.

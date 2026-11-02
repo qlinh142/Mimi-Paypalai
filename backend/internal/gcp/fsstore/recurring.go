@@ -10,6 +10,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/recurring"
+	"github.com/smartlife-lab/mimi/backend/internal/taxonomy"
 )
 
 var _ recurring.Store = (*Store)(nil)
@@ -188,7 +189,7 @@ func (s *Store) Settle(ctx context.Context, uid, occurrenceID string, to recurri
 		}
 		if to == recurring.Paid {
 			// Rule R2: tiền đã thực chi cộng vào tháng thanh toán.
-			cat := "hoa-don-dinh-ky"
+			cat := taxonomy.CategoryRecurring
 			if recSnap != nil && recSnap.Exists() {
 				if c, _ := recSnap.Data()["category_key"].(string); c != "" {
 					cat = c

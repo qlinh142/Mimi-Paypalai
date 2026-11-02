@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "_note": "Nguồn duy nhất cho danh mục chi tiêu. Sửa ở backend/internal/taxonomy/categories.json rồi chép sang frontend/src/i18n/categories.json (test Go TestCategoriesFrontendCopy kiểm tra hai file giống nhau).",
+  "categories": [
+    {
+      "key": "sua",
+      "labels": {
+        "vi": "Sữa và chế phẩm sữa",
+        "en": "Dairy & milk"
+      }
+    },
+    {
+      "key": "do-uong",
+      "labels": {
+        "vi": "Đồ uống",
+        "en": "Drinks"
+      }
+    },
+    {
+      "key": "tuoi-song",
+      "labels": {
+        "vi": "Thịt, cá, trứng",
+        "en": "Meat, fish & eggs"
+      }
+    },
+    {
+      "key": "rau-cu",
+      "labels": {
+        "vi": "Rau củ",
+        "en": "Vegetables"
+      }
+    },
+    {
+      "key": "trai-cay",
+      "labels": {
+        "vi": "Trái cây",
+        "en": "Fruit"
+      }
+    },
+    {
+      "key": "do-kho",
+      "labels": {
+        "vi": "Đồ khô",
+        "en": "Pantry staples"
+      }
+    },
+    {
+      "key": "gia-vi",
+      "labels": {
+        "vi": "Gia vị",
+        "en": "Condiments & spices"
+      }
+    },
+    {
+      "key": "do-dong-lanh",
+      "labels": {
+        "vi": "Đồ đông lạnh",
+        "en": "Frozen food"
+      }
+    },
+    {
+      "key": "banh-keo",
+      "labels": {
+        "vi": "Bánh kẹo",
+        "en": "Sweets & biscuits"
+      }
+    },
+    {
+      "key": "an-vat",
+      "labels": {
+        "vi": "Đồ ăn vặt",
+        "en": "Snacks"
+      }
+    },
+    {
+      "key": "me-be",
+      "labels": {
+        "vi": "Mẹ và bé",
+        "en": "Baby care"
+      }
+    },
+    {
+      "key": "hoa-pham",
+      "labels": {
+        "vi": "Hóa phẩm gia đình",
+        "en": "Household cleaning"
+      }
+    },
+    {
+      "key": "ve-sinh",
+      "labels": {
+        "vi": "Chăm sóc cá nhân",
+        "en": "Personal care"
+      }
+    },
+    {
+      "key": "my-pham",
+      "labels": {
+        "vi": "Mỹ phẩm",
+        "en": "Cosmetics"
+      }
+    },
+    {
+      "key": "giay",
+      "labels": {
+        "vi": "Giấy các loại",
+        "en": "Paper products"
+      }
+    },
+    {
+      "key": "do-dung-bep",
+      "labels": {
+        "vi": "Đồ dùng bếp",
+        "en": "Kitchenware"
+      }
+    },
+    {
+      "key": "thu-cung",
+      "labels": {
+        "vi": "Thú cưng",
+        "en": "Pet supplies"
+      }
+    },
+    {
+      "key": "thuoc",
+      "labels": {
+        "vi": "Thuốc và sức khỏe",
+        "en": "Medicine & health"
+      }
+    },
+    {
+      "key": "van-phong-pham",
+      "labels": {
+        "vi": "Văn phòng phẩm",
+        "en": "Stationery"
+      }
+    },
+    {
+      "key": "dien-gia-dung",
+      "labels": {
+        "vi": "Điện gia dụng",
+        "en": "Home appliances"
+      }
+    },
+    {
+      "key": "do-choi",
+      "labels": {
+        "vi": "Đồ chơi",
+        "en": "Toys"
+      }
+    },
+    {
+      "key": "quan-ao",
+      "labels": {
+        "vi": "Quần áo",
+        "en": "Clothing"
+      }
+    },
+    {
+      "key": "giat-say",
+      "labels": {
+        "vi": "Giặt sấy",
+        "en": "Laundry"
+      }
+    },
+    {
+      "key": "nha-cua",
+      "labels": {
+        "vi": "Nhà cửa",
+        "en": "Home & living"
+      }
+    },
+    {
+      "key": "the-thao",
+      "labels": {
+        "vi": "Thể thao",
+        "en": "Sports"
+      }
+    },
+    {
+      "key": "dich-vu",
+      "labels": {
+        "vi": "Dịch vụ",
+        "en": "Services"
+      }
+    },
+    {
+      "key": "khac",
+      "labels": {
+        "vi": "Khác",
+        "en": "Other"
+      }
+    }
+  ],
+  "system": [
+    {
+      "key": "hoa-don-dinh-ky",
+      "labels": {
+        "vi": "Khoản chi định kỳ",
+        "en": "Recurring bills"
+      }
+    },
+    {
+      "key": "chua-phan-loai",
+      "labels": {
+        "vi": "Chưa phân loại",
+        "en": "Uncategorized"
+      }
+    }
+  ]
+}
