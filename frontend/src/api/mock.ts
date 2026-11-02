@@ -228,7 +228,8 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       role: "owner",
       receipt_count: receiptCount,
       settings: { lead_days: mockSettings.lead_days, lang: mockSettings.lang, timezone: mockSettings.timezone,
-        remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {} },
+        remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {},
+        ...(mockSettings.country ? { country: mockSettings.country } : {}) },
     };
     return json(me);
   }
@@ -803,12 +804,21 @@ function histDetail(id: string): ReceiptDetail | null {
 let mockRefresh: { daily: number; left: number; last_at?: string } = { daily: 3, left: 3 };
 
 function mockMarketItems() {
+  // Bản thử: nước Singapore thì giả giá SGD ở cửa hàng Sing, quy ra VND theo tỷ giá 19.500.
+  const sg = mockSettings.country === "SG";
+  const sgStore: Record<string, string> = { "Co.opmart": "FairPrice", "Bách Hóa Xanh": "Sheng Siong" };
+  const on = new Date().toISOString().slice(0, 10);
   // Trứng gà: giả như chưa tra ra giá online; nước rửa chén: online đắt hơn giá nhà mình từng
   // mua. Cả hai để bản thử hiện dòng "giá nhà mình từng mua".
   return mockCart().items.filter((i) => MOCK_PRICES[i.key] && i.key !== "trung-ga").map((i) => ({
     key: i.key, name: i.name, updated_at: new Date().toISOString(),
     prices: Object.entries(MOCK_PRICES[i.key])
-      .map(([store, v]) => ({ store, price_vnd: Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100, source: "gemini_search", on: new Date().toISOString().slice(0, 10) }))
+      .map(([store, v]) => {
+        const vnd = Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100;
+        if (!sg) return { store, price_vnd: vnd, currency: "VND", source: "gemini_search", on };
+        const local = Math.round((vnd / 19_500) * 100) / 100;
+        return { store: sgStore[store] ?? store, price_vnd: Math.round(local * 19_500), local, currency: "SGD", source: "gemini_search", on };
+      })
       .sort((a, b) => a.price_vnd - b.price_vnd),
   }));
 }

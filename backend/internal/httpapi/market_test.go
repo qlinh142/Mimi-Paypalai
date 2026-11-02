@@ -40,7 +40,7 @@ func TestPlanMarketPrices(t *testing.T) {
 		Home: fakeHome{}, Spending: spending.New(fakeSpendingStore{}), Settings: user.NewSettingsService(fakeSettingsStore{}, nil),
 		Plan:  plan.New(ps, fakePlanItems{}, nil),
 		Notes: fakeNotes{},
-		Market: fakeMarket{market.Key("Sữa tươi"): {
+		Market: fakeMarket{market.ItemID("VN", "Sữa tươi"): {
 			Prices:    []market.Price{{Store: "WinMart", PriceVND: 32_000, Source: "gemini_search", On: "2026-11-03"}},
 			UpdatedAt: time.Date(2026, 11, 3, 2, 0, 0, 0, time.UTC),
 		}},
@@ -92,7 +92,7 @@ func TestPlanMarketPricesRefresh(t *testing.T) {
 		Home: fakeHome{}, Spending: spending.New(fakeSpendingStore{}), Settings: user.NewSettingsService(fakeSettingsStore{}, nil),
 		Plan:  plan.New(ps, fakePlanItems{}, nil),
 		Notes: fakeNotes{},
-		Market: fakeMarket{market.Key("Trứng gà"): {
+		Market: fakeMarket{market.ItemID("VN", "Trứng gà"): {
 			Prices: []market.Price{{Store: "WinMart", PriceVND: 29_000, Source: "gemini_search", On: "2026-11-03"}},
 		}},
 		PriceRefresh: fr,

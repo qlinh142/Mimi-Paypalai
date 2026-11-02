@@ -10,6 +10,11 @@ import type { Assignment, Cart, MarketPrice } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { formatDateTime, formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 
+/** Giá tiền gốc ngoài Việt Nam, ví dụ "4.50 SGD". */
+function formatLocal(amount: number, currency: string) {
+  return `${amount.toFixed(2)} ${currency}`;
+}
+
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : t.common.genericError;
 }
@@ -334,6 +339,7 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
             ) : (
               <>
                 {m1.marketPrices.cheapest(r.store ?? "")}
+                {r.online?.local != null && r.online.currency && r.online.currency !== "VND" && ` · ${formatLocal(r.online.local, r.online.currency)}`}
                 {r.online?.size && ` · ${r.online.size}`}
                 {r.online && ` · ${formatDayMonth(r.online.on)}`}
                 {!!r.more && ` · ${m1.marketPrices.more(r.more)}`}
