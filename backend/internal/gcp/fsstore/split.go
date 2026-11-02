@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 
+	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
 )
@@ -55,15 +56,17 @@ func remainLine(m map[string]any, now time.Time) map[string]any {
 }
 
 // SplitRemaining chuyển món còn mở của Kế hoạch planID sang Kế hoạch mới. Không có món nào còn
-// mở, hoặc là Kế hoạch chính, thì trả nil.
-func (s *Store) SplitRemaining(ctx context.Context, uid, planID string, now time.Time) (*receipt.SplitResult, error) {
+// mở, hoặc là Kế hoạch chính, thì trả nil. actor khác rỗng (người đi mua hộ vừa xong) thì ghi
+// thêm thông báo cho chủ Kế hoạch (B9); chủ giỏ tự lưu hóa đơn thì đã thấy ngay trên màn lưu.
+func (s *Store) SplitRemaining(ctx context.Context, uid, planID, actor string, now time.Time) (*receipt.SplitResult, error) {
 	if planID == "" || planID == plan.DefaultPlanID {
 		return nil, nil
 	}
 	pref := s.user(uid).Collection("plans").Doc(planID)
 	var out *receipt.SplitResult
+	var ev pendingEvent
 	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		out = nil
+		out, ev = nil, pendingEvent{}
 		snap, err := tx.Get(pref)
 		if isNotFound(err) {
 			return nil
@@ -108,10 +111,18 @@ func (s *Store) SplitRemaining(ctx context.Context, uid, planID string, now time
 			return err
 		}
 		out = &receipt.SplitResult{FromPlanID: planID, PlanID: id, Name: remainName(old), Moved: len(open)}
+		if actor != "" {
+			if ev, err = s.writeEvent(tx, uid, event{Event: notify.Event{
+				ID: "split-" + planID, Kind: notify.EventPlanSplit, At: now, ActorName: actor, PlanID: id, Items: len(open),
+			}, planOwner: uid}); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("split remaining: %w", err)
 	}
+	s.enqueue(ctx, ev)
 	return out, nil
 }

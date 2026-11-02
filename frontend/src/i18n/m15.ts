@@ -286,6 +286,15 @@ const vi = {
     auto: "Tự chọn (kế hoạch sớm nhất trước)",
     choose: "Trừ vào kế hoạch",
   },
+  events: {
+    someone: "Người nhà",
+    sent: (w: string, n: number, p: string) => `${w} nhờ bạn mua ${n} món · ${p}`,
+    updated: (w: string, at: string, p: string) => `${w} đã cập nhật kế hoạch lúc ${at} · ${p}`,
+    cancelled: (w: string, at: string, p: string) => `${w} đã hủy kế hoạch lúc ${at} · ${p}`,
+    done: (w: string, p: string, n: number, back: number) => `${w} đã mua xong ${p}: ${n} món${back ? `, ${back} món chưa mua` : ""}`,
+    declined: (w: string, p: string) => `${w} không mua được ${p}, các món đã về lại kế hoạch`,
+    split: (n: number, p: string) => `Đã chuyển ${n} món chưa mua sang kế hoạch mới · ${p}`,
+  },
   run: {
     gone: "Lần nhờ mua này không còn nữa.",
     decline: "Từ chối",
@@ -609,6 +618,15 @@ const en: typeof vi = {
     noneOpt: "Not in any plan",
     auto: "Automatic (earliest plan first)",
     choose: "Count toward plan",
+  },
+  events: {
+    someone: "Family member",
+    sent: (w, n, p) => `${w} asked you to buy ${n} ${n === 1 ? "item" : "items"} · ${p}`,
+    updated: (w, at, p) => `${w} updated the plan at ${at} · ${p}`,
+    cancelled: (w, at, p) => `${w} cancelled the plan at ${at} · ${p}`,
+    done: (w, p, n, back) => `${w} finished ${p}: ${n} bought${back ? `, ${back} not bought` : ""}`,
+    declined: (w, p) => `${w} couldn't buy ${p}; the items are back in your plan`,
+    split: (n, p) => `Moved ${n} unbought ${n === 1 ? "item" : "items"} to a new plan · ${p}`,
   },
   run: {
     gone: "This request is no longer available.",

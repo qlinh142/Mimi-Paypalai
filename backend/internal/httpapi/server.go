@@ -262,6 +262,7 @@ func (s *Server) Handler() http.Handler {
 	private("PUT /plan/state", s.defaultTimeout, s.putPlanState)
 	private("GET /plan/prices", s.defaultTimeout, s.getPlanPrices)
 	private("GET /notifications", s.defaultTimeout, s.getNotifications)
+	private("POST /notifications/{id}/read", s.defaultTimeout, s.markNotificationRead)
 	private("GET /taxonomy", s.defaultTimeout, s.getTaxonomy)
 	private("GET /plans", s.defaultTimeout, s.listPlans)
 	private("POST /plans", s.defaultTimeout, s.createPlan)

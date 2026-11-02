@@ -13,6 +13,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
+	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
 	"github.com/smartlife-lab/mimi/backend/internal/recurring"
@@ -55,10 +56,11 @@ type planTarget struct {
 }
 
 type assignmentState struct {
-	ref     *firestore.DocumentRef
-	ownerID string
-	planID  string
-	items   map[string]map[string]any // key -> item của vòng mua hộ (status assigned)
+	ref       *firestore.DocumentRef
+	ownerID   string
+	planID    string
+	buyerName string
+	items     map[string]map[string]any // key -> item của vòng mua hộ (status assigned)
 }
 
 func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, tz *time.Location) (receipt.SaveOutcome, error) {
@@ -66,9 +68,10 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 	rRef := u.Collection("receipts").Doc(r.ID)
 
 	var out receipt.SaveOutcome
-	var closedOwner, closedPlan string // Kế hoạch được chốt bởi hóa đơn này (B6)
+	var closedOwner, closedPlan, buyerName string // Kế hoạch được chốt bởi hóa đơn này (B6)
+	var ev pendingEvent                           // B9: báo người nhờ khi vòng mua hộ xong
 	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		closedOwner, closedPlan = "", ""
+		closedOwner, closedPlan, buyerName, ev = "", "", "", pendingEvent{}
 		out = receipt.SaveOutcome{ReceiptID: r.ID}
 		lines := append([]receipt.Line(nil), r.Lines...)
 
@@ -368,7 +371,13 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 			}
 			out.Assignment = res
 			if len(res.Done) > 0 {
-				closedOwner, closedPlan = asg.ownerID, asg.planID
+				closedOwner, closedPlan, buyerName = asg.ownerID, asg.planID, asg.buyerName
+			}
+			if ev, err = s.writeEvent(tx, asg.ownerID, event{Event: notify.Event{
+				ID: "done-" + r.AssignmentID, Kind: notify.EventRunDone, At: now, ActorName: asg.buyerName,
+				PlanID: asg.planID, AssignmentID: r.AssignmentID, Items: len(res.Done), Returned: len(res.Returned),
+			}, planOwner: asg.ownerID}); err != nil {
+				return err
 			}
 		} else if r.SourcePlanID != "" {
 			// Chỉ tính là chốt khi hóa đơn thật sự trừ vào Kế hoạch đã chọn. Kế hoạch đứng sau
@@ -406,10 +415,13 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 	if err != nil {
 		return receipt.SaveOutcome{}, err
 	}
+	if !out.Replayed {
+		s.enqueue(ctx, ev)
+	}
 	if closedPlan != "" && !out.Replayed {
 		// B6: món chưa mua sang Kế hoạch mới. Lỗi ở bước này không làm hỏng hóa đơn đã lưu:
 		// món vẫn nằm ở Kế hoạch cũ, lần chốt sau sẽ tách lại.
-		sp, err := s.SplitRemaining(ctx, closedOwner, closedPlan, time.Now())
+		sp, err := s.SplitRemaining(ctx, closedOwner, closedPlan, buyerName, time.Now())
 		if err != nil {
 			slog.WarnContext(ctx, "split remaining", "plan_id", closedPlan, "err", err)
 		} else if sp != nil && closedOwner == uid {
@@ -508,6 +520,7 @@ func (s *Store) readAssignment(tx *firestore.Transaction, householdID, id, buyer
 	a := &assignmentState{ref: ref, items: map[string]map[string]any{}}
 	a.ownerID, _ = d["owner_uid"].(string)
 	a.planID, _ = d["plan_id"].(string)
+	a.buyerName, _ = d["buyer_display_name"].(string)
 	items, _ := d["items"].(map[string]any)
 	for k, v := range items {
 		m, _ := v.(map[string]any)

@@ -56,7 +56,7 @@ func TestSplitRemainingEmulator(t *testing.T) {
 	mustSet(t, p.Collection("items").Doc("dau-an"), map[string]any{"name": "Dầu ăn", "status": "open", "qty": 1.0})
 
 	now := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
-	sp, err := s.SplitRemaining(ctx, uid, "p-cuoi-tuan", now)
+	sp, err := s.SplitRemaining(ctx, uid, "p-cuoi-tuan", "", now)
 	if err != nil || sp == nil || sp.Moved != 1 || sp.Name != "Mua đồ cuối tuần · còn lại" {
 		t.Fatalf("%+v %v", sp, err)
 	}
@@ -71,11 +71,11 @@ func TestSplitRemainingEmulator(t *testing.T) {
 		t.Fatal("old line must be gone")
 	}
 	// Gọi lại không tạo thêm.
-	if again, err := s.SplitRemaining(ctx, uid, "p-cuoi-tuan", now); err != nil || again != nil {
+	if again, err := s.SplitRemaining(ctx, uid, "p-cuoi-tuan", "", now); err != nil || again != nil {
 		t.Fatalf("again %+v %v", again, err)
 	}
 	// Kế hoạch chính không tách.
-	if sp, _ := s.SplitRemaining(ctx, uid, "default", now); sp != nil {
+	if sp, _ := s.SplitRemaining(ctx, uid, "default", "", now); sp != nil {
 		t.Fatal("default plan must not split")
 	}
 }
