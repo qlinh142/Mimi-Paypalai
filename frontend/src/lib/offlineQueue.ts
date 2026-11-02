@@ -63,6 +63,14 @@ export async function pendingCount(): Promise<number> {
 
 let flushing = false;
 
+async function retryable(res: Response): Promise<boolean> {
+  try {
+    return ((await res.clone().json()) as { retryable?: boolean }).retryable === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Gửi lần lượt theo thứ tự. Dừng ở lỗi mạng đầu tiên; bỏ thao tác bị backend từ chối hẳn (4xx).
  * Lỗi N3 (Spec 1.5 mục 8): hết phiên đăng nhập (401) KHÔNG phải từ chối hẳn. Giữ nguyên thao tác,
@@ -82,6 +90,8 @@ export async function flush(send: (w: QueuedWrite) => Promise<Response>) {
         break; // vẫn mất mạng
       }
       if (res.status >= 500 || res.status === 401 || res.status === 408 || res.status === 429) break;
+      // Lỗi tạm thời dạng 409 (đang xử lý cùng mã gửi lại, ghi đồng thời): giữ lại, lần sau gửi tiếp.
+      if (res.status === 409 && (await retryable(res))) break;
       q = rest;
       await set(STORE_KEY, q);
       notify();

@@ -132,7 +132,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Recurring:  recurring.NewService(store, store, store, nil),
 		Households: household.New(store, store, nil),
 		Pricing:    pricing.New(store, store, nil),
-	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout))
+	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)))
 	if err != nil {
 		return err
 	}
