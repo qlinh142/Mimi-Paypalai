@@ -114,6 +114,7 @@ export async function apiSend<T>(
   path: string,
   body?: unknown,
   idempotencyKey: string = crypto.randomUUID(),
+  timeoutMs: number = TIMEOUT_MS,
 ): Promise<T> {
   const h = await headers({ "Content-Type": "application/json", "Idempotency-Key": idempotencyKey });
   let res: Response;
@@ -122,7 +123,7 @@ export async function apiSend<T>(
       method,
       headers: h,
       body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    }, timeoutMs);
   } catch (e) {
     if (e instanceof ApiError) throw e;
     throw new OfflineError("offline");

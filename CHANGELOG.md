@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Nút "Cập nhật giá" trong Kế hoạch
+
+Nhánh `feat/cap-nhat-gia` (trên `feat/gia-online`). Mẹ hỏi 02/11: không phải chờ job đêm, chỉ tra các món của kế hoạch đang mở.
+
+- `POST /plan/market-prices/refresh`: tra lại giá các món của kế hoạch, cùng nguồn công khai với job. Bỏ qua món đã tra trong 12 giờ, tối đa 12 món mỗi lần, tra song song 6 món để kịp giới hạn 60 giây của Hosting, 5 lần mỗi người mỗi ngày (`quota/price-{ngày}`, tách khỏi lượt đọc hóa đơn). Không có món nào cần tra thì không tốn lượt.
+- Nút "Cập nhật giá" dưới khối "Giá đang bán", báo "Đã tra N món, có giá M món" hoặc lỗi hết lượt.
+- Kiểm tra: `go test ./internal/market ./internal/httpapi`, test emulator `TestMarketTouchedAndRefreshQuotaEmulator`, bản thử bấm nút trên iPhone 13.
+
+---
+
 ## 2026-11-02 · Giá online: bảng giá chung và job price-sync
 
 Nhánh `feat/gia-online`. Theo ADR-004 (mẹ duyệt 02/11): bảng giá chung chỉ từ nguồn công khai; giá trên hóa đơn của nhà nào chỉ dùng cho nhà đó.

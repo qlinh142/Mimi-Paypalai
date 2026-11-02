@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	_ market.Store  = (*Store)(nil)
-	_ market.Demand = (*Store)(nil)
+	_ market.Store        = (*Store)(nil)
+	_ market.RefreshStore = (*Store)(nil)
+	_ market.RefreshQuota = (*Store)(nil)
+	_ market.Demand       = (*Store)(nil)
 )
 
 // Bảng giá chung (ADR-004): market_prices/{key} {name, group_key, prices[], updated_at}.
@@ -38,6 +40,18 @@ func (s *Store) FreshKeys(ctx context.Context, since time.Time) (map[string]bool
 	}
 }
 
+// priceDoc là một giá như lưu trong Firestore. Phải có tag firestore: market.Price chỉ có
+// tag json, và Firestore khớp tên trường không phân biệt hoa thường nên "store" vẫn đọc
+// được nhưng "price_vnd" không khớp PriceVND, giá ra 0đ (lỗi mẹ thấy 02/11).
+type priceDoc struct {
+	Store    string `firestore:"store"`
+	PriceVND int64  `firestore:"price_vnd"`
+	Size     string `firestore:"size"`
+	Source   string `firestore:"source"`
+	URL      string `firestore:"url"`
+	On       string `firestore:"on"`
+}
+
 func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
 	prices := make([]map[string]any, 0, len(e.Prices))
 	for _, p := range e.Prices {
@@ -60,11 +74,29 @@ func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
 	return nil
 }
 
-func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.Entry, error) {
-	out := map[string]market.Entry{}
-	if len(keys) == 0 {
+// Touched trả lần tra gần nhất của từng món, kể cả món tra không ra giá.
+func (s *Store) Touched(ctx context.Context, keys []string) (map[string]time.Time, error) {
+	out := map[string]time.Time{}
+	refs := s.marketRefs(keys)
+	if len(refs) == 0 {
 		return out, nil
 	}
+	snaps, err := s.c.GetAll(ctx, refs)
+	if err != nil {
+		return nil, fmt.Errorf("market touched: %w", err)
+	}
+	for _, d := range snaps {
+		if !d.Exists() {
+			continue
+		}
+		if t, ok := d.Data()["updated_at"].(time.Time); ok {
+			out[d.Ref.ID] = t
+		}
+	}
+	return out, nil
+}
+
+func (s *Store) marketRefs(keys []string) []*firestore.DocumentRef {
 	refs := make([]*firestore.DocumentRef, 0, len(keys))
 	seen := map[string]bool{}
 	for _, k := range keys {
@@ -73,6 +105,15 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 		}
 		seen[k] = true
 		refs = append(refs, s.marketPrices().Doc(k))
+	}
+	return refs
+}
+
+func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.Entry, error) {
+	out := map[string]market.Entry{}
+	refs := s.marketRefs(keys)
+	if len(refs) == 0 {
+		return out, nil
 	}
 	snaps, err := s.c.GetAll(ctx, refs)
 	if err != nil {
@@ -83,10 +124,10 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 			continue
 		}
 		var raw struct {
-			Name      string         `firestore:"name"`
-			GroupKey  string         `firestore:"group_key"`
-			Prices    []market.Price `firestore:"prices"`
-			UpdatedAt time.Time      `firestore:"updated_at"`
+			Name      string     `firestore:"name"`
+			GroupKey  string     `firestore:"group_key"`
+			Prices    []priceDoc `firestore:"prices"`
+			UpdatedAt time.Time  `firestore:"updated_at"`
 		}
 		if err := d.DataTo(&raw); err != nil {
 			continue // dòng hỏng: bỏ qua, không làm hỏng cả Giỏ
@@ -94,7 +135,11 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 		if len(raw.Prices) == 0 {
 			continue
 		}
-		out[d.Ref.ID] = market.Entry{Key: d.Ref.ID, Name: raw.Name, GroupKey: raw.GroupKey, Prices: raw.Prices, UpdatedAt: raw.UpdatedAt}
+		prices := make([]market.Price, 0, len(raw.Prices))
+		for _, p := range raw.Prices {
+			prices = append(prices, market.Price(p))
+		}
+		out[d.Ref.ID] = market.Entry{Key: d.Ref.ID, Name: raw.Name, GroupKey: raw.GroupKey, Prices: prices, UpdatedAt: raw.UpdatedAt}
 	}
 	return out, nil
 }

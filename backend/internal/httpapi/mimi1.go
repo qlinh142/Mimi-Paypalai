@@ -1,11 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/smartlife-lab/mimi/backend/internal/authz"
+	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
 	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
@@ -170,7 +173,7 @@ type MarketItem struct {
 }
 
 // getPlanMarketPrices: GET /plan/market-prices (ADR-004). Chỉ trả món đã có giá; món mới
-// thêm vào Kế hoạch có giá sau lượt price-sync đêm đó.
+// thêm vào Kế hoạch có giá sau lượt price-sync đêm đó, hoặc khi bấm "Cập nhật giá".
 func (s *Server) getPlanMarketPrices(w http.ResponseWriter, r *http.Request) {
 	r = withPlan(r)
 	cart, err := s.plan.Get(r.Context(), principalFrom(r.Context()))
@@ -178,20 +181,70 @@ func (s *Server) getPlanMarketPrices(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, err)
 		return
 	}
+	out, err := s.marketPrices(r.Context(), cart)
+	s.reply(w, r, http.StatusOK, out, err)
+}
+
+// MarketRefreshResult là kết quả một lần bấm "Cập nhật giá", kèm bảng giá mới.
+type MarketRefreshResult struct {
+	Items  []MarketItem `json:"items"`
+	Looked int          `json:"looked"` // số món vừa tra
+	Found  int          `json:"found"`  // số món tra ra giá
+	Fresh  int          `json:"fresh"`  // số món vừa có giá trong 12 giờ, giữ nguyên
+}
+
+// refreshPlanMarketPrices: POST /plan/market-prices/refresh. Tra lại giá cho các món của
+// kế hoạch đang mở (mẹ hỏi 02/11), không phải chờ job đêm. Giới hạn lượt mỗi ngày.
+func (s *Server) refreshPlanMarketPrices(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
+	p := principalFrom(r.Context())
+	cart, err := s.plan.Get(r.Context(), p)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	items := make([]market.Wanted, 0, len(cart.Items))
+	for _, it := range cart.Items {
+		items = append(items, market.Wanted{Key: market.Key(it.Name), Name: it.Name, GroupKey: it.Key})
+	}
+	res, err := s.priceRefresh.Refresh(r.Context(), p.UID, today(p), items)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	prices, err := s.marketPrices(r.Context(), cart)
+	out := MarketRefreshResult{Items: prices.Items, Looked: res.Looked, Found: res.Found, Fresh: res.Fresh}
+	s.reply(w, r, http.StatusOK, out, err)
+}
+
+type marketPricesOut struct {
+	Items []MarketItem `json:"items"`
+}
+
+func (s *Server) marketPrices(ctx context.Context, cart plan.Cart) (marketPricesOut, error) {
 	keys := make([]string, 0, len(cart.Items))
 	for _, it := range cart.Items {
 		keys = append(keys, market.Key(it.Name))
 	}
-	entries, err := s.market.Entries(r.Context(), keys)
-	out := struct {
-		Items []MarketItem `json:"items"`
-	}{Items: []MarketItem{}}
+	entries, err := s.market.Entries(ctx, keys)
+	out := marketPricesOut{Items: []MarketItem{}}
 	for i, it := range cart.Items {
 		if e, ok := entries[keys[i]]; ok {
 			out.Items = append(out.Items, MarketItem{Key: it.Key, Name: it.Name, Prices: e.Prices, UpdatedAt: e.UpdatedAt})
 		}
 	}
-	s.reply(w, r, http.StatusOK, out, err)
+	return out, err
+}
+
+// today là ngày hôm nay theo múi giờ của người dùng (mặc định giờ Việt Nam), để đếm lượt.
+func today(p authz.Principal) string {
+	loc := time.FixedZone("ICT", 7*3600)
+	if p.Timezone != "" {
+		if l, err := time.LoadLocation(p.Timezone); err == nil {
+			loc = l
+		}
+	}
+	return domain.Today(time.Now(), loc).String()
 }
 
 func (s *Server) getItemPriceHistory(w http.ResponseWriter, r *http.Request) {

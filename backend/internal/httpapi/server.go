@@ -115,6 +115,10 @@ type (
 	Market interface {
 		Entries(ctx context.Context, keys []string) (map[string]market.Entry, error)
 	}
+	// PriceRefresh là nút "Cập nhật giá": tra lại giá các món của một kế hoạch.
+	PriceRefresh interface {
+		Refresh(ctx context.Context, uid, day string, items []market.Wanted) (market.Result, error)
+	}
 	Pricing interface {
 		Item(ctx context.Context, p authz.Principal, key string) (pricing.ItemHistory, error)
 		Basket(ctx context.Context, p authz.Principal) (pricing.Basket, error)
@@ -166,39 +170,42 @@ type Deps struct {
 	Households Households // nil: các route nhà trả 501
 	Pricing    Pricing    // nil: các route lịch sử giá trả 501
 	Market     Market     // nil: không có route giá đang bán
-	History    History    // nil: lịch sử mua hàng trả 404
-	Accounts   Accounts   // nil: DELETE /me trả 501
-	SignIn     SignInChecker
-	Ready      ReadinessChecker
-	Metrics    Metrics // nil: không ghi metric
+	// PriceRefresh nil: không có nút cập nhật giá (cần cả Market).
+	PriceRefresh PriceRefresh
+	History      History  // nil: lịch sử mua hàng trả 404
+	Accounts     Accounts // nil: DELETE /me trả 501
+	SignIn       SignInChecker
+	Ready        ReadinessChecker
+	Metrics      Metrics // nil: không ghi metric
 }
 
 type Server struct {
-	log        *slog.Logger
-	tokens     TokenVerifier
-	accounts   Accounts
-	signIn     SignInChecker
-	appCheck   AppCheckVerifier
-	principals PrincipalLoader
-	profiles   Profiles
-	receipts   Receipts
-	items      Items
-	home       Home
-	spending   Spending
-	settings   Settings
-	plan       Plan
-	notes      Notifications
-	orders     Orders
-	recurring  Recurring
-	households Households
-	pricing    Pricing
-	market     Market
-	history    History
-	ready      ReadinessChecker
-	metrics    Metrics
-	limiter    *windowLimiter
-	shared     SharedLimiter // nil: chỉ đếm tại instance này
-	idem       idem.Store    // nil: không giữ kết quả theo Idempotency-Key
+	log          *slog.Logger
+	tokens       TokenVerifier
+	accounts     Accounts
+	signIn       SignInChecker
+	appCheck     AppCheckVerifier
+	principals   PrincipalLoader
+	profiles     Profiles
+	receipts     Receipts
+	items        Items
+	home         Home
+	spending     Spending
+	settings     Settings
+	plan         Plan
+	notes        Notifications
+	orders       Orders
+	recurring    Recurring
+	households   Households
+	pricing      Pricing
+	market       Market
+	priceRefresh PriceRefresh
+	history      History
+	ready        ReadinessChecker
+	metrics      Metrics
+	limiter      *windowLimiter
+	shared       SharedLimiter // nil: chỉ đếm tại instance này
+	idem         idem.Store    // nil: không giữ kết quả theo Idempotency-Key
 
 	readTimeout    time.Duration
 	defaultTimeout time.Duration
@@ -225,7 +232,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		log: d.Log, tokens: d.Tokens, accounts: d.Accounts, signIn: d.SignIn, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
-		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, history: d.History,
+		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, priceRefresh: d.PriceRefresh, history: d.History,
 		limiter: newWindowLimiter(60), readTimeout: 55 * time.Second, defaultTimeout: 10 * time.Second,
 	}
 	if s.metrics == nil {
@@ -322,6 +329,9 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.market != nil {
 		private("GET /plan/market-prices", s.defaultTimeout, s.getPlanMarketPrices)
+		if s.priceRefresh != nil {
+			private("POST /plan/market-prices/refresh", s.readTimeout, s.refreshPlanMarketPrices)
+		}
 	}
 
 	if s.orders != nil {

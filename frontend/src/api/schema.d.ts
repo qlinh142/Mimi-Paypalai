@@ -1703,6 +1703,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plan/market-prices/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nút Cập nhật giá: tra lại giá các món trong Kế hoạch, không chờ job đêm
+         * @description Bỏ qua món đã tra trong 12 giờ, tối đa 12 món mỗi lần, 5 lần mỗi người mỗi ngày. Không có món nào cần tra thì không tốn lượt.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MarketRefresh"];
+                    };
+                };
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plan/delegated": {
         parameters: {
             query?: never;
@@ -3279,6 +3321,14 @@ export interface components {
             url?: string;
             /** Format: date */
             on: string;
+        };
+        MarketRefresh: components["schemas"]["MarketPrices"] & {
+            /** @description Số món vừa tra */
+            looked: number;
+            /** @description Số món tra ra giá */
+            found: number;
+            /** @description Số món vừa có giá trong 12 giờ nên giữ nguyên */
+            fresh: number;
         };
         MarketPrices: {
             items: {
