@@ -43,12 +43,15 @@ func TestMarketTouchedAndRefreshQuotaEmulator(t *testing.T) {
 		t.Fatalf("%v %v", got, err)
 	}
 	for i := 0; i < 2; i++ {
-		if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2); err != nil {
+		if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2, now); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2); err == nil {
+	if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2, now); err == nil {
 		t.Fatal("want quota error")
+	}
+	if used, last, err := s.PriceRefreshStatus(ctx, uid, "2031-01-10"); err != nil || used != 2 || !last.Equal(now) {
+		t.Fatalf("%d %v %v", used, last, err)
 	}
 	// Lượt đọc hóa đơn tính riêng.
 	if err := s.Reserve(ctx, uid, "2031-01-10", 1); err != nil {
