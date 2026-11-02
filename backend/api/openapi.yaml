@@ -505,7 +505,7 @@ paths:
     post:
       tags: [plan]
       summary: "Nút Cập nhật giá: tra lại giá các món trong Kế hoạch, không chờ job đêm"
-      description: Bỏ qua món đã tra trong 12 giờ, tối đa 12 món mỗi lần, 5 lần mỗi người mỗi ngày. Không có món nào cần tra thì không tốn lượt.
+      description: Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, 3 lần mỗi người mỗi ngày (mẹ chốt 02/11). Không có món nào cần tra thì không tốn lượt.
       parameters: [{ $ref: "#/components/parameters/PlanId" }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MarketRefresh" } } } }
@@ -1219,11 +1219,19 @@ components:
           properties:
             looked: { type: integer, description: Số món vừa tra }
             found: { type: integer, description: Số món tra ra giá }
-            fresh: { type: integer, description: Số món vừa có giá trong 12 giờ nên giữ nguyên }
+            fresh: { type: integer, description: Số món vừa có giá trong 24 giờ nên giữ nguyên }
+    MarketRefreshStatus:
+      type: object
+      required: [daily, left]
+      properties:
+        daily: { type: integer, description: Số lần bấm Cập nhật giá mỗi ngày }
+        left: { type: integer, description: Số lần còn lại hôm nay }
+        last_at: { type: string, format: date-time, description: Lần bấm gần nhất; vắng khi chưa bấm lần nào }
     MarketPrices:
       type: object
       required: [items]
       properties:
+        refresh: { $ref: "#/components/schemas/MarketRefreshStatus" }
         items:
           type: array
           items:

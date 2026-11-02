@@ -118,6 +118,7 @@ type (
 	// PriceRefresh là nút "Cập nhật giá": tra lại giá các món của một kế hoạch.
 	PriceRefresh interface {
 		Refresh(ctx context.Context, uid, day string, items []market.Wanted) (market.Result, error)
+		Status(ctx context.Context, uid, day string) (market.RefreshStatus, error)
 	}
 	Pricing interface {
 		Item(ctx context.Context, p authz.Principal, key string) (pricing.ItemHistory, error)

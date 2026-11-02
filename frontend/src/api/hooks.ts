@@ -446,7 +446,9 @@ export function useRefreshMarketPrices() {
   return useMutation({
     mutationFn: () =>
       apiSend<MarketRefresh>("POST", `/plan/market-prices/refresh${planQuery(currentPlanId())}`, undefined, crypto.randomUUID(), UPLOAD_TIMEOUT_MS),
-    onSuccess: (d) => qc.setQueryData<MarketPrices>(["plan", "market-prices", currentPlanId()], { items: d.items }),
+    onSuccess: (d) => qc.setQueryData<MarketPrices>(["plan", "market-prices", currentPlanId()], { items: d.items, refresh: d.refresh }),
+    // Hết lượt hoặc lỗi: tải lại để số lần còn lại đúng với máy chủ.
+    onError: () => qc.invalidateQueries({ queryKey: ["plan", "market-prices"] }),
   });
 }
 

@@ -181,16 +181,26 @@ func (s *Server) getPlanMarketPrices(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, err)
 		return
 	}
+	p := principalFrom(r.Context())
 	out, err := s.marketPrices(r.Context(), cart)
+	if err == nil && s.priceRefresh != nil {
+		st, serr := s.priceRefresh.Status(r.Context(), p.UID, today(p))
+		if serr != nil {
+			s.log.WarnContext(r.Context(), "price refresh status failed", "err", serr) // bảng giá vẫn trả
+		} else {
+			out.Refresh = &st
+		}
+	}
 	s.reply(w, r, http.StatusOK, out, err)
 }
 
 // MarketRefreshResult là kết quả một lần bấm "Cập nhật giá", kèm bảng giá mới.
 type MarketRefreshResult struct {
-	Items  []MarketItem `json:"items"`
-	Looked int          `json:"looked"` // số món vừa tra
-	Found  int          `json:"found"`  // số món tra ra giá
-	Fresh  int          `json:"fresh"`  // số món vừa có giá trong 12 giờ, giữ nguyên
+	Items   []MarketItem          `json:"items"`
+	Looked  int                   `json:"looked"` // số món vừa tra
+	Found   int                   `json:"found"`  // số món tra ra giá
+	Fresh   int                   `json:"fresh"`  // số món vừa có giá trong 24 giờ, giữ nguyên
+	Refresh *market.RefreshStatus `json:"refresh,omitempty"`
 }
 
 // refreshPlanMarketPrices: POST /plan/market-prices/refresh. Tra lại giá cho các món của
@@ -214,11 +224,15 @@ func (s *Server) refreshPlanMarketPrices(w http.ResponseWriter, r *http.Request)
 	}
 	prices, err := s.marketPrices(r.Context(), cart)
 	out := MarketRefreshResult{Items: prices.Items, Looked: res.Looked, Found: res.Found, Fresh: res.Fresh}
+	if st, serr := s.priceRefresh.Status(r.Context(), p.UID, today(p)); serr == nil {
+		out.Refresh = &st
+	}
 	s.reply(w, r, http.StatusOK, out, err)
 }
 
 type marketPricesOut struct {
-	Items []MarketItem `json:"items"`
+	Items   []MarketItem          `json:"items"`
+	Refresh *market.RefreshStatus `json:"refresh,omitempty"` // nút Cập nhật giá: còn mấy lần, lần gần nhất
 }
 
 func (s *Server) marketPrices(ctx context.Context, cart plan.Cart) (marketPricesOut, error) {

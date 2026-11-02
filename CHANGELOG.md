@@ -9,8 +9,8 @@ Mới nhất ở trên cùng.
 
 Nhánh `feat/cap-nhat-gia` (trên `feat/gia-online`). Mẹ hỏi 02/11: không phải chờ job đêm, chỉ tra các món của kế hoạch đang mở.
 
-- `POST /plan/market-prices/refresh`: tra lại giá các món của kế hoạch, cùng nguồn công khai với job. Bỏ qua món đã tra trong 12 giờ, tối đa 12 món mỗi lần, tra song song 6 món để kịp giới hạn 60 giây của Hosting, 5 lần mỗi người mỗi ngày (`quota/price-{ngày}`, tách khỏi lượt đọc hóa đơn). Không có món nào cần tra thì không tốn lượt.
-- Nút "Cập nhật giá" dưới khối "Giá đang bán", báo "Đã tra N món, có giá M món" hoặc lỗi hết lượt.
+- `POST /plan/market-prices/refresh`: tra lại giá các món của kế hoạch, cùng nguồn công khai với job. Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, tra song song 6 món để kịp giới hạn 60 giây của Hosting, 3 lần mỗi người mỗi ngày (`quota/price-{ngày}`, tách khỏi lượt đọc hóa đơn). Mẹ chốt 24 giờ và 3 lần (02/11). Không có món nào cần tra thì không tốn lượt.
+- Nút "Cập nhật giá" dưới khối "Giá đang bán", báo "Đã tra N món, có giá M món" hoặc lỗi hết lượt. Dưới nút hiện "Hôm nay còn x/3 lần" và "Lần cập nhật gần nhất" (lưu ở `quota/price-last`, `GET /plan/market-prices` trả kèm `refresh`).
 - Kiểm tra: `go test ./internal/market ./internal/httpapi`, test emulator `TestMarketTouchedAndRefreshQuotaEmulator`, bản thử bấm nút trên iPhone 13.
 
 ---

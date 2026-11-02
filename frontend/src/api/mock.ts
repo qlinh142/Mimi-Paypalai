@@ -799,6 +799,9 @@ function histDetail(id: string): ReceiptDetail | null {
   return { receipt_id: rid, store, purchased_at: histDate(ago, hour), total_vnd: subtotal - disc, item_names: [], kind: "own", plans, lines, subtotal, discount: disc };
 }
 
+/** Bản thử: nút Cập nhật giá 3 lần mỗi ngày như máy chủ. */
+let mockRefresh: { daily: number; left: number; last_at?: string } = { daily: 3, left: 3 };
+
 function mockMarketItems() {
   return mockCart().items.filter((i) => MOCK_PRICES[i.key]).map((i) => ({
     key: i.key, name: i.name, updated_at: new Date().toISOString(),
@@ -884,13 +887,17 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   }
   if (p === "/plan/market-prices" && method === "GET") {
     // Bản thử: giá "tra trên mạng" giả, lệch nhẹ so với giá hóa đơn mẫu.
-    return inPlan(url.searchParams.get("plan_id"), () => json({ items: mockMarketItems() }));
+    return inPlan(url.searchParams.get("plan_id"), () => json({ items: mockMarketItems(), refresh: mockRefresh }));
   }
   if (p === "/plan/market-prices/refresh" && method === "POST") {
     // Bản thử: không tra thật, trả lại bảng giá giả như vừa tra xong.
     return inPlan(url.searchParams.get("plan_id"), () => {
       const items = mockMarketItems();
-      return json({ items, looked: mockCart().items.length, found: items.length, fresh: 0 });
+      if (mockRefresh.left <= 0) {
+        return json({ code: "quota_exceeded", message: `Hôm nay bạn đã cập nhật giá ${mockRefresh.daily} lần, mai cập nhật tiếp nhé. Mimi vẫn tự tra giá mỗi đêm.` }, 429);
+      }
+      mockRefresh = { ...mockRefresh, left: mockRefresh.left - 1, last_at: new Date().toISOString() };
+      return json({ items, looked: mockCart().items.length, found: items.length, fresh: 0, refresh: mockRefresh });
     });
   }
   if (p === "/plan/price-history" && method === "GET") {
