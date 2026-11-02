@@ -447,8 +447,13 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
   if (method === "GET" && p === "/plan") return json(mockCart());
   if (method === "GET" && p === "/plan/prices") return json(mockPrices());
   if (method === "PUT" && p === "/plan/state") {
-    const next = JSON.parse(String(init.body)) as PlanState;
-    planState = { ...next, reconciled_on: planState.reconciled_on }; // reconciled_on chỉ do lưu hóa đơn ghi
+    const { base_rev, ...next } = JSON.parse(String(init.body)) as PlanState;
+    const cur = planState.rev ?? 0;
+    // A1: máy khác đã lưu sau lần đọc thì báo xung đột, không ghi đè.
+    if (base_rev != null && base_rev !== cur) {
+      return json({ code: "conflict", message: L ? "This plan was just changed on another device. Mimi reloaded it, please check and edit again." : "Kế hoạch vừa được sửa trên máy khác. Mimi đã tải lại bản mới, mẹ xem rồi sửa lại nhé.", details: { rev: cur } }, 409);
+    }
+    planState = { ...next, rev: cur + 1, reconciled_on: planState.reconciled_on }; // reconciled_on chỉ do lưu hóa đơn ghi
     return json(planState);
   }
   const planItem = p.match(/^\/plan\/items\/([^/]+)$/);

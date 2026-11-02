@@ -37,8 +37,15 @@ func (m *memStore) RemoveLine(_ context.Context, _ string, k string) error {
 	delete(m.lines, k)
 	return nil
 }
-func (m *memStore) State(context.Context, string) (State, error)        { return m.state, nil }
-func (m *memStore) SetState(_ context.Context, _ string, s State) error { m.state = s; return nil }
+func (m *memStore) State(context.Context, string) (State, error) { return m.state, nil }
+func (m *memStore) SetState(_ context.Context, _ string, s State) (int64, error) {
+	if s.BaseRev != nil && *s.BaseRev != m.state.Rev {
+		return 0, apperr.New(apperr.CodeConflict, "conflict")
+	}
+	s.Rev, s.BaseRev = m.state.Rev+1, nil
+	m.state = s
+	return s.Rev, nil
+}
 func (m *memStore) Prices(_ context.Context, _ string, groups []string) ([]domain.LastPrice, error) {
 	m.asked = append(m.asked, groups...)
 	want := map[string]bool{}
@@ -312,5 +319,24 @@ func TestSetStateMinuteAndIgnoresReconciled(t *testing.T) {
 	bad := 60
 	if _, err := svc.SetState(context.Background(), owner, State{BuyHour: &h, BuyMinute: &bad}); err == nil {
 		t.Fatal("minute 60 accepted")
+	}
+}
+
+func TestSetStateRevConflict(t *testing.T) {
+	svc, _ := setup()
+	ctx := context.Background()
+	first, err := svc.SetState(ctx, owner, State{TripNote: "máy A"})
+	if err != nil || first.Rev != 1 {
+		t.Fatalf("%+v %v", first, err)
+	}
+	base := first.Rev
+	second, err := svc.SetState(ctx, owner, State{TripNote: "máy A lần 2", BaseRev: &base})
+	if err != nil || second.Rev != 2 {
+		t.Fatalf("%+v %v", second, err)
+	}
+	// Máy B còn giữ rev 1: không được ghi đè.
+	_, err = svc.SetState(ctx, owner, State{TripNote: "máy B", BaseRev: &base})
+	if err == nil || apperr.From(err).Code != apperr.CodeConflict {
+		t.Fatalf("want conflict, got %v", err)
 	}
 }

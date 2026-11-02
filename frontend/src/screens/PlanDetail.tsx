@@ -100,7 +100,7 @@ function Detail({ id }: { id: string }) {
     const newName = name.trim();
     if (meta && !meta.default && newName && newName !== meta.name) metaAct.update.mutate({ id, name: newName });
     saveState.mutate(
-      { buy_date: date, buy_hour: h, buy_minute: m, trip_note: store.trim() },
+      { buy_date: date, buy_hour: h, buy_minute: m, trip_note: store.trim(), base_rev: cart.state.rev },
       {
         onSuccess: () => {
           const done = (msg: string) => {

@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryLabel } from "../i18n";
-import { apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
+import { ApiError, apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
 import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
   Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
@@ -236,10 +236,16 @@ export function usePlanLine() {
 export function useSavePlanState() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (st: PlanState) => apiSend<PlanState>("PUT", `/plan/state${planQuery(currentPlanId())}`, st),
+    // A1: gửi kèm rev đã đọc (base_rev). Máy khác lưu trước thì máy chủ trả 409: tải lại kế hoạch
+    // để màn hình hiện bản mới, lỗi mang câu báo của máy chủ.
+    mutationFn: ({ rev, base_rev, ...st }: PlanState) =>
+      apiSend<PlanState>("PUT", `/plan/state${planQuery(currentPlanId())}`, { ...st, base_rev: base_rev ?? rev }),
     onSuccess: (st) => {
       qc.setQueryData<Cart>(qk.cart(currentPlanId()), (c) => (c ? { ...c, state: st } : c));
       qc.invalidateQueries({ queryKey: qk.plans });
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.status === 409) qc.invalidateQueries({ queryKey: qk.cart(currentPlanId()) });
     },
   });
 }
