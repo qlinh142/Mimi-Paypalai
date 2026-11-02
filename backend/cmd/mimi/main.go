@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/account"
 	"github.com/smartlife-lab/mimi/backend/internal/config"
+	"github.com/smartlife-lab/mimi/backend/internal/demo"
 	"github.com/smartlife-lab/mimi/backend/internal/fx"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fbauth"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
@@ -83,7 +84,7 @@ func run(args []string) error {
 		return serveWorker(ctx, cfg, log, store)
 	case "job":
 		if len(args) < 2 {
-			return errors.New("usage: mimi job <digest|price-sync|fx-sync|cleanup>")
+			return errors.New("usage: mimi job <digest|migrate|fx-sync|cleanup|seed-demo|price-sync>")
 		}
 		return runJob(ctx, args[1], cfg, log, store)
 	}
@@ -246,6 +247,20 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		var rates []fx.Rate
 		rates, err = fx.Sync(ctx, fx.ERAPI{}, store, time.Now())
 		log.InfoContext(ctx, "fx-sync done", "currencies", len(rates))
+	case "seed-demo":
+		// V5: ghi lịch sử mua mẫu cho tài khoản demo (đăng nhập tài khoản đó một lần trước).
+		// Chỉ chạy khi đặt DEMO_UID, để không ai lỡ tay ghi vào tài khoản thật.
+		uid := os.Getenv("DEMO_UID")
+		if uid == "" {
+			return errors.New("seed-demo: đặt DEMO_UID là uid tài khoản demo")
+		}
+		var rs *receipt.Service
+		// Thiếu WithTaxonomy thì mọi danh mục bị coi là chưa phân loại và không vào tồn kho.
+		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(loadTaxonomy())); err == nil {
+			var n int
+			n, err = demo.Seed(ctx, rs, uid, time.Now())
+			log.InfoContext(ctx, "seed-demo done", "receipts", n)
+		}
 	case "price-sync":
 		err = fmt.Errorf("job %s: not implemented yet", name)
 	default:
