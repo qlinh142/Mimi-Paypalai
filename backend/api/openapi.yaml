@@ -494,6 +494,13 @@ paths:
       description: Một nơi chỉ có estimated_total khi có giá cho mọi món. Xếp hạng theo độ phủ, rồi tổng, rồi độ mới.
       parameters: [{ $ref: "#/components/parameters/PlanId" }]
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/BasketPrices" } } } } }
+  /plan/market-prices:
+    get:
+      tags: [plan]
+      summary: "ADR-004: giá đang bán của các món trong Kế hoạch, đọc từ bảng giá chung (chỉ nguồn công khai)"
+      description: Chỉ trả món đã có giá. Món mới thêm có giá sau lượt price-sync 2 giờ sáng. Giá trên hóa đơn của nhà mình không nằm ở đây.
+      parameters: [{ $ref: "#/components/parameters/PlanId" }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MarketPrices" } } } } }
   /plan/delegated:
     get:
       tags: [plan, household]
@@ -1185,6 +1192,30 @@ components:
         other_dimension_count: { type: integer }
         history: { type: array, items: { $ref: "#/components/schemas/PriceObservation" } }
         window_days: { type: integer }
+    MarketPrice:
+      type: object
+      required: [store, price_vnd, source, on]
+      properties:
+        store: { type: string }
+        price_vnd: { type: integer, format: int64 }
+        size: { type: string, description: Quy cách nguồn ghi (1L, 900g...) }
+        source: { type: string, description: "gemini_search hoặc partner_..." }
+        url: { type: string }
+        on: { type: string, format: date }
+    MarketPrices:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [key, name, prices, updated_at]
+            properties:
+              key: { type: string, description: Khóa dòng Kế hoạch }
+              name: { type: string }
+              prices: { type: array, items: { $ref: "#/components/schemas/MarketPrice" }, description: Rẻ trước, tối đa 5 }
+              updated_at: { type: string, format: date-time }
     BasketPrices:
       type: object
       properties:

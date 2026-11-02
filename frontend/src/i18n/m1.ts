@@ -114,6 +114,13 @@ const en = {
     split: (n: number) => `Split across ${n} stores`,
     noHistory: (names: string) => `No price history yet: ${names}`,
   },
+  marketPrices: {
+    title: "Prices on sale now",
+    cheapest: (store: string) => `Cheapest at ${store}`,
+    more: (n: number) => `${n} more stores`,
+    disclaimer: "Looked up online each night. In-store prices may differ.",
+    noneYet: "New items get prices the next morning.",
+  },
   priceHistory: {
     title: "Price history",
     last: "Last purchase",
@@ -306,6 +313,13 @@ const vi: M1 = {
     notEnough: "Chưa đủ dữ liệu để ước tính cả giỏ",
     split: (n) => `Chia ${n} nơi`,
     noHistory: (names) => `Chưa có lịch sử giá: ${names}`,
+  },
+  marketPrices: {
+    title: "Giá đang bán",
+    cheapest: (store) => `Rẻ nhất ở ${store}`,
+    more: (n) => `và ${n} nơi khác`,
+    disclaimer: "Mimi tra trên mạng mỗi đêm. Giá tại quầy có thể khác.",
+    noneYet: "Món mới thêm sẽ có giá vào sáng hôm sau.",
   },
   priceHistory: {
     title: "Lịch sử giá",

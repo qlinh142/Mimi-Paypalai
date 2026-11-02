@@ -8,7 +8,7 @@ import type { CartItem, Item, PlanPriority, PlanPrices, PlanState } from "../api
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon, STATUS_TEXT } from "../components/ItemRow";
 import { formatDayMonth, formatVnd } from "../lib/text";
-import { AddAnything, AssignPanel, BasketPricesPanel, DelegatedPanel, PlanSwitcher } from "../components/PlanExtras";
+import { AddAnything, AssignPanel, BasketPricesPanel, DelegatedPanel, MarketPricesPanel, PlanSwitcher } from "../components/PlanExtras";
 import { m1 } from "../i18n/m1";
 import { DEFAULT_PLAN, useCurrentPlanId } from "../lib/currentPlan";
 
@@ -165,6 +165,7 @@ export function Plan() {
 
         {/* 3. Nơi mua tối ưu */}
         {cart && cart.item_count > 0 && prices.data && <WhereToBuy prices={prices.data} names={names} />}
+        {cart && cart.item_count > 0 && <MarketPricesPanel cart={cart} />}
         {cart && cart.item_count > 0 && <BasketPricesPanel cart={cart} />}
         {cart && cart.item_count > 0 && <AssignPanel cart={cart} />}
 
