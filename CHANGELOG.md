@@ -5,6 +5,25 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Người được nhờ báo mua xong hoặc từ chối (B2)
+
+- `POST /households/shopping-assignments/{id}/complete`: ghi các món đã tick thành một hóa đơn của người mua, đi qua cùng đường lưu hóa đơn có `assignment_id`. Kết quả:
+  - Món nhờ mua đã tick thành "done" và vào tồn kho của người nhờ.
+  - Món chưa tick trả về Kế hoạch của người nhờ.
+  - Món "của mình" vào tồn kho của người mua.
+  - Chi tiêu tính cho người trả tiền.
+  - Mã hóa đơn là `run-{mã vòng}`, nên hàng đợi offline gửi lại cũng không ghi trùng.
+- Món chưa nhập giá được lưu là chưa rõ giá (A7). Không tick món nào thì vòng kết thúc ở trạng thái "mua một phần" và mọi món trả về Kế hoạch.
+- `POST /households/shopping-assignments/{id}/decline`: người được nhờ từ chối. Vòng chuyển sang trạng thái `declined`, mọi món trả về Kế hoạch của người nhờ.
+- Chỉ người được nhờ mới báo xong hoặc từ chối được. Vòng đã kết thúc thì báo `invalid_state`.
+- App gửi đủ danh sách, chỉ gồm các trường máy chủ cần.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestCompleteWritesReceipt`, `TestCompleteRules`, `TestDecline`.
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Món chưa rõ giá không bịa số, không tính 0đ (A7)
 
 - Lưu hóa đơn (`POST /receipts`): dòng có ô giá trống được lưu là "chưa rõ giá" (giá null). Món vẫn vào tồn kho và lịch sử, nhưng không cộng vào tổng, chi tiêu tháng hay lịch sử giá. Giá có ghi mà sai dạng thì vẫn báo lỗi như cũ.

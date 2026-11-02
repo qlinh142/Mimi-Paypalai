@@ -93,6 +93,8 @@ type (
 		RemoveMember(ctx context.Context, p authz.Principal, uid string) error
 		Assign(ctx context.Context, p authz.Principal, req household.AssignRequest) (household.Assignment, error)
 		Cancel(ctx context.Context, p authz.Principal, id string) (household.Assignment, error)
+		Complete(ctx context.Context, p authz.Principal, id string, req household.CompleteRequest) (household.Assignment, error)
+		Decline(ctx context.Context, p authz.Principal, id string) (household.Assignment, error)
 		Delegated(ctx context.Context, p authz.Principal) (household.Delegated, error)
 	}
 	// Pricing là lịch sử giá dùng chung cho Đồ dùng và Kế hoạch (8.1).
@@ -284,6 +286,8 @@ func (s *Server) Handler() http.Handler {
 		private("DELETE /households/members/{uid}", s.defaultTimeout, s.deleteMember)
 		private("POST /households/shopping-assignments", s.defaultTimeout, s.postAssignment)
 		private("POST /households/shopping-assignments/{id}/cancel", s.defaultTimeout, s.cancelAssignment)
+		private("POST /households/shopping-assignments/{id}/complete", s.defaultTimeout, s.completeAssignment)
+		private("POST /households/shopping-assignments/{id}/decline", s.defaultTimeout, s.declineAssignment)
 		private("GET /plan/delegated", s.defaultTimeout, s.getDelegated)
 	}
 	if s.history != nil {
