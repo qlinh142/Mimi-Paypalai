@@ -39,7 +39,8 @@ Nhánh `feat/them-vao-lich`. ADR-004 mục Lịch, mẹ chốt: chỉ tạo lị
 - Chi tiết kế hoạch: khi đã có ngày đi chợ, hiện nút "Thêm vào Google Calendar", kèm nhắc đổi giờ thì thêm lại.
 - Kiểm tra: tsc, build; trên bản thử link mở đúng ngày giờ 04/11 09:30 đến 10:30.
 - Đã bỏ nút "Lịch trên iPhone" (file .ics): trên iPhone file chỉ bị tải về, không mở app Lịch, kể cả trong Safari (mẹ thử 02/11). Người dùng iPhone dùng nút Google Calendar.
-- Chưa có: nút này ở màn người được nhờ mua.
+- Màn đi mua hộ: người được nhờ cũng có nút "Thêm vào Google Calendar" ngay dưới ô tóm tắt, khi kế hoạch đã có ngày (tên, giờ, nơi mua, danh sách món lấy từ kế hoạch gốc). Nút tách ra `components/AddToCalendar.tsx` dùng chung.
+
 ## 2026-11-02 · Nút "Cập nhật giá" trong Kế hoạch
 
 Nhánh `feat/cap-nhat-gia` (trên `feat/gia-online`). Mẹ hỏi 02/11: không phải chờ job đêm, chỉ tra các món của kế hoạch đang mở.

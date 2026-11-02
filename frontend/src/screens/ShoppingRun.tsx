@@ -11,6 +11,7 @@ import { formatVnd } from "../lib/text";
 import { useRelations } from "../lib/relation";
 import { LoadState } from "../components/LoadState";
 import { whenText } from "./PlanList";
+import { AddToCalendar } from "../components/AddToCalendar";
 
 /** Một dòng trên danh sách đi mua. `mine` = món khác trên hóa đơn (khối "Của tôi"). */
 type RunLine = { key: string; name: string; qty: number; unit: string; price: number | null; ticked: boolean; fixedName: boolean; mine: boolean; category: string };
@@ -185,6 +186,17 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: DoneInfo) => void }
           <span><CalendarDays size={18} aria-hidden /> {whenText(st)}</span>
           <span><UserRound size={18} aria-hidden /> {m15.run.sender(owner)}</span>
         </section>
+        {st?.buy_date && (
+          <AddToCalendar
+            ev={{
+              title: m15.plan.calTitle(planName),
+              date: st.buy_date,
+              time: st.buy_hour != null ? `${String(st.buy_hour).padStart(2, "0")}:${String(st.buy_minute).padStart(2, "0")}` : undefined,
+              location: st.trip_note || undefined,
+              details: m15.plan.calDetails(ask.slice(0, 20).map((l) => l.name)),
+            }}
+          />
+        )}
 
         {block(m15.run.forOwner(owner, ask.length), ask)}
         {run.scanned && mine.length > 0 && block(m15.run.mine(mine.length), mine)}
