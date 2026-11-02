@@ -46,10 +46,14 @@ jobs:
 
   secrets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
+        # gitleaks-action đọc danh sách commit của PR qua API nên cần quyền đọc pull request.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
