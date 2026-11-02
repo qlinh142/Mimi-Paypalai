@@ -3,7 +3,7 @@ import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import { LoadState } from "../components/LoadState";
 import {
@@ -21,7 +21,7 @@ import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
 import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
-import { type CalendarEvent, googleCalendarUrl } from "../lib/calendar";
+import { AddToCalendar } from "../components/AddToCalendar";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -415,20 +415,6 @@ function Forecast({ cart }: { cart: Cart }) {
       )}
       {compare && <BasketPricesPanel cart={cart} />}
     </section>
-  );
-}
-
-/* ---------- Thêm vào lịch (ADR-004: tạo một lần, không nối tài khoản lịch) ---------- */
-function AddToCalendar({ ev }: { ev: CalendarEvent }) {
-  return (
-    <div className="cal15">
-      <div className="cal15__row">
-        <a className="btn btn--quiet" href={googleCalendarUrl(ev)} target="_blank" rel="noopener noreferrer">
-          <CalendarPlus size={18} aria-hidden /> {m15.plan.calGoogle}
-        </a>
-      </div>
-      <p className="hint">{m15.plan.calHint}</p>
-    </div>
   );
 }
 
