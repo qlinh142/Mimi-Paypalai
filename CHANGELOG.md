@@ -5,6 +5,17 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Lệnh dựng và deploy bản demo từ Cloud Shell
+
+- `deploy/cloudshell-setup.sh <project-id>`: tạo tài khoản dịch vụ (sa-api, sa-jobs, sa-scheduler) và cấp quyền, deploy `mimi-api` lên Cloud Run từ mã nguồn, tạo các job (fx-sync, cleanup, migrate, seed-demo), lịch chạy fx-sync 06:00 và cleanup 03:00, lấy cấu hình web Firebase qua API (không commit khóa), build frontend và đưa rules, index, Hosting lên Firebase.
+- `backend/firebase.json` để `firebase deploy --only firestore` dùng đúng rules và index.
+- Bản demo chạy `MIMI_ENV=dev`: thư chỉ ghi log, App Check tắt. Bật thật khi đã chọn dịch vụ email và cấu hình reCAPTCHA Enterprise.
+
+### Cách kiểm tra
+- `bash -n deploy/cloudshell-setup.sh` qua. Chạy thật trên project `mimi-1-5`.
+
+---
+
 ## 2026-11-02 · Test tự động cho kịch bản demo
 
 - Thêm test Playwright `frontend/e2e/demo.spec.ts` chạy kịch bản demo trên bản thử: đăng nhập, quét bill, xem lại và lưu, Đồ dùng (Cần mua ngay, Sắp hết, Dầu gội còn 5 ngày), Sổ chi tiêu (tổng tháng, nhãn danh mục), Kế hoạch (gợi ý mua, dự kiến chi, ba cách mua với Mimi đang khóa).
