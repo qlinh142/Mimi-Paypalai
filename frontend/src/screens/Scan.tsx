@@ -376,6 +376,9 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
               <p>{m1.scan.assignmentResult(save.data.assignment.done.length, save.data.assignment.returned.length)}</p>
             )}
             {!!save.data?.plan_done?.length && <p>{m1.scan.planDone(save.data.plan_done.length)}</p>}
+            {save.data?.split_plan && (
+              <p><Link to={`/plan/${encodeURIComponent(save.data.split_plan.plan_id)}`}>{m1.scan.splitPlan(save.data.split_plan.moved)} ›</Link></p>
+            )}
             {!!save.data?.recurring_matched?.length && <p>{m1.scan.recurringMatched}</p>}
           </div>
           <dl className="facts">

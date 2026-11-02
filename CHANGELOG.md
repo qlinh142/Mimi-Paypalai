@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Món chưa mua tự sang kế hoạch "· còn lại" (B6)
+
+- Khi một kế hoạch được chốt (người mua bấm "Mua hàng xong", hoặc mẹ xác nhận hóa đơn trừ vào kế hoạch đó), món còn mở chuyển sang kế hoạch mới tên "[tên cũ] · còn lại".
+- Kế hoạch mới giữ biểu tượng và nơi mua, chưa có ngày đi mua, chưa có người mua, nằm trong danh sách của người nhờ. Món mua thiếu chỉ mang theo phần còn thiếu.
+- Mua đủ hết thì không tạo gì. Kế hoạch chính không tách vì là danh sách dùng lâu dài. Kế hoạch đứng sau chỉ nhận phần dư của hóa đơn thì chưa tính là xong.
+- Màn lưu hóa đơn báo "Đã chuyển 1 món chưa mua sang kế hoạch mới ›", bấm vào mở kế hoạch mới. Kế hoạch "Đã mua xong" xuống cuối danh sách và mờ đi.
+- Bước tách chạy ngay sau khi lưu hóa đơn. Nếu lỗi thì hóa đơn vẫn lưu, món vẫn ở kế hoạch cũ; kế hoạch cũ ghi `split_to` nên không bao giờ tách hai lần.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestRemainName`, `TestRemainLine`, `TestSplitRemainingEmulator` (chạy khi có Firestore emulator).
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Kế hoạch giữ tối đa 2 bản (B5)
 
 - Trước đây mỗi lần bấm máy bay giấy lại tạo thêm một lần nhờ mua chỉ gồm món mới, nên người mua thấy nhiều thẻ cho cùng một kế hoạch, còn món mẹ bỏ đi vẫn nằm trong bản cũ.

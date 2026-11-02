@@ -190,6 +190,7 @@ const en = {
     personal: "Just me",
     assignmentResult: (done: number, back: number) => `${done} bought for them${back ? `, ${back} returned to their plan` : ""}.`,
     planDone: (n: number) => `${n} plan ${n === 1 ? "item" : "items"} marked done.`,
+    splitPlan: (n: number) => `Moved ${n} unbought ${n === 1 ? "item" : "items"} to a new plan`,
     recurringMatched: "Matched a recurring payment, not counted twice.",
   },
 };
@@ -382,6 +383,7 @@ const vi: M1 = {
     personal: "Của tôi",
     assignmentResult: (done, back) => `${done} món mua hộ đã vào tồn kho người nhờ${back ? `, ${back} món trả lại kế hoạch của họ` : ""}.`,
     planDone: (n) => `${n} món trong kế hoạch đã xong.`,
+    splitPlan: (n) => `Đã chuyển ${n} món chưa mua sang kế hoạch mới`,
     recurringMatched: "Khớp một khoản định kỳ, không tính hai lần.",
   },
 };

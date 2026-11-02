@@ -905,7 +905,16 @@ components:
         receipt_id: { type: string }
         status: { type: string, enum: [saved] }
         replayed: { type: boolean }
-    Item:
+        plan_done: { type: array, items: { type: string } }
+        recurring_matched: { type: array, items: { type: string } }
+        split_plan:
+          type: object
+          description: "B6: món chưa mua của Kế hoạch vừa chốt đã sang Kế hoạch mới \"[tên cũ] · còn lại\" (giữ biểu tượng, nơi mua; chưa có ngày, chưa có người mua)"
+          properties:
+            from_plan_id: { type: string }
+            plan_id: { type: string }
+            name: { type: string }
+            moved: { type: integer }
       type: object
       properties:
         key: { type: string }

@@ -137,6 +137,9 @@ func (s *Server) saveReceipt(w http.ResponseWriter, r *http.Request) {
 	if out.Assignment != nil {
 		body["assignment"] = out.Assignment
 	}
+	if out.Split != nil {
+		body["split_plan"] = out.Split
+	}
 	writeJSON(w, status, body)
 }
 

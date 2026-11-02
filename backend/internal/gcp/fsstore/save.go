@@ -3,7 +3,9 @@ package fsstore
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -64,7 +66,9 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 	rRef := u.Collection("receipts").Doc(r.ID)
 
 	var out receipt.SaveOutcome
+	var closedOwner, closedPlan string // Kế hoạch được chốt bởi hóa đơn này (B6)
 	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		closedOwner, closedPlan = "", ""
 		out = receipt.SaveOutcome{ReceiptID: r.ID}
 		lines := append([]receipt.Line(nil), r.Lines...)
 
@@ -363,6 +367,18 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 				}
 			}
 			out.Assignment = res
+			if len(res.Done) > 0 {
+				closedOwner, closedPlan = asg.ownerID, asg.planID
+			}
+		} else if r.SourcePlanID != "" {
+			// Chỉ tính là chốt khi hóa đơn thật sự trừ vào Kế hoạch đã chọn. Kế hoạch đứng sau
+			// chỉ nhận phần dư thì chưa xong (đề xuất bước 6, câu 3).
+			for k := range planTargets {
+				if strings.HasPrefix(k, uid+"|"+r.SourcePlanID+"|") {
+					closedOwner, closedPlan = uid, r.SourcePlanID
+					break
+				}
+			}
 		}
 		for _, m := range occs {
 			// Rule R3: hóa đơn đã nằm trong Spending, không cộng lại; kỳ hiện tại rời Forecast.
@@ -389,6 +405,16 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 	}, firestore.MaxAttempts(5))
 	if err != nil {
 		return receipt.SaveOutcome{}, err
+	}
+	if closedPlan != "" && !out.Replayed {
+		// B6: món chưa mua sang Kế hoạch mới. Lỗi ở bước này không làm hỏng hóa đơn đã lưu:
+		// món vẫn nằm ở Kế hoạch cũ, lần chốt sau sẽ tách lại.
+		sp, err := s.SplitRemaining(ctx, closedOwner, closedPlan, time.Now())
+		if err != nil {
+			slog.WarnContext(ctx, "split remaining", "plan_id", closedPlan, "err", err)
+		} else if sp != nil && closedOwner == uid {
+			out.Split = sp
+		}
 	}
 	return out, nil
 }

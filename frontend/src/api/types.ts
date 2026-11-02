@@ -175,6 +175,8 @@ export type SaveReceiptResult = {
   plan_done?: string[];
   assignment?: { assignment_id: string; status: "completed" | "closed_partial"; done: string[]; returned: string[] };
   recurring_matched?: string[];
+  /** B6: món chưa mua của kế hoạch vừa chốt đã sang kế hoạch mới "· còn lại". */
+  split_plan?: { from_plan_id: string; plan_id: string; name: string; moved: number };
 };
 
 /** Kế hoạch mua sắm (GET /plan). Giá là giá mỗi đơn vị người dùng từng trả, lấy từ hóa đơn đã lưu. */
