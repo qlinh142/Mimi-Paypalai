@@ -5,6 +5,21 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Icon kế hoạch và tên gọi người nhà lưu trên máy chủ (B11)
+
+- Biểu tượng của Kế hoạch lưu cùng Kế hoạch trên máy chủ (`icon` trong `GET/POST /plans`, `PATCH /plans/{id}`). Kế hoạch chính chỉ đổi được biểu tượng, lưu ở `default_plan_icon` trên users/{uid}. Máy chủ chỉ nhận 6 khóa trong bộ biểu tượng chung của app: bag, family, kid, gift, home, food.
+- Tên gọi người nhà (Anh, Chị, Bố...) lưu trong `settings.relations` theo uid, riêng cho từng tài khoản. `PUT /settings {relations: {uid: "anh"}}` chỉ gửi phần đổi, `""` là xóa, tối đa 50 tên.
+- App không còn giữ hai thứ này trên máy, nên đăng xuất rồi đăng nhập lại, hoặc đổi máy, vẫn còn nguyên. Đây là phần sửa cho lỗi đăng xuất làm mất icon và tên gọi (từ PR #7).
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...` qua. Test mới: `TestPlanIconStoredOnServer`, `TestRelations`.
+- `npm run build` qua.
+
+### Còn thiếu
+- Icon và tên gọi đã đặt trên máy trước bản này không được chuyển lên máy chủ. Từ PR #7 trở đi, đăng xuất đã xóa chúng rồi.
+
+---
+
 ## 2026-11-02 · Chi tiết món đọc đủ lịch sử mua (lỗi V3)
 
 - Mọi lần mua vẫn được lưu như trước (không bao giờ xóa). Sửa ở chỗ đọc: Chi tiết một món đọc tới 500 lần mua thay cho 20 (chia đợt hàng) và 30 (giá thấp nhất, giá trung bình), nên lần mua cũ không còn bị bỏ qua.

@@ -223,7 +223,7 @@ const vi = {
     relation: "Vai trong nhà",
     relationNone: "Chưa chọn",
     relations: { anh: "Anh", chi: "Chị", em: "Em", bo: "Bố", me: "Mẹ", con: "Con", ong: "Ông", ba: "Bà", khac: "Khác" } as Record<string, string>,
-    relationNote: "Vai trong nhà hiện trong bảng Gửi kế hoạch. Tạm lưu trên máy này.",
+    relationNote: "Vai trong nhà hiện trong bảng Gửi kế hoạch. Chỉ bạn thấy, đăng nhập máy khác vẫn còn.",
     remove: (n: string) => `Xóa ${n} khỏi nhà`,
     privacyPage: [
       "Mimi chỉ lưu những gì đọc được trên hóa đơn: tên món, số lượng, giá, cửa hàng và ngày mua.",
@@ -544,7 +544,7 @@ const en: typeof vi = {
     relation: "Family role",
     relationNone: "Not set",
     relations: { anh: "Brother", chi: "Sister", em: "Younger sibling", bo: "Dad", me: "Mom", con: "Child", ong: "Grandpa", ba: "Grandma", khac: "Other" },
-    relationNote: "Shown when sending a plan. Saved on this device for now.",
+    relationNote: "Shown when sending a plan. Only you see it, and it follows your account.",
     remove: (n) => `Remove ${n} from home`,
     privacyPage: [
       "Mimi only keeps what it reads on a receipt: item names, quantities, prices, store and date.",

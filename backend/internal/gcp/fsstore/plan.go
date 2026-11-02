@@ -190,6 +190,7 @@ func decodePlanMeta(d *firestore.DocumentSnapshot) plan.Meta {
 		pm.Status = st
 	}
 	pm.CreatedAt, _ = m["created_at"].(time.Time)
+	pm.Icon, _ = m["icon"].(string)
 	if ps, ok := m["plan_state"].(map[string]any); ok {
 		pm.BuyDate, _ = ps["buy_date"].(string)
 	}
@@ -227,7 +228,7 @@ func (s *Store) GetPlan(ctx context.Context, uid, id string) (plan.Meta, error) 
 
 func (s *Store) CreatePlan(ctx context.Context, uid string, m plan.Meta) error {
 	_, err := s.user(uid).Collection("plans").Doc(m.ID).Create(ctx, map[string]any{
-		"name": m.Name, "status": m.Status, "created_at": m.CreatedAt,
+		"name": m.Name, "status": m.Status, "created_at": m.CreatedAt, "icon": m.Icon,
 	})
 	if err != nil {
 		return fmt.Errorf("plan create: %w", err)
@@ -237,10 +238,30 @@ func (s *Store) CreatePlan(ctx context.Context, uid string, m plan.Meta) error {
 
 func (s *Store) UpdatePlan(ctx context.Context, uid string, m plan.Meta) error {
 	_, err := s.user(uid).Collection("plans").Doc(m.ID).Update(ctx, []firestore.Update{
-		{Path: "name", Value: m.Name}, {Path: "status", Value: m.Status}, {Path: "updated_at", Value: time.Now()},
+		{Path: "name", Value: m.Name}, {Path: "status", Value: m.Status}, {Path: "icon", Value: m.Icon}, {Path: "updated_at", Value: time.Now()},
 	})
 	if err != nil {
 		return fmt.Errorf("plan update: %w", err)
+	}
+	return nil
+}
+
+// DefaultPlanIcon: biểu tượng của Plan mặc định nằm ở trường default_plan_icon trên users/{uid}.
+func (s *Store) DefaultPlanIcon(ctx context.Context, uid string) (string, error) {
+	snap, err := s.user(uid).Get(ctx)
+	if isNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("default plan icon: %w", err)
+	}
+	v, _ := snap.Data()["default_plan_icon"].(string)
+	return v, nil
+}
+
+func (s *Store) SetDefaultPlanIcon(ctx context.Context, uid, icon string) error {
+	if _, err := s.user(uid).Set(ctx, map[string]any{"default_plan_icon": icon}, firestore.MergeAll); err != nil {
+		return fmt.Errorf("set default plan icon: %w", err)
 	}
 	return nil
 }

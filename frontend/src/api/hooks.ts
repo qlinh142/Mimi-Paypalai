@@ -391,8 +391,8 @@ export function usePlanMeta() {
   return {
     create: useMutation({ mutationFn: (name: string) => apiSend<PlanMeta>("POST", "/plans", { name }), onSettled: done }),
     update: useMutation({
-      mutationFn: (v: { id: string; name?: string; status?: PlanMeta["status"] }) =>
-        apiSend<PlanMeta>("PATCH", `/plans/${encodeURIComponent(v.id)}`, { name: v.name, status: v.status }),
+      mutationFn: (v: { id: string; name?: string; status?: PlanMeta["status"]; icon?: string }) =>
+        apiSend<PlanMeta>("PATCH", `/plans/${encodeURIComponent(v.id)}`, { name: v.name, status: v.status, icon: v.icon }),
       onSettled: done,
     }),
     remove: useMutation({ mutationFn: (id: string) => apiSend<void>("DELETE", `/plans/${encodeURIComponent(id)}`), onSettled: done }),

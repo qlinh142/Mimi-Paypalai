@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Assignment } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { formatVnd } from "../lib/text";
-import { relationOf } from "../lib/relation";
+import { useRelations } from "../lib/relation";
 import { whenText } from "./PlanList";
 
 /** Một dòng trên danh sách đi mua. `mine` = món khác trên hóa đơn (khối "Của tôi"). */
@@ -83,6 +83,7 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: DoneInfo) => void }
   const [confirmDecline, setConfirmDecline] = useState(false);
   useEffect(() => saveRun(a.assignment_id, run), [a.assignment_id, run]);
 
+  const { relationOf } = useRelations();
   const rel = relationOf(a.owner_uid);
   const owner = rel ? m15.settings.relations[rel] : a.owner_display_name;
   const planName = a.trip?.plan_name || m15.plan.main;

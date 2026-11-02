@@ -14,11 +14,11 @@ import { CategoryIcon } from "../components/ItemRow";
 import { AddAnything, BasketPricesPanel } from "../components/PlanExtras";
 import { goodsTier, savedUnit, unitLabel } from "../lib/displayUnit";
 import { setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
-import { PLAN_ICONS, iconOf, planIcon, setPlanIcon } from "../lib/planIcon";
+import { PLAN_ICONS, iconOf, planIcon } from "../lib/planIcon";
 import { formatVnd } from "../lib/text";
 import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
-import { relationOf } from "../lib/relation";
+import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -63,7 +63,7 @@ function Detail({ id }: { id: string }) {
 
   const [name, setName] = useState("");
   const [editName, setEditName] = useState(false);
-  const [icon, setIcon] = useState(planIcon(id));
+  const icon = planIcon(meta);
   const [iconSheet, setIconSheet] = useState(false);
   const [editTrip, setEditTrip] = useState(false);
   const [date, setDate] = useState("");
@@ -215,8 +215,7 @@ function Detail({ id }: { id: string }) {
           value={icon}
           onCancel={() => setIconSheet(false)}
           onSave={(k) => {
-            setIcon(k);
-            setPlanIcon(id, k);
+            metaAct.update.mutate({ id, icon: k });
             setIconSheet(false);
             changed();
           }}
@@ -451,6 +450,7 @@ function IconSheet({ value, onCancel, onSave }: { value: string; onCancel: () =>
 function MemberSheet({ value, onClose, onPick }: { value: string; onClose: () => void; onPick: (uid: string) => void }) {
   const me = useMe();
   const h = useHousehold();
+  const { relationOf } = useRelations();
   const others = (h.data?.members ?? []).filter((m) => m.uid !== me.data?.uid);
   const [pick, setPick] = useState(value || others[0]?.uid || "");
   // Danh sách người nhà tải sau /me: luôn chọn sẵn người đầu tiên còn hợp lệ.

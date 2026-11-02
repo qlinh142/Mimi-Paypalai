@@ -75,7 +75,7 @@ function Mine() {
       <ul className="plans15">
         {list.map((p, i) => {
           const c = carts[i]?.data;
-          const Icon = iconOf(planIcon(p.id));
+          const Icon = iconOf(planIcon(p));
           const buyer = (delegated.data?.from_me ?? []).find(
             (a) => a.plan_id === p.id && (a.status === "assigned" || a.status === "shopping"),
           )?.buyer_display_name;
