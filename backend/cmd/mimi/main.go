@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/account"
 	"github.com/smartlife-lab/mimi/backend/internal/config"
+	"github.com/smartlife-lab/mimi/backend/internal/fx"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fbauth"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/gemini"
@@ -241,7 +242,11 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		var res fsstore.CleanupResult
 		res, err = store.Cleanup(ctx, time.Now(), log)
 		log.InfoContext(ctx, "cleanup done", "invites", res.Invites, "events", res.Events)
-	case "price-sync", "fx-sync":
+	case "fx-sync":
+		var rates []fx.Rate
+		rates, err = fx.Sync(ctx, fx.ERAPI{}, store, time.Now())
+		log.InfoContext(ctx, "fx-sync done", "currencies", len(rates))
+	case "price-sync":
 		err = fmt.Errorf("job %s: not implemented yet", name)
 	default:
 		err = fmt.Errorf("unknown job %q", name)
