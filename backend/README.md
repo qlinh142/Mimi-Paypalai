@@ -37,3 +37,56 @@ gcloud run deploy mimi-worker --image ... --args serve-worker --ingress internal
 gcloud run jobs deploy mimi-job-digest --image ... --args job,digest
 firebase deploy --only firestore:rules,firestore:indexes
 ```
+
+Bản mới deploy với `--no-traffic --tag canary` nên chưa ai dùng tới. Thử ở URL `canary` rồi mới chuyển traffic:
+
+```bash
+gcloud run services update-traffic mimi-api --region asia-southeast1 --to-tags canary=100
+```
+
+## Quay lại bản cũ (rollback)
+
+Quay lại chỉ đổi **code** đang chạy. Dữ liệu trong Firestore giữ nguyên, người dùng không mất gì.
+
+**Khi nào quay lại:** ngay sau một lần deploy mà app không mở được, lưu hóa đơn lỗi, tỷ lệ lỗi 5xx tăng rõ
+trên Cloud Monitoring, hoặc dữ liệu hiện sai. Quay lại trước, tìm nguyên nhân sau.
+
+**Backend (Cloud Run giữ mọi revision cũ):**
+
+```bash
+# 1. Xem các revision, bản đang nhận traffic nằm trên cùng
+gcloud run revisions list --service mimi-api --region asia-southeast1 --limit 5
+
+# 2. Chuyển 100% traffic về revision trước đó (thay tên cho đúng)
+gcloud run services update-traffic mimi-api --region asia-southeast1 --to-revisions mimi-api-00042-abc=100
+
+# 3. Worker và job làm tương tự
+gcloud run services update-traffic mimi-worker --region asia-southeast1 --to-revisions mimi-worker-00017-xyz=100
+gcloud run jobs update mimi-job-digest --region asia-southeast1 --image <image của bản trước>
+```
+
+**Frontend (Firebase Hosting giữ các bản đã phát hành):**
+
+```bash
+firebase hosting:rollback            # về bản phát hành ngay trước
+# hoặc: Firebase console → Hosting → Release history → chọn bản → Rollback
+```
+
+PWA trên điện thoại sẽ nhận bản cũ ở lần mở app kế tiếp (service worker tự cập nhật).
+
+**Firestore rules và index:** deploy lại từ commit cũ:
+
+```bash
+git checkout <commit cũ> -- backend/firestore.rules backend/firestore.indexes.json
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+**Luật để quay lại không làm hỏng dữ liệu:**
+
+1. Mọi thay đổi dữ liệu phải để **code cũ vẫn đọc được**: chỉ thêm ô mới, không đổi tên hay xóa ô cũ trong cùng một lần deploy.
+   Đổi tên thì làm hai lần: lần 1 ghi cả ô cũ lẫn ô mới, lần 2 (khi đã chắc không cần quay lại) mới bỏ ô cũ.
+2. Bước chuyển dữ liệu (`mimi job migrate`, khi có) chạy **sau** khi code mới đã ổn định, không chạy cùng lúc deploy.
+3. Sau khi quay lại, ghi vào `CHANGELOG.md`: giờ quay lại, revision nào, vì sao.
+
+**Diễn tập:** làm thử một lần trên project dev trước demo: deploy bản mới, quay lại revision cũ,
+kiểm tra app vẫn mở và dữ liệu còn nguyên.

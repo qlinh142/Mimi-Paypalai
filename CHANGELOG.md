@@ -5,6 +5,13 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · README: các bước quay lại bản cũ (A6)
+
+- `backend/README.md` thêm mục "Quay lại bản cũ": khi nào quay lại, lệnh cho Cloud Run (api, worker, job), Firebase Hosting, Firestore rules, và luật thay đổi dữ liệu để quay lại không hỏng dữ liệu.
+- Thêm lệnh chuyển traffic sang bản `canary` sau khi thử.
+
+---
+
 ## 2026-11-02 · Chi tiết món đọc đủ lịch sử mua (lỗi V3)
 
 - Mọi lần mua vẫn được lưu như trước (không bao giờ xóa). Sửa ở chỗ đọc: Chi tiết một món đọc tới 500 lần mua thay cho 20 (chia đợt hàng) và 30 (giá thấp nhất, giá trung bình), nên lần mua cũ không còn bị bỏ qua.
