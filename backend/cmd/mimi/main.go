@@ -186,6 +186,11 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 			return merr
 		}
 		_, err = notify.NewDigestJob(fsstore.NewNotifyStore(store, auth), mailer, log, nil).Run(ctx)
+	case "migrate":
+		// A4: đưa dữ liệu mọi người dùng lên phiên bản mới; chạy sau mỗi lần deploy có bước mới.
+		var n int
+		n, err = store.MigrateAll(ctx, log)
+		log.InfoContext(ctx, "migrate done", "users", n, "schema_version", fsstore.SchemaVersion)
 	case "price-sync", "fx-sync", "cleanup":
 		err = fmt.Errorf("job %s: not implemented yet", name)
 	default:

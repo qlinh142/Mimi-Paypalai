@@ -58,6 +58,8 @@ type userDoc struct {
 	ReceiptCount int            `firestore:"receipt_count"`
 	Settings     map[string]any `firestore:"settings"`
 	Deleting     bool           `firestore:"deleting"`
+	// SchemaVersion: 0 là tài liệu có từ trước khi có phiên bản dữ liệu (A4, migrate.go).
+	SchemaVersion int `firestore:"schema_version"`
 }
 
 // LoadPrincipal đọc users/{uid}; lần đăng nhập đầu tiên thì tạo tài liệu mặc định
@@ -67,7 +69,7 @@ func (s *Store) LoadPrincipal(ctx context.Context, uid string) (authz.Principal,
 	snap, err := ref.Get(ctx)
 	if isNotFound(err) {
 		doc := map[string]any{
-			"role": "owner", "receipt_count": 0, "created_at": firestore.ServerTimestamp,
+			"role": "owner", "receipt_count": 0, "created_at": firestore.ServerTimestamp, "schema_version": int64(SchemaVersion),
 			"settings": map[string]any{"lead_days": 7, "timezone": "Asia/Ho_Chi_Minh", "lang": "vi", "remind_enabled": true},
 			// Có next_notify_at thì job digest mới tìm thấy người dùng này (truy vấn theo index).
 			"next_notify_at": domain.NextDigestAt(time.Now(), domain.Location("Asia/Ho_Chi_Minh"),
@@ -87,6 +89,11 @@ func (s *Store) LoadPrincipal(ctx context.Context, uid string) (authz.Principal,
 	}
 	if ud.Deleting {
 		return authz.Principal{}, apperr.ErrUnauthenticated
+	}
+	if ud.SchemaVersion < SchemaVersion {
+		if err := s.migrateUser(ctx, uid, ud.SchemaVersion); err != nil {
+			return authz.Principal{}, err
+		}
 	}
 	p := authz.Principal{UID: uid, HouseholdID: ud.HouseholdID, Role: authz.RoleOwner, Timezone: "Asia/Ho_Chi_Minh", LeadDays: 7}
 	if ud.Role == "member" {
