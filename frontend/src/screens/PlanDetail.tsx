@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CalendarDays, Check, ChevronLeft, ChevronRight, CirclePlus, House, MapPin, Minus, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
+import { LoadState } from "../components/LoadState";
 import {
   useAssignments, useDelegated, useHousehold, useItems, useMe, usePlan, usePlanItem, usePlanLine, usePlanMeta, usePlanPrices, usePlans, useSavePlanState, useClearDefaultPlan,
 } from "../api/hooks";
@@ -121,8 +122,7 @@ function Detail({ id }: { id: string }) {
     <MainFrame>
       <TopBar title={meta ? planName(meta) : m15.plan.title} />
       <div className="page p15 pd15">
-        {plan.isPending && <p className="hint">{t.common.loading}</p>}
-        {plan.isError && !cart && <p className="error" role="alert">{errText(plan.error)}</p>}
+        <LoadState q={plan} hasData={!!cart} />
 
         {/* Icon và tên */}
         <div className="pd15__head">

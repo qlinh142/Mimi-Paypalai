@@ -11,6 +11,7 @@ import { iconOf, planIcon } from "../lib/planIcon";
 import { isDraft, usePlanDraftVersion } from "../lib/planDraft";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { t } from "../i18n";
+import { LoadState } from "../components/LoadState";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -66,7 +67,7 @@ function Mine() {
     nav(`/plan/${encodeURIComponent(id)}`);
   };
 
-  if (plans.isPending) return <p className="hint">{t.common.loading}</p>;
+  if (!plans.data) return <LoadState q={plans} hasData={false} />;
 
   return (
     <>

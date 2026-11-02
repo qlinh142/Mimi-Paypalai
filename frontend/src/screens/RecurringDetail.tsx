@@ -10,6 +10,7 @@ import type { Occurrence, Recurring, RecurringCycle } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { recurringIcon } from "../components/RecurringList";
 import { formatDayMonth, formatVnd } from "../lib/text";
+import { LoadState } from "../components/LoadState";
 
 const CYCLES: RecurringCycle[] = ["monthly", "weekly", "quarterly", "yearly"];
 const todayIso = () => {
@@ -30,7 +31,9 @@ export function RecurringDetail() {
     return (
       <MainFrame>
         <TopBar title={m1.recurring.title} variant="sub" />
-        <div className="page p15"><p className="hint">{list.isPending ? t.common.loading : t.common.genericError}</p></div>
+        <div className="page p15">
+          {list.data ? <p className="hint">{m15.history.gone}</p> : <LoadState q={list} hasData={false} />}
+        </div>
       </MainFrame>
     );
   }

@@ -7,6 +7,7 @@ import { useHome, useMe } from "../api/hooks";
 import { MainFrame } from "../components/AppShell";
 import { MimiMark } from "../components/MimiMark";
 import { formatVnd } from "../lib/text";
+import { loadErrorText } from "../components/LoadState";
 
 /**
  * Home (Mimi 1.5, ảnh mẫu 1-home.png): logo giữa, chuông phải, lời chào, 4 ô màu có hình,
@@ -55,6 +56,13 @@ export function Home({ entering = false }: { entering?: boolean }) {
           <p className="h15__tagline">{m15.home.tagline}</p>
         </div>
 
+        {/* A10: không tải được số liệu thì báo, ô vẫn bấm được. */}
+        {home.isError && !h && (
+          <p className="hint" role="alert">
+            {loadErrorText(home.error)}{" "}
+            <button type="button" className="link15" onClick={() => home.refetch()}>{t.common.retry}</button>
+          </p>
+        )}
         <ul className={entering ? "h15__tiles tiles--enter" : "h15__tiles"}>
           {tiles.map(({ to, tone, Art, title, meta }) => (
             <li key={to}>

@@ -11,6 +11,7 @@ import type { ItemDetail as ItemDetailData } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { ALL_UNITS, formatNum, rememberUnit, savedUnit, stockInDisplay, unitLabel } from "../lib/displayUnit";
 import { formatDayMonth, formatVnd } from "../lib/text";
+import { LoadState } from "../components/LoadState";
 
 /**
  * Chi tiết món (Mimi 1.5, ảnh mẫu 3-do-dung-va-chi-tiet.png): số lượng hiện có với − / + và đơn vị,
@@ -152,7 +153,7 @@ function HistoryCard({ itemKey, unit }: { itemKey: string; unit: string }) {
     <section className="box15" aria-labelledby="hist-title">
       <h2 id="hist-title">{m15.detail.history}</h2>
       {rows.length === 0 ? (
-        <p className="hint">{h.isPending ? t.common.loading : m15.detail.noHistory}</p>
+        h.isPending || h.isError ? <LoadState q={h} hasData={false} /> : <p className="hint">{m15.detail.noHistory}</p>
       ) : (
         <>
           <dl className="stats15">

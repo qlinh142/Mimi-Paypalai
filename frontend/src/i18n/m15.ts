@@ -259,6 +259,7 @@ const vi = {
     dot: "Có việc chưa gửi",
   },
   history: {
+    gone: "Mục này không còn nữa.",
     title: "Lịch sử mua hàng",
     detail: "Chi tiết hóa đơn",
     search: "Tìm nơi mua, món hàng…",
@@ -592,6 +593,7 @@ const en: typeof vi = {
     dot: "Something is waiting to send",
   },
   history: {
+    gone: "This is no longer available.",
     title: "Purchase history",
     detail: "Receipt details",
     search: "Search stores, items…",
