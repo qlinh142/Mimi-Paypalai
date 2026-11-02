@@ -948,6 +948,7 @@ components:
             plan_id: { type: string }
             name: { type: string }
             moved: { type: integer }
+    Item:
       type: object
       properties:
         key: { type: string }
@@ -972,6 +973,17 @@ components:
         confirmed_source: { type: string, enum: [receipt, delivery, manual] }
         rate_per_day: { type: number }
         days_of_stock: { type: number }
+        parts:
+          type: array
+          description: "Món gộp nhiều đơn vị (vd. hộp và gram): tồn kho từng phần"
+          items:
+            type: object
+            properties:
+              estimated: { type: number }
+              unit: { type: string, enum: [g, ml, pc] }
+              confirmed: { type: number }
+              confirmed_on: { type: string, format: date }
+              days_of_stock: { type: integer }
     ItemDetail:
       allOf:
         - $ref: "#/components/schemas/Item"
@@ -1173,6 +1185,7 @@ components:
     BasketPrices:
       type: object
       properties:
+        window_days: { type: integer, description: "Số ngày lịch sử giá đã xét (90)" }
         basket_item_count: { type: integer }
         store_options:
           type: array
@@ -1214,6 +1227,15 @@ components:
         note: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time, description: "B5: lần cuối người nhờ gửi bản cập nhật; không có khi chưa cập nhật" }
+        trip:
+          type: object
+          description: "Ngày, giờ, nơi mua của Kế hoạch lúc gửi; plan_name rỗng là Kế hoạch chính"
+          properties:
+            plan_name: { type: string }
+            buy_date: { type: string, format: date }
+            buy_hour: { type: integer }
+            buy_minute: { type: integer }
+            trip_note: { type: string }
         items:
           type: array
           items: { type: object, properties: { consumption_group_key: { type: string }, name_display: { type: string }, qty: { type: number }, unit: { type: string }, status: { type: string, enum: [assigned, done, returned] } } }
@@ -1236,6 +1258,8 @@ components:
     Cart:
       type: object
       properties:
+        plan_id: { type: string }
+        phase: { type: string, enum: [planning, shopping, reconciled] }
         items:
           type: array
           items:
