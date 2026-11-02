@@ -13,6 +13,9 @@ Mới nhất ở trên cùng.
 
 ### Cách kiểm tra
 - `go vet ./...`, `go test ./...` qua. Test mới: `TestItemReadsFullHistory`, `TestVisibleLots`.
+
+---
+
 ## 2026-11-02 · Hàng đợi offline và dữ liệu trong máy gắn với tài khoản
 
 - Mỗi thao tác chờ gửi ghi kèm uid. Người khác đăng nhập trên cùng máy thì không thấy và không gửi thao tác của người trước; người trước đăng nhập lại thì gửi tiếp. (vấn đề 63, 65)
