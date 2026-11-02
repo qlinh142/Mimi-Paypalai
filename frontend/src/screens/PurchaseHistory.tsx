@@ -8,6 +8,7 @@ import type { HistoryReceipt } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
 import { formatVnd } from "../lib/text";
+import { useRelations } from "../lib/relation";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 /** Giờ Việt Nam của một mốc ISO: "14/10 · 18:15". */
@@ -21,13 +22,19 @@ const monthKey = (iso: string) => {
 };
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
 
-export function receiptTitle(r: HistoryReceipt) {
-  return r.kind === "delegated" ? m15.history.delegated(r.buyer_name ?? "", r.plan_name ?? "") : r.store;
+/** Người mua hộ hiện bằng tên gọi người dùng đã đặt (Anh, Bố...), không có thì tên hiển thị. */
+export function receiptTitle(r: HistoryReceipt, relationOf: (uid: string) => string = () => "") {
+  const rel = r.buyer_uid ? relationOf(r.buyer_uid) : "";
+  const buyer = rel ? m15.settings.relations[rel] : (r.buyer_name ?? "");
+  return r.kind === "delegated" ? m15.history.delegated(buyer, r.plan_name ?? "") : r.store;
 }
+
+const vndOrNone = (v: number | null) => (v == null ? m15.plan.noPrice : formatVnd(v));
 
 /** Một dòng hóa đơn (hoặc khoản định kỳ đã trả, góp ý 01/11): dùng ở Sổ chi tiêu (tóm tắt) và màn 4c. */
 export function ReceiptRow({ r }: { r: HistoryReceipt }) {
   const rec = r.kind === "recurring";
+  const { relationOf } = useRelations();
   const Icon = rec ? CalendarClock : r.kind === "delegated" ? UsersRound : Store;
   const to = rec ? `/items/recurring/${encodeURIComponent(r.recurring_id ?? "")}` : `/spending/receipt/${encodeURIComponent(r.receipt_id)}`;
   return (
@@ -35,7 +42,7 @@ export function ReceiptRow({ r }: { r: HistoryReceipt }) {
       <Link to={to} className="ph15__row">
         <span className="ph15__icon"><Icon size={22} aria-hidden /></span>
         <span className="rows15__text">
-          <span>{receiptTitle(r)}{rec && <span className="tag15 ph15__rectag">{m15.history.recurringTag}</span>}</span>
+          <span>{receiptTitle(r, relationOf)}{rec && <span className="tag15 ph15__rectag">{m15.history.recurringTag}</span>}</span>
           <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{rec ? dayTime(r.purchased_at).split(" · ")[0] : dayTime(r.purchased_at)}</small>
         </span>
         <span className="num">{formatVnd(r.total_vnd)}</span>
@@ -52,6 +59,7 @@ export function ReceiptRow({ r }: { r: HistoryReceipt }) {
 export function PurchaseHistory() {
   const nav = useNavigate();
   const h = useReceiptHistory();
+  const { relationOf } = useRelations();
   const [q, setQ] = useState("");
   const [store, setStore] = useState("");
   const [month, setMonth] = useState("");
@@ -63,7 +71,7 @@ export function PurchaseHistory() {
   const list = useMemo(() => {
     const f = fold(q.trim());
     return all
-      .filter((r) => !f || fold(r.store).includes(f) || r.item_names.some((n) => fold(n).includes(f)) || fold(receiptTitle(r)).includes(f))
+      .filter((r) => !f || fold(r.store).includes(f) || r.item_names.some((n) => fold(n).includes(f)) || fold(receiptTitle(r, relationOf)).includes(f))
       .filter((r) => !store || r.store === store)
       .filter((r) => !month || monthKey(r.purchased_at) === month)
       .sort((a, b) => b.purchased_at.localeCompare(a.purchased_at));
@@ -136,6 +144,7 @@ export function ReceiptDetailScreen() {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const r = useReceiptDetail(id).data;
+  const { relationOf } = useRelations();
   return (
     <MainFrame>
       <TopBar title={m15.history.detail} />
@@ -153,7 +162,7 @@ export function ReceiptDetailScreen() {
             <section className="box15 ph15__store">
               <span className="ph15__icon">{r.kind === "delegated" ? <UsersRound size={24} aria-hidden /> : <Store size={24} aria-hidden />}</span>
               <span className="rows15__text">
-                <strong>{receiptTitle(r)}</strong>
+                <strong>{receiptTitle(r, relationOf)}</strong>
                 <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{dayTime(r.purchased_at)}</small>
               </span>
             </section>
@@ -176,9 +185,9 @@ export function ReceiptDetailScreen() {
                           {l.name}{l.spec ? ` ${l.spec}` : ""}
                           {l.tag && <span className={`tag15 ${l.tag === "mine" ? "tag15--buyer" : "tag15--bought"}`}>{l.tag === "mine" ? m15.run.mineShort : m15.run.forOwner(r.split?.owner_name ?? "")}</span>}
                         </span>
-                        <span className="line15__sub">{l.qty} × {formatVnd(l.unit_price)}</span>
+                        <span className="line15__sub">{l.qty} × {vndOrNone(l.unit_price)}</span>
                       </span>
-                      <span className="num run15__total">{formatVnd(l.amount)}</span>
+                      <span className="num run15__total">{vndOrNone(l.amount)}</span>
                     </div>
                   </li>
                 ))}

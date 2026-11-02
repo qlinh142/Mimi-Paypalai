@@ -183,6 +183,23 @@ paths:
         - { name: cursor, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
       responses: { "200": { description: OK } }
+  /receipts/history:
+    get:
+      tags: [receipts]
+      summary: "Spec 1.5 mục 4 (màn 4c): Lịch sử mua hàng mọi tháng, mới nhất trước"
+      description: |
+        Gồm hóa đơn tự lưu (kind own, tối đa 500), phần món người nhà mua hộ (kind delegated, receipt_id
+        dạng d-{mã hóa đơn của người mua}, chỉ các món của mình) và khoản định kỳ trả tay (kind recurring).
+        Món chưa rõ giá không nằm trong total_vnd, đếm ở missing_price. buyer_uid để app hiện tên gọi đã đặt.
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { receipts: { type: array, items: { $ref: "#/components/schemas/HistoryReceipt" } } } } } } } }
+  /receipts/{id}:
+    get:
+      tags: [receipts]
+      summary: "Spec 1.5 mục 4 (màn 4d): Chi tiết hóa đơn, kèm phần chia khi có món mua hộ"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReceiptDetail" } } } }
+        "404": { $ref: "#/components/responses/Error" }
   /receipts/{id}/lines/{lineId}:
     patch:
       tags: [receipts]
@@ -971,6 +988,47 @@ components:
         paid_at: { type: string, format: date }
         source_type: { type: string, enum: [manual, receipt] }
         source_id: { type: string }
+    HistoryReceipt:
+      type: object
+      properties:
+        receipt_id: { type: string }
+        store: { type: string }
+        purchased_at: { type: string, format: date-time }
+        total_vnd: { type: integer }
+        item_names: { type: array, items: { type: string } }
+        kind: { type: string, enum: [own, delegated, recurring] }
+        buyer_uid: { type: string }
+        buyer_name: { type: string }
+        plan_name: { type: string }
+        recurring_id: { type: string }
+        missing_price: { type: integer, description: "Số món chưa rõ giá, không tính vào tổng" }
+    ReceiptDetail:
+      allOf:
+        - $ref: "#/components/schemas/HistoryReceipt"
+        - type: object
+          properties:
+            plans: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string } } } }
+            subtotal: { type: integer }
+            discount: { type: integer }
+            lines:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  spec: { type: string }
+                  qty: { type: number }
+                  unit_price: { type: [integer, "null"] }
+                  amount: { type: [integer, "null"], description: "null là chưa rõ giá" }
+                  category_key: { type: string }
+                  tag: { type: string, enum: [for_owner, mine] }
+            split:
+              type: object
+              properties:
+                for_owner: { type: integer }
+                mine: { type: integer }
+                owner_uid: { type: string }
+                owner_name: { type: string }
     PlanMeta:
       type: object
       properties:

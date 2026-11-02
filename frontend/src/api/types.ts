@@ -232,11 +232,14 @@ export type PlanPrices = {
 export type HistoryReceipt = {
   receipt_id: string; store: string; purchased_at: string; total_vnd: number; /** Tên các món, để tìm theo món. */ item_names: string[];
   /** "delegated" = khoản người nhà mua hộ, chỉ phần món của mình, không có hóa đơn gốc. */
-  kind?: "own" | "delegated" | "recurring"; buyer_name?: string; plan_name?: string;
+  kind?: "own" | "delegated" | "recurring"; buyer_uid?: string; buyer_name?: string; plan_name?: string;
+  /** Số món chưa rõ giá, không tính vào total_vnd. */
+  missing_price?: number;
   /** kind "recurring": khoản định kỳ đã trả, bấm thì mở chi tiết khoản (góp ý 01/11). */
   recurring_id?: string;
 };
-export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number; amount: number; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
+/** unit_price, amount null: món chưa rõ giá, không tính vào tổng. */
+export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
 export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };
 export type ReceiptSummary = { receipt_id: string; store?: string; purchased_on: string; total_vnd: number; discount_vnd: number };
 export type SpendingReport = {

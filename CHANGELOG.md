@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Lịch sử mua hàng và Chi tiết hóa đơn chạy bằng dữ liệu thật (B1)
+
+- `GET /receipts/history` (màn 4c) trả mọi hóa đơn, mới nhất trước. Gồm hóa đơn tự lưu (tối đa 500), phần món người nhà mua hộ (gom theo hóa đơn của người mua, mã `d-...`, chỉ các món của mình) và khoản định kỳ trả tay.
+- `GET /receipts/{id}` (màn 4d) trả các món, tạm tính, giảm giá và kế hoạch đã trừ. Hóa đơn có món mua hộ thì chia phần "của người nhờ" và "của mình".
+- Người mua hộ có kèm `buyer_uid`, nên app hiện đúng tên gọi người dùng đã đặt (Anh, Bố...), không có thì hiện tên hiển thị.
+- Món chưa rõ giá có `amount` là null, không cộng vào tổng, và được đếm ở `missing_price`. App ghi "chưa có giá" thay cho 0đ. Phần làm mờ thuộc A7.
+- Chỉ đọc dữ liệu đã có (receipts, purchases, recurring_occurrences), không thêm collection hay index.
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...` qua. Test mới: `TestHistory`, `TestDetail`.
+- `npm run build` qua. Đã chạy thử màn 4c và 4d ở chế độ mock, console không có lỗi.
+
+---
+
 ## 2026-11-02 · Icon kế hoạch và tên gọi người nhà lưu trên máy chủ (B11)
 
 - Biểu tượng của Kế hoạch lưu cùng Kế hoạch trên máy chủ (`icon` trong `GET/POST /plans`, `PATCH /plans/{id}`). Kế hoạch chính chỉ đổi được biểu tượng, lưu ở `default_plan_icon` trên users/{uid}. Máy chủ chỉ nhận 6 khóa trong bộ biểu tượng chung của app: bag, family, kid, gift, home, food.

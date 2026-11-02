@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
+	"github.com/smartlife-lab/mimi/backend/internal/history"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
 	"github.com/smartlife-lab/mimi/backend/internal/idem"
@@ -95,6 +96,10 @@ type (
 		Delegated(ctx context.Context, p authz.Principal) (household.Delegated, error)
 	}
 	// Pricing là lịch sử giá dùng chung cho Đồ dùng và Kế hoạch (8.1).
+	History interface {
+		History(ctx context.Context, p authz.Principal) ([]history.Entry, error)
+		Detail(ctx context.Context, p authz.Principal, id string) (history.Detail, error)
+	}
 	Pricing interface {
 		Item(ctx context.Context, p authz.Principal, key string) (pricing.ItemHistory, error)
 		Basket(ctx context.Context, p authz.Principal) (pricing.Basket, error)
@@ -145,6 +150,7 @@ type Deps struct {
 	Recurring  Recurring  // nil: các route khoản định kỳ trả 501
 	Households Households // nil: các route nhà trả 501
 	Pricing    Pricing    // nil: các route lịch sử giá trả 501
+	History    History    // nil: lịch sử mua hàng trả 404
 	Ready      ReadinessChecker
 	Metrics    Metrics // nil: không ghi metric
 }
@@ -166,6 +172,7 @@ type Server struct {
 	recurring  Recurring
 	households Households
 	pricing    Pricing
+	history    History
 	ready      ReadinessChecker
 	metrics    Metrics
 	limiter    *windowLimiter
@@ -196,7 +203,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		log: d.Log, tokens: d.Tokens, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
-		recurring: d.Recurring, households: d.Households, pricing: d.Pricing,
+		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, history: d.History,
 		limiter: newWindowLimiter(60), readTimeout: 55 * time.Second, defaultTimeout: 10 * time.Second,
 	}
 	if s.metrics == nil {
@@ -278,6 +285,10 @@ func (s *Server) Handler() http.Handler {
 		private("POST /households/shopping-assignments", s.defaultTimeout, s.postAssignment)
 		private("POST /households/shopping-assignments/{id}/cancel", s.defaultTimeout, s.cancelAssignment)
 		private("GET /plan/delegated", s.defaultTimeout, s.getDelegated)
+	}
+	if s.history != nil {
+		private("GET /receipts/history", s.defaultTimeout, s.getReceiptHistory)
+		private("GET /receipts/{id}", s.defaultTimeout, s.getReceiptDetail)
 	}
 	if s.pricing != nil {
 		private("GET /items/{key}/price-history", s.defaultTimeout, s.getItemPriceHistory)
