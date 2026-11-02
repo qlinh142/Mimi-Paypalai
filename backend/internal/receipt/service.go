@@ -95,7 +95,7 @@ func New(reader Reader, drafts DraftCache, quota Quota, fx FXRates, store Store,
 		maxPages:     MaxPages,
 		maxPageBytes: MaxPageBytes,
 		maxLines:     150,
-		pageTimeout:  20 * time.Second,
+		pageTimeout:  40 * time.Second, // model Gemini 3.x đọc ảnh dày chữ có lúc quá 20 s; request có 55 s
 		retryBudget:  25 * time.Second,
 	}
 	for _, o := range opts {
