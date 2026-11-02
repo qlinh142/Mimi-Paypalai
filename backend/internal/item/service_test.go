@@ -238,3 +238,16 @@ func TestQuantityActions(t *testing.T) {
 		t.Fatal("unknown action must fail")
 	}
 }
+
+// Lỗi V3: chia FIFO trên đủ lịch sử, nhưng Chi tiết món chỉ hiện lot còn hàng và 20 lot mới nhất.
+func TestVisibleLots(t *testing.T) {
+	lots := make([]domain.Lot, 30)
+	for i := range lots {
+		lots[i] = domain.Lot{ID: string(rune('a' + i))}
+	}
+	lots[25].Remaining = 2 // lot cũ nhưng còn hàng
+	got := visibleLots(lots)
+	if len(got) != lotShow+1 || got[lotShow].ID != lots[25].ID {
+		t.Fatalf("got %d lots, last %q", len(got), got[len(got)-1].ID)
+	}
+}

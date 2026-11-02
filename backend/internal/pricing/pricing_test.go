@@ -1,8 +1,10 @@
 package pricing
 
 import (
+	"context"
 	"testing"
 
+	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 )
 
@@ -65,5 +67,25 @@ func TestEstimateBasketCoverage(t *testing.T) {
 	full := EstimateBasket([]BasketLine{{Key: "sua", Qty: 1, Unit: "l"}, {Key: "trung", Qty: 1}}, obs, today)
 	if full.StoreOptions[0].EstimatedTotal == nil || full.Recommend != "single" {
 		t.Fatalf("full coverage %+v %s", full.StoreOptions, full.Recommend)
+	}
+}
+
+type limitStore struct{ got int }
+
+func (s *limitStore) PriceObservations(_ context.Context, _ string, _ []string, limit int) (map[string][]Observation, error) {
+	s.got = limit
+	return map[string][]Observation{}, nil
+}
+
+// Lỗi V3: Chi tiết một món đọc đủ lịch sử mua, không chỉ 30 lần gần nhất.
+func TestItemReadsFullHistory(t *testing.T) {
+	st := &limitStore{}
+	svc := New(st, nil, nil)
+	p := authz.Principal{UID: "u1", Role: authz.RoleOwner}
+	if _, err := svc.Item(context.Background(), p, "sua-tuoi"); err != nil {
+		t.Fatal(err)
+	}
+	if st.got != ItemHistoryLimit {
+		t.Fatalf("limit %d, want %d", st.got, ItemHistoryLimit)
 	}
 }
