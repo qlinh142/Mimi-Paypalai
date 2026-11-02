@@ -800,10 +800,12 @@ function histDetail(id: string): ReceiptDetail | null {
 }
 
 function mockMarketItems() {
-  return mockCart().items.filter((i) => MOCK_PRICES[i.key]).map((i) => ({
+  // Trứng gà: giả như chưa tra ra giá online; nước rửa chén: online đắt hơn giá nhà mình từng
+  // mua. Cả hai để bản thử hiện dòng "giá nhà mình từng mua".
+  return mockCart().items.filter((i) => MOCK_PRICES[i.key] && i.key !== "trung-ga").map((i) => ({
     key: i.key, name: i.name, updated_at: new Date().toISOString(),
     prices: Object.entries(MOCK_PRICES[i.key])
-      .map(([store, v]) => ({ store, price_vnd: Math.round((v * 0.97) / 100) * 100, source: "gemini_search", on: new Date().toISOString().slice(0, 10) }))
+      .map(([store, v]) => ({ store, price_vnd: Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100, source: "gemini_search", on: new Date().toISOString().slice(0, 10) }))
       .sort((a, b) => a.price_vnd - b.price_vnd),
   }));
 }
