@@ -237,7 +237,11 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		var n int
 		n, err = store.MigrateAll(ctx, log)
 		log.InfoContext(ctx, "migrate done", "users", n, "schema_version", fsstore.SchemaVersion)
-	case "price-sync", "fx-sync", "cleanup":
+	case "cleanup":
+		var res fsstore.CleanupResult
+		res, err = store.Cleanup(ctx, time.Now(), log)
+		log.InfoContext(ctx, "cleanup done", "invites", res.Invites, "events", res.Events)
+	case "price-sync", "fx-sync":
 		err = fmt.Errorf("job %s: not implemented yet", name)
 	default:
 		err = fmt.Errorf("unknown job %q", name)
