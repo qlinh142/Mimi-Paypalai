@@ -84,8 +84,13 @@ type LotReader interface {
 	Lots(ctx context.Context, uid, key string, limit int) ([]domain.Lot, error)
 }
 
-// lotLimit: số lot gần nhất hiển thị và dùng để chia FIFO.
-const lotLimit = 20
+// lotLimit: số lot đọc để chia FIFO. Mọi lần mua đều được lưu, nên đọc đủ lịch sử để
+// tồn kho không bị mất phần nằm ở lot cũ (lỗi V3). lotShow: số lot đã dùng hết vẫn hiện
+// (mới nhất trước); lot còn hàng luôn hiện.
+const (
+	lotLimit = 500
+	lotShow  = 20
+)
 
 // historyLimit: số lần mua hiển thị trong Chi tiết món.
 const historyLimit = 10
@@ -255,9 +260,21 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, key string) (Detai
 		if err != nil {
 			return Detail{}, err
 		}
-		d.Lots = allocateLots(lots, d.Stock)
+		d.Lots = visibleLots(allocateLots(lots, d.Stock))
 	}
 	return d, nil
+}
+
+// visibleLots giữ mọi lot còn hàng và các lot mới nhất cho đủ lotShow, theo thứ tự đọc
+// (mới nhất trước), để Chi tiết món không dài 500 dòng.
+func visibleLots(lots []domain.Lot) []domain.Lot {
+	out := make([]domain.Lot, 0, min(len(lots), lotShow))
+	for i, l := range lots {
+		if l.Remaining > 0 || i < lotShow {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // allocateLots chia tồn ước tính của từng stream (chính và phụ) xuống các lot cùng chiều đo.

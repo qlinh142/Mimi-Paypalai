@@ -299,10 +299,18 @@ func findStore(obs []Observation, id string, since domain.Date) (Observation, bo
 	return Observation{}, false
 }
 
-// Store đọc các lần mua đã lưu của từng nhóm, mới nhất trước.
+// Store đọc tối đa limit lần mua đã lưu của từng nhóm, mới nhất trước.
 type Store interface {
-	PriceObservations(ctx context.Context, uid string, groups []string) (map[string][]Observation, error)
+	PriceObservations(ctx context.Context, uid string, groups []string, limit int) (map[string][]Observation, error)
 }
+
+// Số lần mua đọc cho mỗi nhóm. Mọi lần mua đều được lưu (không bao giờ xóa), nên Chi tiết
+// một món đọc toàn bộ lịch sử để giá thấp nhất và giá trung bình tính trên mọi lần mua
+// (lỗi V3); 500 lần là khoảng 10 năm nếu mua hằng tuần. Giỏ nhiều món chỉ cần giá gần đây.
+const (
+	ItemHistoryLimit = 500
+	BasketPriceLimit = 30
+)
 
 // Lines là các dòng đang mở của Plan trong context (plan.IDFrom).
 type Lines interface {
@@ -329,7 +337,7 @@ func (s *Service) Item(ctx context.Context, p authz.Principal, key string) (Item
 	if !item.ValidKey(key) {
 		return ItemHistory{}, apperr.ErrNotFound
 	}
-	obs, err := s.store.PriceObservations(ctx, p.UID, []string{key})
+	obs, err := s.store.PriceObservations(ctx, p.UID, []string{key}, ItemHistoryLimit)
 	if err != nil {
 		return ItemHistory{}, err
 	}
@@ -356,7 +364,7 @@ func (s *Service) Basket(ctx context.Context, p authz.Principal) (Basket, error)
 	sort.Slice(lines, func(i, j int) bool { return lines[i].Key < lines[j].Key })
 	obs := map[string][]Observation{}
 	if len(keys) > 0 {
-		if obs, err = s.store.PriceObservations(ctx, p.UID, keys); err != nil {
+		if obs, err = s.store.PriceObservations(ctx, p.UID, keys, BasketPriceLimit); err != nil {
 			return Basket{}, err
 		}
 	}

@@ -269,18 +269,15 @@ func (s *Store) DeletePlan(ctx context.Context, uid, id string) error {
 
 var _ pricing.Store = (*Store)(nil)
 
-// pricesPerHistory: số lần mua gần nhất đọc cho mỗi nhóm khi tính lịch sử giá.
-const pricesPerHistory = 30
-
 // PriceObservations đọc purchases của từng nhóm (index group_key + habit + purchased_on DESC).
 // Purchase trước 0.1 chưa có canonical_quantity thì quy từ số lượng và đơn vị in cạnh số lượng.
 // Dòng cần xem lại (needs_review) không dùng để so giá.
-func (s *Store) PriceObservations(ctx context.Context, uid string, groups []string) (map[string][]pricing.Observation, error) {
+func (s *Store) PriceObservations(ctx context.Context, uid string, groups []string, limit int) (map[string][]pricing.Observation, error) {
 	out := map[string][]pricing.Observation{}
 	for _, g := range groups {
 		docs, err := s.user(uid).Collection("purchases").
 			Where("group_key", "==", g).Where("habit", "==", true).
-			OrderBy("purchased_on", firestore.Desc).Limit(pricesPerHistory).Documents(ctx).GetAll()
+			OrderBy("purchased_on", firestore.Desc).Limit(limit).Documents(ctx).GetAll()
 		if err != nil {
 			return nil, fmt.Errorf("price history %s: %w", g, err)
 		}

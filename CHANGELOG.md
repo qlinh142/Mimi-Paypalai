@@ -5,6 +5,17 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Chi tiết món đọc đủ lịch sử mua (lỗi V3)
+
+- Mọi lần mua vẫn được lưu như trước (không bao giờ xóa). Sửa ở chỗ đọc: Chi tiết một món đọc tới 500 lần mua thay cho 20 (chia đợt hàng) và 30 (giá thấp nhất, giá trung bình), nên lần mua cũ không còn bị bỏ qua.
+- Chi tiết món vẫn chỉ hiện các đợt còn hàng và 20 đợt mới nhất.
+- Giỏ nhiều món (Kế hoạch, so giá cửa hàng) giữ 30 lần mua gần nhất mỗi món để mở nhanh.
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...` qua. Test mới: `TestItemReadsFullHistory`, `TestVisibleLots`.
+
+---
+
 ## 2026-11-02 · Hàng đợi offline và dữ liệu trong máy gắn với tài khoản
 
 - Mỗi thao tác chờ gửi ghi kèm uid. Người khác đăng nhập trên cùng máy thì không thấy và không gửi thao tác của người trước; người trước đăng nhập lại thì gửi tiếp. (vấn đề 63, 65)
