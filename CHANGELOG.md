@@ -15,6 +15,7 @@ Mới nhất ở trên cùng.
 
 ### Cách kiểm tra
 - `go vet`, `go test ./...` qua; test mới `TestSeedDatesFollowToday`, `TestDemoSeedEmulator` (lưu thật trên emulator, kiểm tra dự đoán Sữa tươi và chạy lại không ghi trùng).
+- `TestSeedLinesReachInventory` chạy qua service lưu hóa đơn thật: mọi dòng demo đều đủ danh mục, nhóm và khối lượng để vào tồn kho. Test này bắt được job thiếu danh sách danh mục (mọi dòng bị coi là chưa phân loại) và rau, chuối, bánh quy thiếu khối lượng.
 
 ---
 

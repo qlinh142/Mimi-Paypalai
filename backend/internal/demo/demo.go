@@ -34,16 +34,16 @@ var (
 	sua     = item{"Sữa tươi không đường 1L", "sua-tuoi", "sua", 1, "hộp", 36_000}
 	trung   = item{"Trứng gà 10 quả", "trung-ga", "tuoi-song", 1, "vỉ", 35_000}
 	thit    = item{"Thịt ba chỉ heo", "thit-heo", "tuoi-song", 0.5, "kg", 75_000}
-	rau     = item{"Rau cải ngọt", "rau-cai", "rau-cu", 1, "bó", 15_000}
+	rau     = item{"Rau cải ngọt", "rau-cai", "rau-cu", 0.5, "kg", 15_000}
 	gao     = item{"Gạo ST25 5kg", "gao", "do-kho", 1, "túi", 185_000}
 	mam     = item{"Nước mắm Nam Ngư 750ml", "nuoc-mam", "gia-vi", 1, "chai", 42_000}
 	ruaChen = item{"Nước rửa chén Sunlight 750g", "nuoc-rua-chen", "ve-sinh", 1, "chai", 38_000}
 	dauGoi  = item{"Dầu gội Clear 630g", "dau-goi", "my-pham", 1, "chai", 159_000}
-	banhQuy = item{"Bánh quy Cosy", "banh-quy", "banh-keo", 1, "gói", 28_000}
+	banhQuy = item{"Bánh quy Cosy 336g", "banh-quy", "banh-keo", 1, "hộp", 28_000}
 	giay    = item{"Giấy vệ sinh Pulppy 10 cuộn", "giay-ve-sinh", "giay", 1, "lốc", 89_000}
 	kemRang = item{"Kem đánh răng P/S 230g", "kem-danh-rang", "ve-sinh", 1, "tuýp", 34_000}
 	caChua  = item{"Cà chua", "ca-chua", "rau-cu", 0.5, "kg", 18_000}
-	chuoi   = item{"Chuối già", "chuoi", "trai-cay", 1, "nải", 25_000}
+	chuoi   = item{"Chuối già", "chuoi", "trai-cay", 1, "kg", 25_000}
 )
 
 type bill struct {
@@ -99,4 +99,19 @@ func Seed(ctx context.Context, s Saver, uid string, now time.Time) (int, error) 
 		n++
 	}
 	return n, nil
+}
+
+// CategoryKeys trả các danh mục chi tiêu mà dữ liệu demo dùng (cho test).
+func CategoryKeys() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, b := range bills {
+		for _, it := range b.items {
+			if !seen[it.category] {
+				seen[it.category] = true
+				out = append(out, it.category)
+			}
+		}
+	}
+	return out
 }

@@ -16,7 +16,7 @@ func TestDemoSeedEmulator(t *testing.T) {
 	s, c, uid := emulator(t)
 	ctx := context.Background()
 	mustSet(t, c.Collection("users").Doc(uid), map[string]any{"display_name": "Lan", "role": "owner"})
-	svc, err := receipt.New(nil, s, s, s, s, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	svc, err := receipt.New(nil, s, s, s, s, slog.New(slog.NewTextHandler(io.Discard, nil)), receipt.WithTaxonomy(demo.CategoryKeys()))
 	if err != nil {
 		t.Fatal(err)
 	}

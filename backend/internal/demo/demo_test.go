@@ -2,10 +2,13 @@ package demo
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
+	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
 )
 
@@ -57,4 +60,50 @@ func validLike(s string) bool {
 		}
 	}
 	return len(s) > 0 && len(s) <= 64
+}
+
+type memDrafts struct{}
+
+func (memDrafts) Get(context.Context, string, string) (*receipt.Draft, error) { return nil, nil }
+func (memDrafts) Put(context.Context, string, receipt.Draft) error            { return nil }
+
+type memQuota struct{}
+
+func (memQuota) Reserve(context.Context, string, string, int) error { return nil }
+func (memQuota) Release(context.Context, string, string) error      { return nil }
+
+type memFX struct{}
+
+func (memFX) Rate(context.Context, string, domain.Date) (receipt.FX, bool, error) {
+	return receipt.FX{}, false, nil
+}
+
+type memStore struct{ saved []receipt.Receipt }
+
+func (m *memStore) SaveReceipt(_ context.Context, _ string, r receipt.Receipt, _ *time.Location) (receipt.SaveOutcome, error) {
+	m.saved = append(m.saved, r)
+	return receipt.SaveOutcome{ReceiptID: r.ID}, nil
+}
+func (m *memStore) HasSimilar(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+
+// Qua service thật: mọi dòng demo phải đủ danh mục, nhóm và lượng để vào tồn kho và dự đoán.
+func TestSeedLinesReachInventory(t *testing.T) {
+	st := &memStore{}
+	svc, err := receipt.New(nil, memDrafts{}, memQuota{}, memFX{}, st,
+		slog.New(slog.NewTextHandler(io.Discard, nil)), receipt.WithTaxonomy(CategoryKeys()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Seed(context.Background(), svc, "uid-lan", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range st.saved {
+		for _, l := range r.Lines {
+			if !l.ForInventory() {
+				t.Errorf("%s: %q chưa vào tồn kho (cat=%q group=%q qty=%v review=%v)", r.ID, l.Name, l.CategoryKey, l.GroupKey, l.CanonicalQty, l.NeedsReview)
+			}
+		}
+	}
 }
