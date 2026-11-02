@@ -267,7 +267,22 @@ export type SpendingReport = {
 /** GET /notifications: suy ra lúc đọc từ món sắp hết và chuyến mua. */
 export type Notification =
   | { id: string; kind: "item"; item_key: string; name: string; status: StockStatus; days_left?: number | null }
-  | { id: string; kind: "trip"; date: string; hour?: number | null; item_count: number };
+  | { id: string; kind: "trip"; date: string; hour?: number | null; item_count: number }
+  /** B9: sự kiện giữa người trong nhà, đã lưu, có trạng thái đã đọc. */
+  | { id: string; kind: "event"; event: HouseEvent };
+
+export type HouseEvent = {
+  id: string;
+  kind: "plan_sent" | "plan_updated" | "plan_cancelled" | "run_done" | "run_declined" | "plan_split";
+  at: string;
+  actor_name?: string;
+  plan_id?: string;
+  plan_name?: string;
+  assignment_id?: string;
+  items?: number;
+  returned?: number;
+  read: boolean;
+};
 
 /** Cài đặt đọc từ GET /me (settings) và gửi qua PUT /settings (chỉ trường thay đổi). */
 export type SettingsPatch = Partial<{

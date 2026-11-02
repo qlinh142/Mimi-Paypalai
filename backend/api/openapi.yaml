@@ -105,8 +105,11 @@ paths:
   /notifications:
     get:
       tags: [home]
-      summary: Thông báo, suy ra lúc đọc (không lưu, chưa có trạng thái đã đọc)
+      summary: Thông báo trong nhà (đã lưu, có đã đọc) và thông báo suy ra lúc đọc
       description: |
+        B9: sự kiện giữa người trong nhà đứng đầu (kind=event, 30 ngày gần nhất): plan_sent, plan_updated,
+        plan_cancelled (gửi người mua), run_done, run_declined, plan_split (gửi người nhờ). Sự kiện được ghi
+        cùng transaction với thay đổi, rồi đẩy vào hàng đợi Cloud Tasks "notify" để worker gửi thư.
         Chủ giỏ: chuyến mua hẹn hôm nay hoặc ngày mai khi giỏ còn món (kind=trip), rồi các món trong
         "Cần mua" 7 ngày (kind=item). Thành viên nhà: chỉ món sắp hết của nhà, không có giá hay chuyến mua.
       responses:
@@ -123,7 +126,7 @@ paths:
                       type: object
                       properties:
                         id: { type: string }
-                        kind: { type: string, enum: [item, trip] }
+                        kind: { type: string, enum: [event, item, trip] }
                         item_key: { type: string }
                         name: { type: string }
                         status: { $ref: "#/components/schemas/StockStatus" }
@@ -131,6 +134,29 @@ paths:
                         date: { type: string, format: date }
                         hour: { type: [integer, "null"] }
                         item_count: { type: integer }
+                        event:
+                          type: object
+                          description: "Chỉ có khi kind=event. Không có giá tiền."
+                          properties:
+                            id: { type: string }
+                            kind: { type: string, enum: [plan_sent, plan_updated, plan_cancelled, run_done, run_declined, plan_split] }
+                            at: { type: string, format: date-time }
+                            actor_name: { type: string }
+                            plan_id: { type: string }
+                            plan_name: { type: string, description: "Đọc lúc trả về; rỗng là Kế hoạch chính" }
+                            assignment_id: { type: string }
+                            items: { type: integer }
+                            returned: { type: integer }
+                            read: { type: boolean }
+  /notifications/{id}/read:
+    post:
+      tags: [home]
+      summary: "B9: đánh dấu một thông báo sự kiện đã đọc (id dạng event:...)"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Đã đánh dấu }
+        "404": { description: Không phải thông báo sự kiện, hoặc không còn }
 
   # ---------------- Hóa đơn ----------------
   /receipts/read:

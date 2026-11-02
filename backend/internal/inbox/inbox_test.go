@@ -12,6 +12,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
+	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 )
 
@@ -77,4 +78,32 @@ func TestList(t *testing.T) {
 			t.Fatalf("err=%v", err)
 		}
 	})
+}
+
+type fakeEvents struct{ read []string }
+
+func (f *fakeEvents) Events(context.Context, string, int) ([]notify.Event, error) {
+	return []notify.Event{{ID: "sent-trip-1", Kind: notify.EventPlanSent, ActorName: "Mẹ", Items: 3}}, nil
+}
+func (f *fakeEvents) MarkEventRead(_ context.Context, _, id string) error {
+	f.read = append(f.read, id)
+	return nil
+}
+
+// B9: sự kiện đã lưu đứng đầu, kể cả với thành viên nhà; đánh dấu đã đọc theo id "event:...".
+func TestListEvents(t *testing.T) {
+	ctx := context.Background()
+	ev := &fakeEvents{}
+	svc := New(&fakeItems{}, fakePlans{}, nil).WithEvents(ev)
+	member := authz.Principal{UID: "minh", Role: authz.RoleMember, HouseholdID: "h1"}
+	got, err := svc.List(ctx, member)
+	if err != nil || len(got.Items) != 2 || got.Items[0].Kind != "event" || got.Items[0].ID != "event:sent-trip-1" || got.Items[0].Event.Items != 3 {
+		t.Fatalf("%v %+v", err, got)
+	}
+	if err := svc.MarkRead(ctx, member, "event:sent-trip-1"); err != nil || len(ev.read) != 1 || ev.read[0] != "sent-trip-1" {
+		t.Fatalf("%v %v", err, ev.read)
+	}
+	if err := svc.MarkRead(ctx, member, "item:sua"); !errors.Is(err, apperr.ErrNotFound) {
+		t.Fatalf("derived notes have no read state, got %v", err)
+	}
 }

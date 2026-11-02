@@ -256,6 +256,15 @@ export const useSpending = (month: string) =>
 export const useNotifications = () =>
   useQuery({ queryKey: qk.notifications, queryFn: async () => (await apiGet<{ items: Notification[] }>("/notifications")).items });
 
+/** B9: đánh dấu một thông báo sự kiện đã đọc. */
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiSend<void>("POST", `/notifications/${encodeURIComponent(id)}/read`),
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.notifications }),
+  });
+}
+
 export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({

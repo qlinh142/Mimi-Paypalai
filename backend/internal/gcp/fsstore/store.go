@@ -24,11 +24,13 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/user"
 )
 
 type Store struct {
-	c *firestore.Client
+	c     *firestore.Client
+	queue notify.Enqueuer // B9: hàng đợi notify; nil là chưa cấu hình
 }
 
 // New nhận client đã tạo sẵn (cmd/mimi tạo, đóng khi tắt). Khi FIRESTORE_EMULATOR_HOST

@@ -432,7 +432,16 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       .filter((i) => isSoon(i, 7))
       .sort(order)
       .map((i) => ({ id: `item:${i.key}`, kind: "item", item_key: i.key, name: i.name, status: i.status, days_left: i.days_left }));
-    return json({ items: list });
+    // B9: sự kiện trong nhà đứng đầu.
+    const events: Notification[] = [
+      { id: "event:done-mock", kind: "event", event: { id: "done-mock", kind: "run_done", at: new Date(Date.now() - 3600_000).toISOString(), actor_name: "Minh", plan_name: "Mua đồ cuối tuần", items: 4, returned: 1, read: mockEventRead.has("event:done-mock") } },
+    ];
+    return json({ items: [...events, ...list] });
+  }
+  const readM = p.match(/^\/notifications\/([^/]+)\/read$/);
+  if (readM && method === "POST") {
+    mockEventRead.add(decodeURIComponent(readM[1]));
+    return json(undefined, 204);
   }
 
   if (method === "GET" && p === "/plan") return json(mockCart());
@@ -701,6 +710,7 @@ let household: { id: string; name: string; members: { uid: string; display_name:
     { uid: "mock-me", display_name: L ? "Grandma" : "Bà", role: "member", joined_at: iso(today) },
   ],
 };
+const mockEventRead = new Set<string>();
 type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string; qty?: number; unit?: string; unit_price?: number; category_key?: string }[]; created_at: string; updated_at?: string; note?: string;
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string } };
 // Spec 1.5 mục 2: một lần nhờ Minh mua đang dở, để thấy màn mẹ xem kết quả (tiến độ, ghi chú).

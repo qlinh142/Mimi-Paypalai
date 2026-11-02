@@ -44,6 +44,29 @@ Bản mới deploy với `--no-traffic --tag canary` nên chưa ai dùng tới. 
 gcloud run services update-traffic mimi-api --region asia-southeast1 --to-tags canary=100
 ```
 
+## Thông báo trong nhà (hàng đợi `notify`)
+
+Gửi kế hoạch, cập nhật, hủy, mua xong, từ chối, món chưa mua sang kế hoạch mới: mỗi việc ghi một sự kiện
+vào `users/{uid}/events/{id}` trong cùng transaction với thay đổi, nên không mất. App đọc ở `GET /notifications`.
+Khi có hàng đợi, API đẩy thêm một task để `mimi-worker` gửi thư (tên task theo sự kiện, đẩy hai lần không gửi hai thư).
+
+```bash
+# Một lần cho mỗi project
+gcloud tasks queues create notify --location asia-southeast1 \
+  --max-attempts 5 --min-backoff 30s --max-backoff 10m --max-doublings 4
+# API cần quyền tạo task và "đóng vai" service account gọi worker
+gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:sa-api@$PROJECT.iam.gserviceaccount.com --role roles/cloudtasks.enqueuer
+gcloud iam service-accounts add-iam-policy-binding sa-tasks@$PROJECT.iam.gserviceaccount.com \
+  --member serviceAccount:sa-api@$PROJECT.iam.gserviceaccount.com --role roles/iam.serviceAccountUser
+gcloud run services add-iam-policy-binding mimi-worker --region asia-southeast1 \
+  --member serviceAccount:sa-tasks@$PROJECT.iam.gserviceaccount.com --role roles/run.invoker
+```
+
+Biến môi trường của `mimi-api`: `TASKS_QUEUE=projects/$PROJECT/locations/asia-southeast1/queues/notify`,
+`WORKER_URL` (URL của mimi-worker), `TASKS_SA_EMAIL=sa-tasks@...`. Không đặt `TASKS_QUEUE` thì thông báo chỉ hiện trong app.
+Worker trả 503 khi lỗi tạm thời để hàng đợi thử lại theo cấu hình trên, 204 khi đã gửi hoặc lỗi vĩnh viễn.
+Gửi thư thật cần nhà cung cấp email (bước 13).
+
 ## Quay lại bản cũ (rollback)
 
 Quay lại chỉ đổi **code** đang chạy. Dữ liệu trong Firestore giữ nguyên, người dùng không mất gì.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
+	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 )
 
@@ -244,6 +245,7 @@ func decodeAssignment(d *firestore.DocumentSnapshot) household.Assignment {
 func (s *Store) CreateAssignment(ctx context.Context, hid string, a household.Assignment) (household.Assignment, error) {
 	ref := s.household(hid).Collection("shopping_assignments").Doc(a.ID)
 	col := s.planItems(a.OwnerUID, a.PlanID)
+	var ev pendingEvent
 	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		refs := make([]*firestore.DocumentRef, 0, len(a.Items))
 		for _, it := range a.Items {
@@ -267,6 +269,12 @@ func (s *Store) CreateAssignment(ctx context.Context, hid string, a household.As
 				return err
 			}
 		}
+		if ev, err = s.writeEvent(tx, a.BuyerUID, event{Event: notify.Event{
+			ID: "sent-" + a.ID, Kind: notify.EventPlanSent, At: now, ActorName: a.OwnerName,
+			PlanID: a.PlanID, AssignmentID: a.ID, Items: len(a.Items),
+		}, planOwner: a.OwnerUID}); err != nil {
+			return err
+		}
 		return tx.Create(ref, map[string]any{
 			"owner_uid": a.OwnerUID, "owner_display_name": a.OwnerName, "buyer_uid": a.BuyerUID, "buyer_display_name": a.BuyerName,
 			"plan_id": a.PlanID, "status": a.Status, "note": a.Note, "items": assignmentItemsDoc(a.Items),
@@ -276,6 +284,7 @@ func (s *Store) CreateAssignment(ctx context.Context, hid string, a household.As
 	if err != nil {
 		return household.Assignment{}, err
 	}
+	s.enqueue(ctx, ev)
 	return a, nil
 }
 
@@ -288,6 +297,7 @@ func (s *Store) UpdateAssignment(ctx context.Context, hid string, a household.As
 	ref := s.household(hid).Collection("shopping_assignments").Doc(a.ID)
 	col := s.planItems(a.OwnerUID, a.PlanID)
 	var out household.Assignment
+	var ev pendingEvent
 	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		snap, err := tx.Get(ref)
 		if isNotFound(err) {
@@ -374,6 +384,18 @@ func (s *Store) UpdateAssignment(ctx context.Context, hid string, a household.As
 		}); err != nil {
 			return err
 		}
+		assigned := 0
+		for _, it := range a.Items {
+			if it.Status == "assigned" {
+				assigned++
+			}
+		}
+		if ev, err = s.writeEvent(tx, cur.BuyerUID, event{Event: notify.Event{
+			ID: fmt.Sprintf("upd-%s-%d", a.ID, at.UnixMilli()), Kind: notify.EventPlanUpdated, At: at, ActorName: cur.OwnerName,
+			PlanID: cur.PlanID, AssignmentID: a.ID, Items: assigned,
+		}, planOwner: cur.OwnerUID}); err != nil {
+			return err
+		}
 		out = cur
 		out.Items, out.Note, out.UpdatedAt = a.Items, a.Note, &at
 		sort.Slice(out.Items, func(i, j int) bool { return out.Items[i].Key < out.Items[j].Key })
@@ -382,6 +404,7 @@ func (s *Store) UpdateAssignment(ctx context.Context, hid string, a household.As
 	if err != nil {
 		return household.Assignment{}, err
 	}
+	s.enqueue(ctx, ev)
 	return out, nil
 }
 
@@ -473,6 +496,7 @@ func (s *Store) endAssignment(ctx context.Context, hid, id, status string, allow
 	}
 	ref := s.household(hid).Collection("shopping_assignments").Doc(id)
 	var out household.Assignment
+	var ev pendingEvent
 	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		snap, err := tx.Get(ref)
 		if isNotFound(err) {
@@ -497,10 +521,16 @@ func (s *Store) endAssignment(ctx context.Context, hid, id, status string, allow
 			return err
 		}
 		a.Status = status
+		returned := 0
 		for i := range a.Items {
 			if a.Items[i].Status == "assigned" {
 				a.Items[i].Status = "returned"
+				returned++
 			}
+		}
+		to, e := endEventFor(a, status, returned)
+		if ev, err = s.writeEvent(tx, to, e); err != nil {
+			return err
 		}
 		out = a
 		return nil
@@ -508,7 +538,24 @@ func (s *Store) endAssignment(ctx context.Context, hid, id, status string, allow
 	if err != nil {
 		return household.Assignment{}, err
 	}
+	s.enqueue(ctx, ev)
 	return out, nil
+}
+
+// endEventFor: người nhờ hủy → báo người mua; người mua từ chối hoặc báo xong → báo người nhờ.
+func endEventFor(a household.Assignment, status string, returned int) (string, event) {
+	now := time.Now()
+	base := notify.Event{At: now, PlanID: a.PlanID, AssignmentID: a.ID}
+	switch status {
+	case "cancelled":
+		base.ID, base.Kind, base.ActorName, base.Items = "cancel-"+a.ID, notify.EventPlanCancelled, a.OwnerName, returned
+		return a.BuyerUID, event{Event: base, planOwner: a.OwnerUID}
+	case "declined":
+		base.ID, base.Kind, base.ActorName, base.Items = "declined-"+a.ID, notify.EventRunDeclined, a.BuyerName, returned
+	default: // closed_partial: bấm "Mua hàng xong" mà không tick món nào
+		base.ID, base.Kind, base.ActorName, base.Returned = "done-"+a.ID, notify.EventRunDone, a.BuyerName, returned
+	}
+	return a.OwnerUID, event{Event: base, planOwner: a.OwnerUID}
 }
 
 func (s *Store) Assignments(ctx context.Context, hid, field, uid string, limit int) ([]household.Assignment, error) {

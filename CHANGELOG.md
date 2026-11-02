@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Thông báo trong nhà qua hàng đợi, có thử lại (B9)
+
+- Mẹ gửi, cập nhật hay hủy kế hoạch thì người mua nhận thông báo; người mua bấm "Mua hàng xong" hay từ chối thì mẹ nhận thông báo; món chưa mua sang kế hoạch mới cũng báo mẹ.
+- Mỗi thông báo được ghi trong cùng một lần lưu với thay đổi (`users/{uid}/events`), nên không mất kể cả khi gửi thư lỗi. Màn Thông báo hiện chúng ở đầu, chưa đọc thì đậm, bấm vào mở đúng kế hoạch hoặc lần đi mua và đánh dấu đã đọc.
+- Có cấu hình hàng đợi Cloud Tasks `notify` thì máy chủ đẩy task cho `mimi-worker` gửi thư: lỗi tạm thời thì hàng đợi thử lại có giãn cách, tối đa 5 lần; bị từ chối hẳn thì dừng; task bị gửi lại không gửi thư lần hai. Người tắt nhắc nhở hoặc chưa có email thì không nhận thư, vẫn thấy trong app.
+- Thư không có giá tiền. Gửi thư thật cần nhà cung cấp email ở bước 13; hiện bản dev ghi log thay vì gửi.
+- README có mục tạo hàng đợi và cấp quyền.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestDeliver`, `TestEventMail`, `TestTaskBody`, `TestEndEventFor`, `TestListEvents`.
+- `npm run build` qua; chạy thử màn Thông báo ở chế độ mẫu.
+
+---
+
 ## 2026-11-02 · Món chưa có giá và giá ước tính (B7)
 
 - Mỗi dòng hóa đơn ghi thêm nguồn giá `price_source`: `receipt` (in trên hóa đơn), `manual` (người đi mua tự nhập), `estimate` (ước tính), `missing` (chưa có giá). Giá trị `online` đã có chỗ trong dữ liệu, để dành cho phần quét giá online ở bước 13.

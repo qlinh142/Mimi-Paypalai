@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fbauth"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/gemini"
+	"github.com/smartlife-lab/mimi/backend/internal/gcp/tasks"
 	"github.com/smartlife-lab/mimi/backend/internal/history"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
@@ -76,7 +78,7 @@ func run(args []string) error {
 	case "serve-api":
 		return serveAPI(ctx, cfg, log, store)
 	case "serve-worker":
-		return serveWorker(ctx, cfg, log)
+		return serveWorker(ctx, cfg, log, store)
 	case "job":
 		if len(args) < 2 {
 			return errors.New("usage: mimi job <digest|price-sync|fx-sync|cleanup>")
@@ -109,6 +111,15 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	if cfg.AppCheckRequired {
 		appCheck = auth
 	}
+	// B9: có cấu hình hàng đợi thì đẩy thông báo sự kiện cho worker gửi thư; chưa có thì
+	// thông báo chỉ hiện trong app.
+	if cfg.TasksQueue != "" {
+		q, err := tasks.New(ctx, cfg.TasksQueue, cfg.WorkerURL, cfg.TasksSAEmail)
+		if err != nil {
+			return err
+		}
+		store.WithQueue(q)
+	}
 	items := item.New(store, nil)
 	planSvc := plan.New(store, store, nil).WithPlans(store)
 	payments, err := newPayments(cfg)
@@ -125,7 +136,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Receipts: receipts, Items: items, Ready: store,
 		Home:     home.New(store, items, planSvc, nil),
 		Plan:     planSvc,
-		Notes:    inbox.New(items, planSvc, nil),
+		Notes:    inbox.New(items, planSvc, nil).WithEvents(store),
 		Spending: spending.New(store),
 		Settings: user.NewSettingsService(store, nil),
 		Orders:   orders,
@@ -160,16 +171,47 @@ func newPayments(cfg config.Config) (order.Payments, error) {
 
 // serveWorker: nhận task từ Cloud Tasks. Cloud Run đã kiểm tra OIDC (ingress internal,
 // bắt buộc IAM), handler chỉ kiểm tra nội dung task.
-func serveWorker(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+func serveWorker(ctx context.Context, cfg config.Config, log *slog.Logger, store *fsstore.Store) error {
+	auth, err := fbauth.New(ctx, cfg.ProjectID, false)
+	if err != nil {
+		return err
+	}
+	mailer, err := newMailer(cfg, log)
+	if err != nil {
+		return err
+	}
+	d := notify.NewDeliverer(fsstore.NewNotifyStore(store, auth), mailer)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("POST /tasks/notify", func(w http.ResponseWriter, r *http.Request) {
-		// Bước tiếp theo: giải mã task, kiểm tra uid và loại task trong danh sách cho phép,
-		// gửi email qua Mailer với timeout. Trả 2xx khi xong hoặc lỗi vĩnh viễn, 5xx để
-		// Cloud Tasks retry khi lỗi tạm thời.
-		http.Error(w, "not implemented", http.StatusNotImplemented)
-	})
+	mux.HandleFunc("POST /tasks/notify", notifyHandler(d, log))
 	return listen(ctx, log, cfg.Port, mux)
+}
+
+// notifyHandler (B9): 2xx khi đã gửi hoặc lỗi vĩnh viễn (Cloud Tasks không thử lại), 503 khi
+// lỗi tạm thời để Cloud Tasks thử lại theo cấu hình hàng đợi (giãn cách, số lần tối đa).
+func notifyHandler(d *notify.Deliverer, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var t notify.Task
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&t); err != nil {
+			log.WarnContext(r.Context(), "notify task: bad body", "err", err)
+			w.WriteHeader(http.StatusNoContent) // task hỏng: thử lại cũng vô ích
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		retry, err := d.Deliver(ctx, t)
+		attempt := r.Header.Get("X-CloudTasks-TaskRetryCount")
+		if err != nil {
+			log.WarnContext(ctx, "notify task", "event_id", t.EventID, "retry", retry, "attempt", attempt, "err", err)
+		}
+		if retry {
+			http.Error(w, "retry", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logger, store *fsstore.Store) error {

@@ -4,18 +4,31 @@
 //   - món trong "Cần mua" 7 ngày (cùng quy tắc với Đồ dùng và ô Trang chủ);
 //   - chuyến mua đã hẹn hôm nay hoặc ngày mai khi giỏ còn món (chỉ chủ giỏ).
 //
-// Vì không lưu, chưa có trạng thái "đã đọc"; nội dung luôn phản ánh tình trạng hiện tại.
+// Hai loại trên không lưu nên không có trạng thái "đã đọc"; nội dung luôn phản ánh tình trạng hiện tại.
+// B9: thêm sự kiện giữa người trong nhà (gửi, cập nhật, hủy kế hoạch, mua xong, từ chối...), lưu ở
+// users/{uid}/events, có "đã đọc", đứng đầu danh sách.
 package inbox
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
+	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 )
+
+// Events là kho sự kiện đã lưu (B9).
+type Events interface {
+	Events(ctx context.Context, uid string, limit int) ([]notify.Event, error)
+	MarkEventRead(ctx context.Context, uid, id string) error
+}
+
+const eventLimit = 30
 
 // Items là phần của item.Service mà Thông báo cần.
 type Items interface {
@@ -39,6 +52,8 @@ type Note struct {
 	Date      string        `json:"date,omitempty"` // trip: YYYY-MM-DD
 	Hour      *int          `json:"hour,omitempty"` // trip: 0..23
 	ItemCount int           `json:"item_count,omitempty"`
+	// Kind "event" (B9): sự kiện đã lưu.
+	Event *notify.Event `json:"event,omitempty"`
 }
 
 type List struct {
@@ -49,9 +64,41 @@ type List struct {
 const horizon = item.NeedsHorizonDays
 
 type Service struct {
-	items Items
-	plans Plans
-	now   func() time.Time
+	items  Items
+	plans  Plans
+	events Events
+	now    func() time.Time
+}
+
+func (s *Service) WithEvents(e Events) *Service {
+	s.events = e
+	return s
+}
+
+// MarkRead đánh dấu một sự kiện đã đọc. ID có dạng "event:{id}".
+func (s *Service) MarkRead(ctx context.Context, p authz.Principal, id string) error {
+	if err := authz.Can(p, authz.ActionReadSelf); err != nil {
+		return err
+	}
+	if s.events == nil || !strings.HasPrefix(id, "event:") {
+		return apperr.ErrNotFound
+	}
+	return s.events.MarkEventRead(ctx, p.UID, strings.TrimPrefix(id, "event:"))
+}
+
+func (s *Service) eventNotes(ctx context.Context, uid string) ([]Note, error) {
+	if s.events == nil {
+		return nil, nil
+	}
+	evs, err := s.events.Events(ctx, uid, eventLimit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Note, 0, len(evs))
+	for i := range evs {
+		out = append(out, Note{ID: "event:" + evs[i].ID, Kind: "event", Event: &evs[i]})
+	}
+	return out, nil
 }
 
 func New(items Items, plans Plans, now func() time.Time) *Service {
@@ -66,6 +113,11 @@ func (s *Service) List(ctx context.Context, p authz.Principal) (List, error) {
 		return List{}, err
 	}
 	out := List{Items: []Note{}}
+	evs, err := s.eventNotes(ctx, p.UID)
+	if err != nil {
+		return List{}, err
+	}
+	out.Items = append(out.Items, evs...)
 
 	if p.Role == authz.RoleMember {
 		shared, err := s.items.ListShared(ctx, p, horizon)

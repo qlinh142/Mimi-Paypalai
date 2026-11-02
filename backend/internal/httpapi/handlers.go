@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
+	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
@@ -359,6 +360,22 @@ func (s *Server) getNotifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
+}
+
+// markNotificationRead: POST /notifications/{id}/read (B9, chỉ sự kiện đã lưu).
+func (s *Server) markNotificationRead(w http.ResponseWriter, r *http.Request) {
+	mr, ok := s.notes.(interface {
+		MarkRead(ctx context.Context, p authz.Principal, id string) error
+	})
+	if !ok {
+		s.writeError(w, r, apperr.ErrNotFound)
+		return
+	}
+	if err := mr.MarkRead(r.Context(), principalFrom(r.Context()), r.PathValue("id")); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) notImplemented(w http.ResponseWriter, r *http.Request) {
