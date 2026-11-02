@@ -180,6 +180,7 @@
 .scan > * { flex-shrink: 0; } /* màn thấp thì cuộn, không ép bẹp ảnh thu nhỏ hay nút */
 .scan[aria-busy="true"] .scan__view { flex: 1; height: auto; } /* màn chờ đọc: không có camera */
 .scan__view video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan__badge { position: absolute; top: var(--s2); left: var(--s2); margin: 0; padding: 4px 12px; border-radius: var(--r-pill); background: rgb(10 15 41 / .75); color: #fff; font-size: var(--fs-sm); }
 .scan__hint { font-size: var(--fs-sm); color: #c9d4f5; text-align: center; padding: 0 var(--s4); }
 .scan__thumbs { display: flex; gap: var(--s2); min-height: 64px; overflow-x: auto; padding: var(--s2) 0; }
 .scan__thumbs img { width: 48px; height: 64px; object-fit: cover; border-radius: 8px; border: 2px solid rgb(255 255 255 / .3); }
@@ -238,6 +239,7 @@
 .scan__notice { color: #ffd2b8; }
 .scan__count { justify-self: end; font-size: var(--fs-sm); color: #c9d4f5; font-variant-numeric: tabular-nums; }
 .scan__lib { justify-self: start; }
+.scan__next { justify-self: end; gap: 2px; padding: 0 var(--s2); }
 .scan__thumbs { padding: 10px 10px 4px 2px; gap: var(--s3); }
 /* Thẳng hàng giữa các ô: icon, tiêu đề (dành 2 dòng, chữ bám đáy), dòng phụ đều bắt đầu cùng một độ cao */
 .tile { grid-template-rows: auto 1fr; align-content: start; }

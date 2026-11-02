@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Quét 2 bill trong một lần
+
+Nhánh `feat/quet-2-bill` (dựa trên `fix/quet-hoa-don-that`).
+
+- Người dùng hay để dồn vài ngày mới quét. Mẹ chốt: tối đa 2 bill mỗi lần quét, mỗi bill đọc riêng (không gộp cửa hàng, ngày, tổng tiền).
+- Màn chụp có nút "Bill tiếp": bill đang chụp được gửi đọc ngay (chạy ngầm), màn chụp mở lại cho bill 2. Góc khung camera hiện trạng thái bill 1.
+- Bấm "Xong": xem lại và lưu bill 1, rồi "Xem bill tiếp theo" để lưu bill 2. Bill 1 đọc lỗi: chọn "Đọc lại bill 1" (ảnh đã đọc được lấy từ bộ nhớ đệm) hoặc "Bỏ bill 1".
+- Mỗi bill vẫn tính 1 lượt quét như cũ. Không đổi backend.
+- Kiểm tra: tsc, build, chạy luồng 2 bill trên bản thử (giả lập iPhone 13, camera giả).
+
 ## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ
 
 Nhánh `fix/quet-hoa-don-that`.

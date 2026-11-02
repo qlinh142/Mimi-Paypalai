@@ -2,7 +2,7 @@ import { t, uiLang } from "../i18n";
 import { m15 } from "../i18n/m15";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Camera, ImagePlus, X } from "lucide-react";
+import { Camera, ChevronRight, ImagePlus, X } from "lucide-react";
 import { toSaveRequest, useDelegated, usePlanCarts, usePlans, useReadReceipt, useSaveReceipt } from "../api/hooks";
 import { allocate, planNeeds } from "../lib/allocate";
 import { visiblePlans } from "../components/PlanPicker";
@@ -10,7 +10,7 @@ import { planName } from "./PlanList";
 import { m1 } from "../i18n/m1";
 import { currentPlanId } from "../lib/currentPlan";
 import type { ReceiptDraft } from "../api/types";
-import { ApiError, OfflineError } from "../api/client";
+import { ApiError, OfflineError, apiUploadReceipt } from "../api/client";
 import { compressReceiptImage, grabFrame } from "../lib/image";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { MimiMark } from "../components/MimiMark";
@@ -20,10 +20,51 @@ const MAX_PHOTOS = 10; // BUG-05 mục 6: tối đa 10 ảnh / hóa đơn, khớ
 
 type Photo = { id: string; blob: Blob; url: string; from: "camera" | "library" };
 
-/** Mỗi lần "Quét hóa đơn khác" tạo phiên mới: ảnh, receipt_id và kết quả đọc đều làm lại từ đầu. */
+const MAX_BILLS = 2; // mẹ chốt 02/11: tối đa 2 bill mỗi lần quét, mỗi bill đọc riêng
+
+/** Bill 1 được đọc ngầm trong lúc người dùng chụp bill 2. */
+export type BgBill = {
+  receiptId: string;
+  images: Blob[];
+  status: "reading" | "ok" | "error";
+  draft?: ReceiptDraft;
+  error?: unknown;
+};
+
+/**
+ * Mỗi lần "Quét hóa đơn khác" tạo phiên mới: ảnh, receipt_id và kết quả đọc đều làm lại từ đầu.
+ * Bấm "Chụp bill tiếp theo": bill đang chụp được gửi đọc ngay (chạy ngầm), màn chụp mở lại cho bill sau.
+ */
 export function Scan() {
   const [session, setSession] = useState(0);
-  return <ScanSession key={session} onNext={() => setSession((s) => s + 1)} />;
+  const [bg, setBg] = useState<BgBill | null>(null);
+
+  function readBg(receiptId: string, images: Blob[]) {
+    setBg({ receiptId, images, status: "reading" });
+    const same = (b: BgBill | null) => b?.receiptId === receiptId;
+    apiUploadReceipt<ReceiptDraft>(receiptId, images, uiLang).then(
+      (draft) => setBg((b) => (same(b) ? { ...b!, status: "ok", draft } : b)),
+      (error) => setBg((b) => (same(b) ? { ...b!, status: "error", error } : b)),
+    );
+  }
+
+  return (
+    <ScanSession
+      key={session}
+      bg={bg}
+      canAddBill={!bg && MAX_BILLS > 1}
+      onNextBill={(receiptId, images) => {
+        readBg(receiptId, images);
+        setSession((s) => s + 1);
+      }}
+      onRetryBg={() => bg && readBg(bg.receiptId, bg.images)}
+      onDropBg={() => setBg(null)}
+      onNext={() => {
+        setBg(null);
+        setSession((s) => s + 1);
+      }}
+    />
+  );
 }
 
 /**
@@ -34,7 +75,14 @@ export function Scan() {
  *   Ô chọn thư viện KHÔNG có thuộc tính capture, vì capture buộc điện thoại mở camera.
  * Mọi ảnh được nén và bỏ EXIF ngay trên máy, chỉ nằm trong bộ nhớ trang tới khi gửi đi.
  */
-function ScanSession({ onNext }: { onNext: () => void }) {
+function ScanSession({ onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }: {
+  onNext: () => void;
+  bg: BgBill | null;
+  canAddBill: boolean;
+  onNextBill: (receiptId: string, images: Blob[]) => void;
+  onRetryBg: () => void;
+  onDropBg: () => void;
+}) {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -49,6 +97,9 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   const [replaceAt, setReplaceAt] = useState<number | null>(null);
   const [receiptId] = useState(() => crypto.randomUUID()); // khóa idempotent cho cả lần đọc và lần lưu
   const read = useReadReceipt();
+  // Xem lại: bill 1 (đọc ngầm) trước, rồi tới bill đang chụp. reviewOnly: bill này chưa chụp gì, chỉ xem bill 1.
+  const [reviewOnly, setReviewOnly] = useState(false);
+  const [bgSaved, setBgSaved] = useState(false);
   const urls = useRef<string[]>([]);
 
   // Bật camera; bật lại sau khi gửi lỗi (lúc gửi camera đã tắt để đỡ tốn pin).
@@ -158,6 +209,36 @@ function ScanSession({ onNext }: { onNext: () => void }) {
     else if (typeof f.image_index === "number") badImages.add(f.image_index);
   }
 
+  const ownReady = reviewOnly || !!read.data;
+  if (ownReady && bg && !bgSaved) {
+    if (bg.status === "reading") return <Waiting text={m15.scan.waitBg} />;
+    if (bg.status === "error") {
+      const msg = bg.error instanceof OfflineError ? t.scan.uploadOffline : bg.error instanceof Error ? bg.error.message : "";
+      return (
+        <main className="scan">
+          <div className="scan__view" style={{ flex: 1, height: "auto" }}>
+            <div className="scan__fallback">
+              <p role="alert">{m15.scan.bgError(msg)}</p>
+              <button type="button" className="btn btn--primary" onClick={onRetryBg}>{m15.scan.retryBg}</button>
+              <button type="button" className="btn btn--quiet" onClick={() => (reviewOnly ? onNext() : onDropBg())}>{m15.scan.skipBg}</button>
+            </div>
+          </div>
+        </main>
+      );
+    }
+    if (bg.draft) {
+      return (
+        <Confirm
+          key={bg.receiptId}
+          draft={bg.draft}
+          onDone={() => nav("/")}
+          onNext={onNext}
+          onContinue={reviewOnly ? undefined : () => setBgSaved(true)}
+        />
+      );
+    }
+  }
+
   if (read.isPending) {
     return (
       <main className="scan" aria-busy="true">
@@ -171,7 +252,8 @@ function ScanSession({ onNext }: { onNext: () => void }) {
     );
   }
 
-  if (read.data) return <Confirm draft={read.data} onDone={() => nav("/")} onNext={onNext} />;
+  if (read.data) return <Confirm key={receiptId} draft={read.data} onDone={() => nav("/")} onNext={onNext} />;
+  if (reviewOnly) return <Waiting text={m15.scan.waitBg} />; // bill 1 lưu xong: onNext đã mở phiên mới
 
   const fromLibrary = photos.some((p) => p.from === "library");
 
@@ -197,6 +279,11 @@ function ScanSession({ onNext }: { onNext: () => void }) {
               <Camera size={20} aria-hidden /> {t.scan.openCamera}
             </button>
           </div>
+        )}
+        {bg && (
+          <p className="scan__badge" role="status">
+            {bg.status === "reading" ? m15.scan.bgReading : bg.status === "ok" ? m15.scan.bgDone : m15.scan.bgFailed}
+          </p>
         )}
       </div>
 
@@ -247,7 +334,23 @@ function ScanSession({ onNext }: { onNext: () => void }) {
           <ImagePlus size={20} aria-hidden /> {t.scan.library}
         </button>
         <button type="button" className="shutter" aria-label={t.scan.shutter} onClick={shoot} />
-        <span className="scan__count">{photos.length > 0 ? t.scan.count(photos.length, MAX_PHOTOS) : ""}</span>
+        {canAddBill && photos.length > 0 && !read.isError ? (
+          // Chụp xong bill này: gửi đọc ngầm, mở màn chụp cho bill sau
+          <button
+            type="button"
+            className="btn btn--quiet scan__next"
+            aria-disabled={busy || undefined}
+            onClick={() => {
+              if (busy) return;
+              if (!navigator.onLine) return setOffline(true);
+              onNextBill(receiptId, photos.map((p) => p.blob));
+            }}
+          >
+            {m15.scan.nextBill} <ChevronRight size={18} aria-hidden />
+          </button>
+        ) : (
+          <span className="scan__count">{photos.length > 0 ? t.scan.count(photos.length, MAX_PHOTOS) : ""}</span>
+        )}
       </div>
 
       {/* Thư viện: không có capture, chọn nhiều ảnh */}
@@ -281,13 +384,32 @@ function ScanSession({ onNext }: { onNext: () => void }) {
           <button type="button" className="btn btn--outline" onClick={() => nav("/plan")}>{m15.run.manual}</button>
         </div>
       )}
-      {photos.length > 0 && (
+      {(photos.length > 0 || bg) && (
         <div className="scan__done">
-          <button type="button" className="btn btn--primary btn--block btn--lg" onClick={finish} aria-disabled={busy || undefined}>
-            {t.scan.finish(photos.length)}
-          </button>
+          {photos.length > 0 ? (
+            <button type="button" className="btn btn--primary btn--block btn--lg" onClick={finish} aria-disabled={busy || undefined}>
+              {t.scan.finish(photos.length)}
+            </button>
+          ) : (
+            <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => setReviewOnly(true)}>
+              {m15.scan.reviewOnly}
+            </button>
+          )}
         </div>
       )}
+    </main>
+  );
+}
+
+function Waiting({ text }: { text: string }) {
+  return (
+    <main className="scan" aria-busy="true">
+      <div className="scan__view">
+        <div style={{ display: "grid", justifyItems: "center", gap: 16 }}>
+          <MimiMark size={88} animated />
+          <p className="scan__hint" role="status">{text}</p>
+        </div>
+      </div>
     </main>
   );
 }
@@ -302,7 +424,13 @@ function todayLocal(): string {
  * Xác nhận hóa đơn: màn tối giản, đối chiếu tổng tiền thành một dòng chữ.
  * Mọi con số (từng dòng, tổng, khớp hay lệch) do backend tính trong bản nháp; khi lưu backend tính lại.
  */
-function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () => void; onNext: () => void }) {
+function Confirm({ draft, onDone, onNext, onContinue }: {
+  draft: ReceiptDraft;
+  onDone: () => void;
+  onNext: () => void;
+  /** Còn bill sau cần xem: nút chính sau khi lưu chuyển sang bill đó. */
+  onContinue?: () => void;
+}) {
   const [usePrediction, setUsePrediction] = useState(true);
   const [purchasedOn, setPurchasedOn] = useState(draft.purchased_on || todayLocal());
   const save = useSaveReceipt();
@@ -404,9 +532,15 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
           </dl>
           {/* Cùng quy cách với nút "Lưu hóa đơn": nút chính rộng hết khung, nút phụ viền nhạt bên dưới */}
           <div className="actions">
-            <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onNext}>
-              {t.confirm.scanAnother}
-            </button>
+            {onContinue ? (
+              <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onContinue}>
+                {m15.scan.seeNext}
+              </button>
+            ) : (
+              <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onNext}>
+                {t.confirm.scanAnother}
+              </button>
+            )}
             <button type="button" className="btn btn--quiet btn--block" onClick={onDone}>
               {t.common.backHome}
             </button>
