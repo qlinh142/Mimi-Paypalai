@@ -39,9 +39,17 @@ func TestHouseholdFlowEmulator(t *testing.T) {
 	if st := get(t, ou.Collection("plan_items").Doc("gao"))["status"]; st != "assigned" {
 		t.Fatalf("plan line %v", st)
 	}
-	// Gửi lại món đang giao: không còn mở.
-	if _, err := svc.Assign(ctx, op, household.AssignRequest{BuyerUID: buyer, Keys: []string{"gao"}}); err == nil {
-		t.Fatal("assigned line must not be sent twice")
+	// B5: gửi lại cho cùng người là cập nhật vòng đang mở (không tạo vòng thứ hai). Món bỏ
+	// khỏi danh sách mới trả về kế hoạch, món còn lại vẫn đang giao.
+	a2, err := svc.Assign(ctx, op, household.AssignRequest{BuyerUID: buyer, Keys: []string{"gao"}})
+	if err != nil || a2.ID != a.ID || len(a2.Items) != 1 {
+		t.Fatalf("resend %+v %v", a2, err)
+	}
+	if st := get(t, ou.Collection("plan_items").Doc("sua-tuoi"))["status"]; st != "open" {
+		t.Fatalf("dropped line %v", st)
+	}
+	if st := get(t, ou.Collection("plan_items").Doc("gao"))["status"]; st != "assigned" {
+		t.Fatalf("kept line %v", st)
 	}
 	d, err := svc.Delegated(ctx, bp)
 	if err != nil || len(d.ToMe) != 1 || d.ToMe[0].ID != a.ID {

@@ -29,6 +29,40 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
 
+  # Test chạm Firestore thật (transaction, query, xóa đệ quy) chạy trên emulator. Không có
+  # FIRESTORE_EMULATOR_HOST thì các test này tự bỏ qua, nên job backend ở trên không thấy chúng.
+  emulator:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: beta,cloud-firestore-emulator
+      - name: Start Firestore emulator
+        run: |
+          gcloud beta emulators firestore start --host-port=127.0.0.1:8085 > /tmp/emulator.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -s http://127.0.0.1:8085 >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/emulator.log
+          exit 1
+      - run: go test -count=1 ./internal/gcp/fsstore/
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8085
+          GOOGLE_CLOUD_PROJECT: mimi-test
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
