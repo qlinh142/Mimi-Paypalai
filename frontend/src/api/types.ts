@@ -205,7 +205,8 @@ export type PlanSource = "forecast" | "check" | "meal" | "manual";
 /** PATCH /plan/items/{key}: chỉ gửi trường thay đổi. */
 export type PlanLinePatch = Partial<{ qty: number; unit: string; need_by: string; priority: PlanPriority; reason: string }>;
 
-export type PlanState = { buy_date: string; buy_hour: number | null; buy_minute?: number | null; trip_note: string; reconciled_on?: string };
+/** rev: máy chủ tăng mỗi lần lưu. base_rev: rev máy này đã đọc, lệch thì máy chủ trả 409 (A1). */
+export type PlanState = { buy_date: string; buy_hour: number | null; buy_minute?: number | null; trip_note: string; reconciled_on?: string; rev?: number; base_rev?: number };
 export type PlanPhase = "planning" | "shopping" | "reconciled";
 
 export type Cart = {

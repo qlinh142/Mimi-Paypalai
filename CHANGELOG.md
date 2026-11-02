@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Báo khi hai máy cùng sửa một kế hoạch (A1)
+
+- Mỗi kế hoạch có số phiên bản `rev` (lưu ở `plan_rev`), tăng mỗi lần lưu ngày, giờ, ghi chú.
+- App gửi kèm `base_rev` là số đã đọc. Máy khác đã lưu trước thì máy chủ trả 409 "Kế hoạch vừa được sửa trên máy khác…", không ghi đè; app tự tải lại bản mới để mẹ xem rồi sửa lại.
+- Kiểm tra và ghi nằm trong một transaction Firestore, nên hai máy bấm lưu cùng lúc cũng chỉ một máy thắng.
+- Bản app cũ không gửi `base_rev` vẫn lưu được như trước. Sửa từng món (số lượng, ưu tiên) vẫn lưu theo lần ghi sau cùng.
+- OpenAPI: `PlanState` thêm `buy_minute`, `reconciled_on`, `rev`, `base_rev`; `PUT /plan/state` có 409 và tham số `plan_id`.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestSetStateRevConflict` và `TestSetStateRevEmulator` (chạy khi có emulator).
+- `npm run build` qua; chạy thử chế độ mẫu: lưu kế hoạch hai lần liền không báo nhầm, dữ liệu cũ trên máy thì hiện câu báo xung đột và tải lại.
+
+---
+
 ## 2026-11-02 · Rà màn đang tải và báo lỗi ở mọi màn (A10)
 
 - Thêm `LoadState` dùng chung: lần tải đầu hiện "Đang tải"; lỗi mà chưa có dữ liệu thì báo đúng lý do (mất mạng, mạng chậm, lỗi máy chủ) kèm nút Thử lại; đang có dữ liệu đã lưu thì không che màn.

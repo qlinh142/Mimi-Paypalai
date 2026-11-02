@@ -140,8 +140,8 @@ func (f *fakePlanStore) RemoveLine(_ context.Context, _ string, k string) error 
 	delete(f.lines, k)
 	return nil
 }
-func (f *fakePlanStore) State(context.Context, string) (plan.State, error)  { return plan.State{}, nil }
-func (f *fakePlanStore) SetState(context.Context, string, plan.State) error { return nil }
+func (f *fakePlanStore) State(context.Context, string) (plan.State, error)           { return plan.State{}, nil }
+func (f *fakePlanStore) SetState(context.Context, string, plan.State) (int64, error) { return 1, nil }
 func (f *fakePlanStore) Prices(context.Context, string, []string) ([]domain.LastPrice, error) {
 	return []domain.LastPrice{{GroupKey: "sua", Store: "Co.op", Unit: 32000}}, nil
 }

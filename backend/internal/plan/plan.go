@@ -72,6 +72,11 @@ type State struct {
 	// ReconciledOn: ngày của hóa đơn gần nhất đã đối chiếu Plan này. Chỉ transaction lưu
 	// hóa đơn ghi; client gửi lên bị bỏ qua.
 	ReconciledOn string `json:"reconciled_on,omitempty"`
+	// Rev tăng mỗi lần lưu ngày, giờ, ghi chú. Client gửi lại số đã đọc trong BaseRev; nếu
+	// máy khác đã lưu trước (Rev trên máy chủ khác BaseRev), máy chủ trả 409 thay vì ghi đè.
+	// Không gửi BaseRev thì ghi như cũ (bản cũ của app, thao tác dọn kế hoạch).
+	Rev     int64  `json:"rev"`
+	BaseRev *int64 `json:"base_rev,omitempty"`
 }
 
 // Giai đoạn của Plan (3.1 mục 18): planning trước ngày mua, shopping từ ngày mua, reconciled
@@ -101,7 +106,9 @@ type Store interface {
 	// RemoveLine xóa dòng; nhóm không có trong giỏ cũng không lỗi.
 	RemoveLine(ctx context.Context, uid, key string) error
 	State(ctx context.Context, uid string) (State, error)
-	SetState(ctx context.Context, uid string, s State) error
+	// SetState ghi trạng thái và trả Rev mới. s.BaseRev khác nil mà lệch Rev đang lưu thì
+	// trả apperr.CodeConflict, không ghi gì.
+	SetState(ctx context.Context, uid string, s State) (int64, error)
 	// Prices trả giá mỗi đơn vị gần nhất của từng nhóm tại từng cửa hàng người dùng từng mua.
 	Prices(ctx context.Context, uid string, groups []string) ([]domain.LastPrice, error)
 }
@@ -444,9 +451,11 @@ func (s *Service) SetState(ctx context.Context, p authz.Principal, st State) (St
 	if err := st.validate(domain.Today(s.now(), domain.Location(p.Timezone))); err != nil {
 		return State{}, err
 	}
-	if err := s.store.SetState(ctx, p.UID, st); err != nil {
+	rev, err := s.store.SetState(ctx, p.UID, st)
+	if err != nil {
 		return State{}, err
 	}
+	st.Rev, st.BaseRev = rev, nil
 	return st, nil
 }
 

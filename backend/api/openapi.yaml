@@ -468,9 +468,15 @@ paths:
     put:
       tags: [plan]
       summary: Ngày, giờ và ghi chú cho chuyến mua
+      description: >-
+        Gửi base_rev là rev đọc được trong Cart.state. Nếu máy khác đã lưu sau đó, trả 409 conflict
+        (details.rev là rev hiện tại) và không ghi gì; client tải lại kế hoạch rồi cho người dùng sửa lại.
+        Không gửi base_rev thì ghi đè như cũ.
+      parameters: [{ $ref: "#/components/parameters/PlanId" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PlanState" } } } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlanState" } } } }
+        "409": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/Error" }
   /plan/prices:
     get:
@@ -1222,7 +1228,11 @@ components:
       properties:
         buy_date: { type: string, description: "YYYY-MM-DD hoặc chuỗi rỗng; từ 7 ngày trước đến 1 năm tới" }
         buy_hour: { type: [integer, "null"], minimum: 0, maximum: 23 }
+        buy_minute: { type: [integer, "null"], minimum: 0, maximum: 59, description: "Đi cùng buy_hour; bỏ qua khi buy_hour null" }
         trip_note: { type: string, maxLength: 120 }
+        reconciled_on: { type: string, readOnly: true, description: "Ngày hóa đơn gần nhất đã đối chiếu; client gửi lên bị bỏ qua" }
+        rev: { type: integer, readOnly: true, description: "Tăng mỗi lần lưu; gửi lại trong base_rev" }
+        base_rev: { type: integer, writeOnly: true, description: "rev client đã đọc; lệch thì 409" }
     Cart:
       type: object
       properties:

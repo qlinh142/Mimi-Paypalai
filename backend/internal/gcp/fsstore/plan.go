@@ -2,6 +2,7 @@ package fsstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -115,10 +116,11 @@ func (s *Store) State(ctx context.Context, uid string) (plan.State, error) {
 		st.BuyMinute = &v
 	}
 	st.ReconciledOn, _ = snap.Data()["plan_reconciled_on"].(string)
+	st.Rev, _ = snap.Data()["plan_rev"].(int64)
 	return st, nil
 }
 
-func (s *Store) SetState(ctx context.Context, uid string, st plan.State) error {
+func (s *Store) SetState(ctx context.Context, uid string, st plan.State) (int64, error) {
 	var hour, minute any // nil: chưa chọn giờ
 	if st.BuyHour != nil {
 		hour = int64(*st.BuyHour)
@@ -126,13 +128,33 @@ func (s *Store) SetState(ctx context.Context, uid string, st plan.State) error {
 			minute = int64(*st.BuyMinute)
 		}
 	}
-	_, err := s.planStateDoc(ctx, uid).Update(ctx, []firestore.Update{{Path: "plan_state", Value: map[string]any{
-		"buy_date": st.BuyDate, "buy_hour": hour, "buy_minute": minute, "trip_note": st.TripNote, "updated_at": time.Now(),
-	}}})
+	ref := s.planStateDoc(ctx, uid)
+	var rev int64
+	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if err != nil {
+			return err // không có tài liệu: Update bên dưới cũng sẽ lỗi NotFound như trước
+		}
+		cur, _ := snap.Data()["plan_rev"].(int64)
+		if st.BaseRev != nil && *st.BaseRev != cur {
+			return apperr.New(apperr.CodeConflict, "Kế hoạch vừa được sửa trên máy khác. Mimi đã tải lại bản mới, mẹ xem rồi sửa lại nhé.").
+				With("rev", cur)
+		}
+		rev = cur + 1
+		return tx.Update(ref, []firestore.Update{
+			{Path: "plan_state", Value: map[string]any{
+				"buy_date": st.BuyDate, "buy_hour": hour, "buy_minute": minute, "trip_note": st.TripNote, "updated_at": time.Now(),
+			}},
+			{Path: "plan_rev", Value: rev},
+		})
+	})
 	if err != nil {
-		return fmt.Errorf("plan set state: %w", err)
+		if ae := (*apperr.Error)(nil); errors.As(err, &ae) {
+			return 0, ae
+		}
+		return 0, fmt.Errorf("plan set state: %w", err)
 	}
-	return nil
+	return rev, nil
 }
 
 // Prices đọc các lần mua gần nhất của từng nhóm (index purchases group_key + habit +
