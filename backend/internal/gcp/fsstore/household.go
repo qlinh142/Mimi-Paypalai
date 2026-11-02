@@ -221,6 +221,9 @@ func decodeAssignment(d *firestore.DocumentSnapshot) household.Assignment {
 	a.Status, _ = m["status"].(string)
 	a.Note, _ = m["note"].(string)
 	a.CreatedAt, _ = m["created_at"].(time.Time)
+	if t, ok := m["updated_at"].(time.Time); ok {
+		a.UpdatedAt = &t
+	}
 	if t, ok := m["closed_at"].(time.Time); ok {
 		a.ClosedAt = &t
 	}
@@ -274,6 +277,112 @@ func (s *Store) CreateAssignment(ctx context.Context, hid string, a household.As
 		return household.Assignment{}, err
 	}
 	return a, nil
+}
+
+// UpdateAssignment ghi đè bản đã gửi của một vòng còn mở (B5). Trong cùng transaction: món mới
+// chuyển assigned, món bị bỏ trả về open, tên và số lượng lấy lại từ dòng Kế hoạch hiện tại.
+func (s *Store) UpdateAssignment(ctx context.Context, hid string, a household.Assignment) (household.Assignment, error) {
+	if hid == "" || a.ID == "" || len(a.ID) > 80 {
+		return household.Assignment{}, apperr.ErrNotFound
+	}
+	ref := s.household(hid).Collection("shopping_assignments").Doc(a.ID)
+	col := s.planItems(a.OwnerUID, a.PlanID)
+	var out household.Assignment
+	err := s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if isNotFound(err) {
+			return apperr.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		cur := decodeAssignment(snap)
+		if cur.OwnerUID != a.OwnerUID {
+			return apperr.ErrForbidden
+		}
+		if !cur.Active() {
+			return apperr.New(apperr.CodeInvalidState, "Vòng mua hộ này đã kết thúc.").With("status", cur.Status)
+		}
+		want := map[string]bool{}
+		var keys []string
+		for _, it := range a.Items {
+			if it.Status == "assigned" {
+				want[it.Key] = true
+				keys = append(keys, it.Key)
+			}
+		}
+		var dropped []string
+		for _, it := range cur.Items {
+			if it.Status == "assigned" && !want[it.Key] {
+				dropped = append(dropped, it.Key)
+			}
+		}
+		refs := make([]*firestore.DocumentRef, 0, len(keys)+len(dropped))
+		for _, k := range append(append([]string{}, keys...), dropped...) {
+			refs = append(refs, col.Doc(k))
+		}
+		snaps, err := tx.GetAll(refs)
+		if err != nil {
+			return err
+		}
+		lines := map[string]map[string]any{}
+		for _, sn := range snaps {
+			if sn.Exists() {
+				lines[sn.Ref.ID] = sn.Data()
+			}
+		}
+		mine := func(m map[string]any) bool { return m["status"] == "assigned" && m["assignment_id"] == a.ID }
+		now := time.Now()
+		for i, it := range a.Items {
+			if it.Status != "assigned" {
+				continue
+			}
+			m := lines[it.Key]
+			if m == nil || (m["status"] != "open" && !mine(m)) {
+				return apperr.New(apperr.CodeInvalidState, "Có món không còn mở trong Kế hoạch.").With("key", it.Key)
+			}
+			a.Items[i].Qty = asFloat(m["qty"])
+			if n, _ := m["name"].(string); n != "" {
+				a.Items[i].Name = n
+			}
+			a.Items[i].Unit, _ = m["unit"].(string)
+			if m["status"] == "open" {
+				if err := tx.Update(col.Doc(it.Key), []firestore.Update{
+					{Path: "status", Value: "assigned"}, {Path: "assigned_to_uid", Value: cur.BuyerUID},
+					{Path: "assignment_id", Value: a.ID}, {Path: "updated_at", Value: now},
+				}); err != nil {
+					return err
+				}
+			}
+		}
+		for _, k := range dropped {
+			if m := lines[k]; m != nil && mine(m) {
+				if err := tx.Update(col.Doc(k), []firestore.Update{
+					{Path: "status", Value: "open"}, {Path: "assigned_to_uid", Value: nil},
+					{Path: "assignment_id", Value: nil}, {Path: "updated_at", Value: now},
+				}); err != nil {
+					return err
+				}
+			}
+		}
+		at := now
+		if a.UpdatedAt != nil {
+			at = *a.UpdatedAt
+		}
+		if err := tx.Update(ref, []firestore.Update{
+			{Path: "items", Value: assignmentItemsDoc(a.Items)}, {Path: "note", Value: a.Note}, {Path: "updated_at", Value: at},
+		}); err != nil {
+			return err
+		}
+		out = cur
+		out.Items, out.Note, out.UpdatedAt = a.Items, a.Note, &at
+		sort.Slice(out.Items, func(i, j int) bool { return out.Items[i].Key < out.Items[j].Key })
+		return nil
+	})
+	if err != nil {
+		return household.Assignment{}, err
+	}
+	return out, nil
 }
 
 // readReturns đọc dòng Kế hoạch của các món còn assigned trong những vòng sắp hủy.

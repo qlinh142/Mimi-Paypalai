@@ -405,7 +405,7 @@ export type AssignmentItem = { consumption_group_key: string; name_display: stri
 export type Assignment = {
   assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string;
   plan_id: string; status: "assigned" | "shopping" | "completed" | "closed_partial" | "cancelled" | "declined"; note?: string;
-  items: AssignmentItem[]; created_at: string;
+  items: AssignmentItem[]; created_at: string; updated_at?: string;
   /** Tên, thời gian, ghi chú của Plan gốc, luôn là bản mới nhất (3.1 mục 3B.4). */
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string };
 };

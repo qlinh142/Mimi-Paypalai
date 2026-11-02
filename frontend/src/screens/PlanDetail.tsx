@@ -108,7 +108,8 @@ function Detail({ id }: { id: string }) {
           };
           if (!buyerName) return done(m15.plan.saved);
           // Gửi cho người mua: lần đầu là gửi, các lần sau là cập nhật (gửi tuần tự, Spec 1.5 mục 1).
-          const keys = cart.items.filter((i) => i.line_status !== "assigned").map((i) => i.key);
+          // B5: gửi cả danh sách hiện tại; máy chủ ghi đè bản đã gửi, món đã bỏ khỏi kế hoạch trả về.
+          const keys = cart.items.map((i) => i.key);
           if (keys.length === 0) return done(sentTo ? m15.plan.updated(buyerName) : m15.plan.saved);
           assign.mutate({ buyer_uid: buyer, keys }, { onSuccess: () => done(sentTo ? m15.plan.updated(buyerName) : m15.plan.sent(buyerName)) });
         },

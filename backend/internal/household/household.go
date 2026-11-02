@@ -63,18 +63,20 @@ type AssignmentItem struct {
 
 // Assignment là một vòng mua hộ.
 type Assignment struct {
-	ID               string           `json:"assignment_id"`
-	OwnerUID         string           `json:"owner_uid"`
-	OwnerName        string           `json:"owner_display_name"`
-	BuyerUID         string           `json:"buyer_uid"`
-	BuyerName        string           `json:"buyer_display_name"`
-	PlanID           string           `json:"plan_id"`
-	Status           string           `json:"status"` // assigned | shopping | completed | closed_partial | cancelled | declined
-	Note             string           `json:"note,omitempty"`
-	Items            []AssignmentItem `json:"items"`
-	CreatedAt        time.Time        `json:"created_at"`
-	ClosedAt         *time.Time       `json:"closed_at,omitempty"`
-	MatchedReceiptID string           `json:"matched_receipt_id,omitempty"`
+	ID        string           `json:"assignment_id"`
+	OwnerUID  string           `json:"owner_uid"`
+	OwnerName string           `json:"owner_display_name"`
+	BuyerUID  string           `json:"buyer_uid"`
+	BuyerName string           `json:"buyer_display_name"`
+	PlanID    string           `json:"plan_id"`
+	Status    string           `json:"status"` // assigned | shopping | completed | closed_partial | cancelled | declined
+	Note      string           `json:"note,omitempty"`
+	Items     []AssignmentItem `json:"items"`
+	CreatedAt time.Time        `json:"created_at"`
+	// UpdatedAt: lần cuối người nhờ gửi bản cập nhật (B5). Không có khi chưa cập nhật lần nào.
+	UpdatedAt        *time.Time `json:"updated_at,omitempty"`
+	ClosedAt         *time.Time `json:"closed_at,omitempty"`
+	MatchedReceiptID string     `json:"matched_receipt_id,omitempty"`
 	// Trip: tên, thời gian, ghi chú của Plan gốc, đọc mới mỗi lần (3.1 mục 3B.4, 3B.5:
 	// người nhận luôn thấy bản mới nhất, không phải bản sao). Chỉ có ở danh sách to_me.
 	Trip *Trip `json:"trip,omitempty"`
@@ -108,6 +110,10 @@ type Store interface {
 	// CreateAssignment đánh dấu các dòng Kế hoạch đang mở là assigned và tạo vòng mua hộ
 	// trong một transaction. Dòng không còn mở trả apperr.CodeInvalidState.
 	CreateAssignment(ctx context.Context, hid string, a Assignment) (Assignment, error)
+	// UpdateAssignment thay danh sách món đã gửi của một vòng còn mở bằng bản mới (B5): món mới
+	// chuyển assigned, món bị bỏ trả về open, món đã mua giữ nguyên. Vòng đã kết thúc trả
+	// apperr.CodeInvalidState.
+	UpdateAssignment(ctx context.Context, hid string, a Assignment) (Assignment, error)
 	// CancelAssignment: vòng còn mở → cancelled, món trả về open (Case 4).
 	CancelAssignment(ctx context.Context, hid, id, ownerUID string) (Assignment, error)
 	// EndByBuyer: người được nhờ kết thúc vòng (declined, hoặc closed_partial khi không mua
@@ -346,6 +352,22 @@ func (s *Service) Assign(ctx context.Context, p authz.Principal, req AssignReque
 	if err != nil {
 		return Assignment{}, err
 	}
+	// B5: một Kế hoạch chỉ có hai bản: bản đang lưu (Plan) và bản đã gửi người mua (vòng mua hộ
+	// còn mở). Gửi lại thì ghi đè bản đã gửi, không tạo thêm vòng mới.
+	cur, err := s.activeFor(ctx, p.HouseholdID, p.UID, planID)
+	if err != nil {
+		return Assignment{}, err
+	}
+	if cur != nil && cur.BuyerUID != req.BuyerUID {
+		// Đổi người mua: hủy bản đã gửi người cũ (món trả về Kế hoạch) rồi gửi người mới.
+		if _, err := s.store.CancelAssignment(ctx, p.HouseholdID, cur.ID, p.UID); err != nil {
+			return Assignment{}, err
+		}
+		cur = nil
+	}
+	if cur != nil {
+		return s.update(ctx, p, *cur, keys, note)
+	}
 	a := Assignment{
 		ID:       "trip-" + strings.ToLower(newCode()),
 		OwnerUID: p.UID, OwnerName: h.name(p.UID), BuyerUID: req.BuyerUID, BuyerName: h.name(req.BuyerUID),
@@ -360,6 +382,67 @@ func (s *Service) Assign(ctx context.Context, p authz.Principal, req AssignReque
 		a.Items = append(a.Items, it)
 	}
 	return s.store.CreateAssignment(ctx, p.HouseholdID, a)
+}
+
+// activeFor trả vòng mua hộ còn mở của Kế hoạch planID (nil khi không có).
+func (s *Service) activeFor(ctx context.Context, hid, owner, planID string) (*Assignment, error) {
+	list, err := s.store.Assignments(ctx, hid, "owner_uid", owner, 20)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range list {
+		if a.PlanID == planID && a.Active() {
+			return &a, nil
+		}
+	}
+	return nil, nil
+}
+
+// update ghi đè bản đã gửi bằng danh sách keys mới. Món đã mua giữ nguyên dấu "done"; món còn
+// trong bản mới giữ trạng thái và lấy lại tên, số lượng mới nhất từ Kế hoạch.
+func (s *Service) update(ctx context.Context, p authz.Principal, cur Assignment, keys []string, note string) (Assignment, error) {
+	old := map[string]AssignmentItem{}
+	for _, it := range cur.Items {
+		old[it.Key] = it
+	}
+	var fresh []string
+	for _, k := range keys {
+		if it, ok := old[k]; !ok || it.Status != "done" {
+			fresh = append(fresh, k)
+		}
+	}
+	info, err := s.plans.OpenLineInfo(ctx, p.UID, cur.PlanID, fresh)
+	if err != nil {
+		return Assignment{}, err
+	}
+	next := cur
+	next.Note, next.Items = note, nil
+	now := s.now()
+	next.UpdatedAt = &now
+	want := map[string]bool{}
+	for _, k := range keys {
+		want[k] = true
+		it, had := old[k]
+		if had && it.Status == "done" {
+			next.Items = append(next.Items, it)
+			continue
+		}
+		line, ok := info[k]
+		if !ok && !had {
+			return Assignment{}, apperr.New(apperr.CodeInvalidState, "Có món không còn mở trong Kế hoạch.").With("key", k)
+		}
+		if ok {
+			it.Name, it.Qty, it.Unit = line.Name, line.Qty, line.Unit
+		}
+		it.Key, it.Status = k, "assigned"
+		next.Items = append(next.Items, it)
+	}
+	for _, it := range cur.Items {
+		if !want[it.Key] && it.Status == "done" {
+			next.Items = append(next.Items, it) // đã mua rồi thì không bỏ được
+		}
+	}
+	return s.store.UpdateAssignment(ctx, p.HouseholdID, next)
 }
 
 func (s *Service) Cancel(ctx context.Context, p authz.Principal, id string) (Assignment, error) {

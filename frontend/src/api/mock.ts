@@ -701,7 +701,7 @@ let household: { id: string; name: string; members: { uid: string; display_name:
     { uid: "mock-me", display_name: L ? "Grandma" : "Bà", role: "member", joined_at: iso(today) },
   ],
 };
-type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string; qty?: number; unit?: string; unit_price?: number; category_key?: string }[]; created_at: string; note?: string;
+type MockAssignment = { assignment_id: string; owner_uid: string; owner_display_name: string; buyer_uid: string; buyer_display_name: string; plan_id: string; status: string; items: { consumption_group_key: string; name_display: string; status: string; qty?: number; unit?: string; unit_price?: number; category_key?: string }[]; created_at: string; updated_at?: string; note?: string;
   trip?: { plan_name: string; buy_date?: string; buy_hour?: number; buy_minute?: number; trip_note?: string } };
 // Spec 1.5 mục 2: một lần nhờ Minh mua đang dở, để thấy màn mẹ xem kết quả (tiến độ, ghi chú).
 const assignments: MockAssignment[] = [{
@@ -950,6 +950,16 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
     const buyer = household.members.find((m) => m.uid === b.buyer_uid);
     if (!buyer || buyer.uid === ME) return json({ code: "forbidden", message: "buyer" }, 403);
     return inPlan(b.plan_id ?? null, () => {
+      // B5: kế hoạch đang gửi cho cùng người thì ghi đè bản đã gửi.
+      const cur = assignments.find((x) => x.plan_id === (b.plan_id ?? "default") && x.buyer_uid === buyer.uid && (x.status === "assigned" || x.status === "shopping"));
+      if (cur) {
+        const done = cur.items.filter((i) => i.status === "done");
+        for (const i of cur.items) if (i.status === "assigned" && !b.keys.includes(i.consumption_group_key)) planLines.set(i.consumption_group_key, { ...planLines.get(i.consumption_group_key), line_status: "open", assigned_to_uid: undefined });
+        cur.items = [...done, ...b.keys.filter((k) => !done.some((d) => d.consumption_group_key === k)).map((k) => ({ consumption_group_key: k, name_display: items.find((i) => i.key === k)?.name ?? extraNames.get(k) ?? k, status: "assigned" as const }))];
+        cur.updated_at = new Date().toISOString();
+        for (const k of b.keys) planLines.set(k, { ...planLines.get(k), line_status: "assigned", assigned_to_uid: buyer.uid });
+        return json(cur, 201);
+      }
       const a: MockAssignment = {
         assignment_id: `trip-${Date.now()}`, owner_uid: ME, owner_display_name: "Lan", buyer_uid: buyer.uid, buyer_display_name: buyer.display_name,
         plan_id: b.plan_id ?? "default", status: "assigned", created_at: new Date().toISOString(),

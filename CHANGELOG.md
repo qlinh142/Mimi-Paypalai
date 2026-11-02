@@ -5,6 +5,21 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Kế hoạch giữ tối đa 2 bản (B5)
+
+- Trước đây mỗi lần bấm máy bay giấy lại tạo thêm một lần nhờ mua chỉ gồm món mới, nên người mua thấy nhiều thẻ cho cùng một kế hoạch, còn món mẹ bỏ đi vẫn nằm trong bản cũ.
+- Giờ mỗi kế hoạch chỉ có hai bản: bản mẹ đang lưu và bản đã gửi người mua. Gửi lại thì ghi đè bản đã gửi:
+  - món mới thêm vào, món mẹ bỏ trả về kế hoạch, món đã mua giữ nguyên;
+  - tên và số lượng lấy theo kế hoạch hiện tại;
+  - người mua thấy "Mẹ đã cập nhật kế hoạch lúc 10:32". Món còn trong bản mới giữ dấu tick và chỗ đã sửa.
+- Đổi người mua thì bản đã gửi người cũ bị hủy, món về lại kế hoạch rồi gửi người mới. Người mua đã bấm "Mua hàng xong" thì lần gửi sau là lần nhờ mua mới.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestAssignKeepsTwoVersions`.
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Chia hóa đơn theo từng người (B4)
 
 - Trước đây cả hóa đơn cộng vào Sổ chi tiêu của người quét, kể cả món mua hộ.
