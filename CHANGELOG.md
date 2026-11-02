@@ -5,6 +5,15 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ
+
+Nhánh `fix/quet-hoa-don-that`.
+
+- Thử trên mimi-1-5 với bill GO! rõ nét, app báo "Mimi chưa đọc được hóa đơn này. Chụp lại rõ hơn".
+- Nguyên nhân nghi nhiều nhất: schema gửi Gemini có `category_key` với enum chứa chuỗi rỗng, Vertex AI từ chối (400). Mọi lỗi 4xx của AI lại bị xếp thành "ảnh không đọc được".
+- Sửa: bỏ chuỗi rỗng khỏi enum; lỗi 400/403/404 từ AI thành `ai_unavailable` ("thử lại sau hoặc nhập tay"), không bảo chụp lại, không thử lại; log `receipt read` ghi thêm `cause` (lời Google trả về) để lần sau thấy ngay.
+- Kiểm tra: `TestSchemaEnumsHaveNoEmptyValue`, `TestClassify`, test service mới; chạy lại trên mimi-1-5 với bill thật.
+
 ## 2026-11-02 · Bật App Check (reCAPTCHA Enterprise)
 
 Nhánh `deploy/app-check`, xếp chồng lên PR #36.

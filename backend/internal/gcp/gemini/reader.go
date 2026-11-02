@@ -84,7 +84,8 @@ type output struct {
 
 func (r *Reader) schema() *genai.Schema {
 	str := func(desc string) *genai.Schema { return &genai.Schema{Type: genai.TypeString, Description: desc} }
-	categories := append([]string{""}, r.taxonomy...)
+	// Vertex AI từ chối enum có chuỗi rỗng; category_key không bắt buộc nên model bỏ trống bằng cách không trả.
+	categories := append([]string{}, r.taxonomy...)
 	group := str("product group key, lowercase, hyphen-separated; khac if none fits")
 	if len(r.groups) > 0 {
 		group = &genai.Schema{Type: genai.TypeString, Description: "product group from taxonomy 0.2; khac if none fits", Enum: append(append([]string{}, r.groups...), "khac")}
@@ -170,7 +171,8 @@ func (r *Reader) ReadPage(ctx context.Context, img receipt.Image, lang string) (
 	return page, nil
 }
 
-// classify: 429 and 5xx are transient errors (retry once); otherwise treat the receipt as unreadable.
+// classify: 429 and 5xx are transient errors (retry once); other API errors mean the request itself
+// was rejected (schema, permission, model), which is not the photo's fault.
 func classify(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("gemini: timeout: %w", receipt.ErrTransient)
@@ -180,7 +182,8 @@ func classify(err error) error {
 		if apiErr.Code == http.StatusTooManyRequests || apiErr.Code >= 500 {
 			return fmt.Errorf("gemini: %d: %w", apiErr.Code, receipt.ErrTransient)
 		}
-		return fmt.Errorf("gemini: %d: %w", apiErr.Code, receipt.ErrUnreadable)
+		// 400/403/404: yêu cầu sai hoặc thiếu quyền, không phải ảnh mờ. Giữ lời Google trả về để xem trong log.
+		return fmt.Errorf("gemini: %d %s: %w", apiErr.Code, apiErr.Message, receipt.ErrAIRejected)
 	}
 	return fmt.Errorf("gemini: %v: %w", err, receipt.ErrTransient)
 }
