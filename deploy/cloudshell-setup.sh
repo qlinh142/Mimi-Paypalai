@@ -61,6 +61,7 @@ sched() { # tên job, cron
 }
 sched fx-sync "0 6 * * *"
 sched cleanup "0 3 * * *"
+echo "  chạy tỷ giá lần đầu"; gcloud run jobs execute mimi-job-fx-sync --region "$REGION" --wait --quiet >/dev/null || echo "  (chưa lấy được tỷ giá, 6h sáng mai lịch sẽ chạy lại)"
 
 say "5/7 Cấu hình web Firebase cho frontend"
 TOKEN="$(gcloud auth print-access-token)"
