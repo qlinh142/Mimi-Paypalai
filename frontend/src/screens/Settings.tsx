@@ -257,6 +257,18 @@ export function SettingsLanguage() {
           <input value="VND (đ)" readOnly aria-readonly="true" className="set15__ro" />
         </label>
         <label className="field15">
+          <span>{S.country}</span>
+          <select
+            className="pick15"
+            value={me?.settings.country ?? (tz === "Asia/Singapore" ? "SG" : "VN")}
+            disabled={!me || save.isPending}
+            onChange={(e) => save.mutate({ country: e.target.value as "VN" | "SG" })}
+          >
+            <option value="VN">{S.countryName.VN}</option>
+            <option value="SG">{S.countryName.SG}</option>
+          </select>
+        </label>
+        <label className="field15">
           <span>{S.tz}</span>
           <select className="pick15" value={tz} disabled={!me || save.isPending} onChange={(e) => save.mutate({ timezone: e.target.value })}>
             {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}

@@ -275,8 +275,10 @@ export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: SettingsPatch) => apiSend<Record<string, unknown>>("PUT", "/settings", patch),
-    onSuccess: () => {
+    onSuccess: (_d, patch) => {
       qc.invalidateQueries({ queryKey: qk.me });
+      // Đổi nước thì bảng giá online đổi theo nước.
+      if (patch.country) qc.invalidateQueries({ queryKey: ["plan", "market-prices"] });
       qc.invalidateQueries({ queryKey: qk.home });
       qc.invalidateQueries({ queryKey: qk.items() });
     },
