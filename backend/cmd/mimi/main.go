@@ -256,7 +256,7 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		}
 		var rs *receipt.Service
 		// Thiếu WithTaxonomy thì mọi danh mục bị coi là chưa phân loại và không vào tồn kho.
-		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(loadTaxonomy())); err == nil {
+		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(groupTaxonomy.SpendingKeys())); err == nil {
 			var n int
 			n, err = demo.Seed(ctx, rs, uid, time.Now())
 			log.InfoContext(ctx, "seed-demo done", "receipts", n)
