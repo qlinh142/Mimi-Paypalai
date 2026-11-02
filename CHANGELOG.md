@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Món chưa có giá và giá ước tính (B7)
+
+- Mỗi dòng hóa đơn ghi thêm nguồn giá `price_source`: `receipt` (in trên hóa đơn), `manual` (người đi mua tự nhập), `estimate` (ước tính), `missing` (chưa có giá). Giá trị `online` đã có chỗ trong dữ liệu, để dành cho phần quét giá online ở bước 13.
+- Đi mua hộ không có hóa đơn mà không nhập giá: lấy giá mua gần nhất của món đó, ghi "Ước tính". Món của người nhờ theo giá người nhờ từng mua, món của mình theo giá của mình.
+- Món chưa từng có giá thì để là chưa có giá: không tính 0đ vào tổng, màn Chi tiết hóa đơn hiện "chưa có giá" và đếm số món cần nhập sau.
+- Có quét hóa đơn thì không ước tính, giá theo hóa đơn.
+- Hóa đơn cũ không có `price_source`: đọc như trước.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestCompletePriceSources`, `TestLatestUnitPrices`, "price source is validated" trong `TestSave`.
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Món chưa mua tự sang kế hoạch "· còn lại" (B6)
 
 - Khi một kế hoạch được chốt (người mua bấm "Mua hàng xong", hoặc mẹ xác nhận hóa đơn trừ vào kế hoạch đó), món còn mở chuyển sang kế hoạch mới tên "[tên cũ] · còn lại".

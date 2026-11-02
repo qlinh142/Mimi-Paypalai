@@ -30,6 +30,7 @@ func histLine(m map[string]any) history.Line {
 	l.Store, _ = m["store"].(string)
 	l.PurchasedOn, _ = m["purchased_on"].(string)
 	l.AssignmentID, _ = m["assignment_id"].(string)
+	l.PriceSource, _ = m["price_source"].(string)
 	if ps, ok := m["plans"].([]any); ok {
 		l.PlanSet = true
 		for _, x := range ps {

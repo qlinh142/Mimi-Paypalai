@@ -185,7 +185,10 @@ export function ReceiptDetailScreen() {
                           {l.name}{l.spec ? ` ${l.spec}` : ""}
                           {l.tag && <span className={`tag15 ${l.tag === "mine" ? "tag15--buyer" : "tag15--bought"}`}>{l.tag === "mine" ? m15.run.mineShort : m15.run.forOwner(r.split?.owner_name ?? "")}</span>}
                         </span>
-                        <span className="line15__sub">{l.qty} × {vndOrNone(l.unit_price)}</span>
+                        <span className="line15__sub">
+                          {l.qty} × {vndOrNone(l.unit_price)}
+                          {l.price_source === "estimate" && <span className="tag15 tag15--draft">{m15.plan.estimated}</span>}
+                        </span>
                       </span>
                       <span className="num run15__total" style={l.amount == null ? { opacity: 0.55 } : undefined}>{vndOrNone(l.amount)}</span>
                     </div>

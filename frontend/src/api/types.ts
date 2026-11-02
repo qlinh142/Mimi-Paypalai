@@ -243,7 +243,9 @@ export type HistoryReceipt = {
   recurring_id?: string;
 };
 /** unit_price, amount null: món chưa rõ giá, không tính vào tổng. */
-export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
+export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine";
+  /** B7: estimate = không nhập giá, lấy giá mua gần nhất; missing = chưa có giá. "online" để dành cho bước 13. */
+  price_source?: "receipt" | "manual" | "estimate" | "missing" | "online" };
 export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };
 export type ReceiptSummary = { receipt_id: string; store?: string; purchased_on: string; total_vnd: number; discount_vnd: number; delegated?: boolean };
 export type SpendingReport = {

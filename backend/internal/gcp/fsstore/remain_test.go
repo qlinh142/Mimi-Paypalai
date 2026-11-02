@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/smartlife-lab/mimi/backend/internal/domain"
 )
 
 func TestRemainName(t *testing.T) {
@@ -75,5 +77,18 @@ func TestSplitRemainingEmulator(t *testing.T) {
 	// Kế hoạch chính không tách.
 	if sp, _ := s.SplitRemaining(ctx, uid, "default", now); sp != nil {
 		t.Fatal("default plan must not split")
+	}
+}
+
+func TestLatestUnitPrices(t *testing.T) {
+	d1, _ := domain.ParseDate("2026-10-01")
+	d2, _ := domain.ParseDate("2026-10-20")
+	got := latestUnitPrices([]domain.LastPrice{
+		{GroupKey: "sua", Store: "A", Unit: 30000, On: d1},
+		{GroupKey: "sua", Store: "B", Unit: 32000, On: d2},
+		{GroupKey: "gao", Store: "A", Unit: 0, On: d2},
+	})
+	if got["sua"] != 32000 || len(got) != 1 {
+		t.Fatalf("%v", got)
 	}
 }

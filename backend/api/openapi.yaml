@@ -899,6 +899,7 @@ components:
                 maxItems: 11
                 description: "B3: Kế hoạch mà dòng trừ vào, theo thứ tự đã chia; vắng thì theo source_plan_id, mảng rỗng là không trừ"
                 items: { type: object, additionalProperties: false, properties: { plan_id: { type: string }, qty: { type: number, minimum: 0 } } }
+              price_source: { type: string, enum: [receipt, manual, estimate], description: "B7: nguồn giá; vắng là receipt. Dòng không có giá luôn lưu là missing. Giá trị online để dành cho giá quét online (bước 13)" }
     SaveResult:
       type: object
       properties:

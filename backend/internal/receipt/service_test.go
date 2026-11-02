@@ -292,6 +292,31 @@ func TestSave(t *testing.T) {
 		if got.TotalVND != 138000 || len(got.Lines) != 3 || got.Lines[2].VND != nil {
 			t.Fatalf("saved %+v", got)
 		}
+		// B7: nguồn giá của từng dòng.
+		if got.Lines[0].PriceSource != PriceReceipt || got.Lines[2].PriceSource != PriceMissing {
+			t.Fatalf("price source %q %q", got.Lines[0].PriceSource, got.Lines[2].PriceSource)
+		}
+	})
+
+	// B7: chỉ nhận receipt | manual | estimate; giá online để dành, chưa nhận từ app.
+	t.Run("price source is validated", func(t *testing.T) {
+		st := &fakeStore{saved: map[string]Receipt{}}
+		s := newSvc(t, nil, &fakeQuota{}, st)
+		r := req
+		r.ReceiptID = "r-14"
+		r.Lines = append([]SaveLine(nil), req.Lines...)
+		r.Lines[0].PriceSource = PriceEstimate
+		if _, err := s.Save(context.Background(), owner, r); err != nil {
+			t.Fatal(err)
+		}
+		if got := st.saved["r-14"].Lines[0].PriceSource; got != PriceEstimate {
+			t.Fatalf("got %q", got)
+		}
+		r.ReceiptID = "r-15"
+		r.Lines[0].PriceSource = PriceOnline
+		if _, err := s.Save(context.Background(), owner, r); apperr.From(err).Code != apperr.CodeValidation {
+			t.Fatalf("online must be rejected for now, got %v", err)
+		}
 	})
 
 	// B3: mỗi dòng mang danh sách Kế hoạch nó trừ vào.
