@@ -5,6 +5,18 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Giới hạn số lần ghi dùng chung giữa các máy chủ (A5)
+
+- Trước đây mỗi máy chủ (instance Cloud Run) tự đếm 60 thao tác ghi mỗi phút cho mỗi người. Chạy 3 instance thì một người ghi được tới 180 lần.
+- Giờ bộ đếm nằm trên Firestore (`users/{uid}/rate/{phút}`), mọi instance cùng đọc ghi trong một transaction, nên tổng vẫn là 60.
+- Bộ đếm tại chỗ vẫn chạy trước để chặn ngay lượt vượt rõ ràng, không tốn lượt ghi Firestore. Firestore lỗi thì không chặn người dùng, bộ đếm tại chỗ vẫn giữ giới hạn.
+- `firestore.indexes.json` thêm TTL cho `rate.expire_at` (10 phút sau phút đếm). Lúc deploy cần `firebase deploy --only firestore:indexes` để bật TTL.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestAllowWriteSharedAcrossInstances`, `TestRateLimiterSharedEmulator` (chạy khi có emulator).
+
+---
+
 ## 2026-11-02 · Hợp đồng API: sinh kiểu từ OpenAPI, CI báo khi lệch (A3)
 
 - `frontend/src/api/schema.d.ts` sinh từ `backend/api/openapi.yaml` (`npm run gen:api`) và được commit. CI chạy lại lệnh này; file sinh ra khác bản đã commit thì CI đỏ.
