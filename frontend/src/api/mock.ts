@@ -212,6 +212,15 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
 async function mockCore(method: string, url: URL, init: RequestInit): Promise<Response> {
   const p = url.pathname;
 
+  // B10: như máy chủ, chỉ xóa khi vừa "đăng nhập lại" trong 5 phút (khóa MOCK_REAUTH_KEY ở lib/auth).
+  if (method === "DELETE" && p === "/me") {
+    const at = Number(sessionStorage.getItem("mimi.mock.reauthAt") ?? 0);
+    if (Date.now() - at > 5 * 60_000) {
+      return json({ code: "reauth_required", message: L ? "Please sign in again to confirm deleting your account." : "Mẹ đăng nhập lại để xác nhận xóa tài khoản nhé." }, 403);
+    }
+    sessionStorage.removeItem("mimi.mock.reauthAt");
+    return new Response(null, { status: 204 });
+  }
   if (method === "GET" && p === "/me") {
     const me: Me = {
       uid: "mock-uid",

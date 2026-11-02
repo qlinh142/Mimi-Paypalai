@@ -472,6 +472,11 @@ export function useRecurringActions() {
 /** 4.1: nhà, mã mời, thành viên. */
 export const useHousehold = () => useQuery({ queryKey: qk.household, queryFn: () => apiGet<Household>("/households") });
 
+/** B10: xóa tài khoản. 403 reauth_required nghĩa là cần đăng nhập lại rồi gọi lại. */
+export function useDeleteAccount() {
+  return useMutation({ mutationFn: () => apiSend<void>("DELETE", "/me") });
+}
+
 export function useHouseholdActions() {
   const qc = useQueryClient();
   const done = () => {

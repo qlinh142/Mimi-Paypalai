@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
@@ -380,4 +381,30 @@ func (s *Server) markNotificationRead(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) notImplemented(w http.ResponseWriter, r *http.Request) {
 	s.writeError(w, r, apperr.New(apperr.CodeNotImplemented, "Chức năng này chưa có trên máy chủ."))
+}
+
+// reauthWindow: xóa tài khoản chỉ nhận token của lần đăng nhập trong khoảng này (B10).
+// App passwordless nên "nhập lại mật khẩu" là đăng nhập lại bằng Google hoặc link email.
+const reauthWindow = 5 * time.Minute
+
+func (s *Server) deleteMe(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	p := principalFrom(ctx)
+	raw, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	uid, at, err := s.signIn.SignedInAt(ctx, raw)
+	if err != nil || uid != p.UID {
+		// Token bị thu hồi (đổi mật khẩu, đăng xuất mọi máy) cũng rơi vào đây.
+		s.writeError(w, r, apperr.Wrap(apperr.CodeReauthRequired, "Mẹ đăng nhập lại để xác nhận xóa tài khoản nhé.", err))
+		return
+	}
+	if time.Since(at) > reauthWindow {
+		s.writeError(w, r, apperr.New(apperr.CodeReauthRequired, "Mẹ đăng nhập lại để xác nhận xóa tài khoản nhé."))
+		return
+	}
+	if err := s.accounts.Delete(ctx, p); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	s.log.InfoContext(ctx, "account deleted", "uid", p.UID)
+	w.WriteHeader(http.StatusNoContent)
 }

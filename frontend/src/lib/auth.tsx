@@ -5,6 +5,10 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   signInWithRedirect,
+  reauthenticateWithRedirect,
+  reauthenticateWithCredential,
+  getRedirectResult,
+  EmailAuthProvider,
   GoogleAuthProvider,
   signOut as fbSignOut,
   type User,
@@ -28,11 +32,21 @@ type AuthCtx = {
   signOut: () => Promise<void>;
   idToken: () => Promise<string | null>;
   pendingDisplayName: () => string | null;
+  /**
+   * B10: đăng nhập lại để xác nhận thao tác nhạy cảm (xóa tài khoản). App không có mật khẩu
+   * nên "nhập lại mật khẩu" là đăng nhập lại bằng Google (chuyển trang) hoặc link email.
+   * returnPath là trang quay về sau khi đăng nhập lại.
+   */
+  startReauth: (returnPath: string) => Promise<"redirecting" | "link_sent" | "done">;
+  /** Gọi khi mở trang returnPath: hoàn tất đăng nhập lại nếu vừa quay về từ Google hoặc link. */
+  completeReauthIfPresent: () => Promise<"none" | "ok" | "expired">;
 };
 
 const EMAIL_KEY = "mimi.emailForSignIn";
 const NAME_KEY = "mimi.pendingDisplayName";
 const MOCK_KEY = "mimi.mock.session";
+/** Chế độ mẫu: lúc "đăng nhập lại" gần nhất, để mock DELETE /me kiểm tra như máy chủ. */
+export const MOCK_REAUTH_KEY = "mimi.mock.reauthAt";
 const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -116,6 +130,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         await fbSignOut(firebase()!.auth);
+      },
+
+      async startReauth(returnPath) {
+        if (!live) {
+          sessionStorage.setItem(MOCK_REAUTH_KEY, String(Date.now()));
+          return "done";
+        }
+        const u = firebase()!.auth.currentUser;
+        if (!u) throw new Error("not signed in");
+        if (u.providerData.some((p) => p.providerId === "google.com")) {
+          await reauthenticateWithRedirect(u, new GoogleAuthProvider());
+          return "redirecting";
+        }
+        if (!u.email) throw new Error("no email");
+        localStorage.setItem(EMAIL_KEY, u.email);
+        await sendSignInLinkToEmail(firebase()!.auth, u.email, { url: `${location.origin}${returnPath}`, handleCodeInApp: true });
+        return "link_sent";
+      },
+
+      async completeReauthIfPresent() {
+        if (!live) return "none";
+        const { auth } = firebase()!;
+        const u = auth.currentUser;
+        if (!u) return "none";
+        const link = location.href;
+        if (isSignInWithEmailLink(auth, link)) {
+          const email = localStorage.getItem(EMAIL_KEY) ?? u.email;
+          history.replaceState(null, "", location.pathname);
+          if (!email) return "expired";
+          try {
+            await reauthenticateWithCredential(u, EmailAuthProvider.credentialWithLink(email, link));
+            localStorage.removeItem(EMAIL_KEY);
+            return "ok";
+          } catch {
+            return "expired";
+          }
+        }
+        // Quay về từ Google: kết quả đăng nhập lại nằm ở getRedirectResult.
+        const r = await getRedirectResult(auth).catch(() => null);
+        return r ? "ok" : "none";
       },
 
       async idToken() {

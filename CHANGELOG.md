@@ -5,6 +5,21 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Xóa tài khoản, đăng nhập lại để xác nhận (B10)
+
+- Cài đặt → Quyền riêng tư & bảo mật có mục Xóa tài khoản. Bấm Xóa vĩnh viễn: nếu mẹ chưa đăng nhập lại trong 5 phút, Mimi mời đăng nhập lại (Google, hoặc link gửi về email rồi quay lại đúng trang này), sau đó mẹ bấm Xóa vĩnh viễn lần nữa.
+- App không dùng mật khẩu, nên "nhập lại mật khẩu" ở đây là đăng nhập lại. Máy chủ kiểm tra token chưa bị thu hồi và thời điểm đăng nhập (`auth_time`) trong 5 phút; không thì trả 403 `reauth_required` (không phải 401, để app không tự đăng xuất).
+- Máy chủ xóa theo thứ tự: chủ nhà thì mời từng người nhà ra (vòng mua hộ còn mở bị hủy, món trả về kế hoạch người nhờ) rồi xóa nhà; thành viên thì rời nhà. Sau đó xóa toàn bộ `users/{uid}`, rồi xóa tài khoản đăng nhập sau cùng. Lỗi giữa chừng thì gọi lại sẽ chạy tiếp.
+- Món mẹ đã mua hộ người nhà nằm trong sổ của họ nên vẫn giữ.
+- Xóa xong, app xóa dữ liệu trên máy và về màn Chào mừng.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestDeleteOwnerDissolvesHousehold`, `TestDeleteMemberOnlyLeaves`, `TestDeleteResumesAndStopsBeforeAuth`, `TestDeleteMeNeedsRecentSignIn`, `TestEraseUserEmulator` (chạy khi có emulator).
+- `npm run build` qua; chạy thử chế độ mẫu: bấm xóa thì được mời đăng nhập lại, đăng nhập lại rồi xóa thì về màn Chào mừng, không lỗi console.
+- Chưa thử với Firebase thật (chờ dựng dự án Firebase ở bước 13).
+
+---
+
 ## 2026-11-02 · Đọc giá nhiều món cùng lúc (A9)
 
 - Trước đây máy chủ đọc giá gần nhất và lịch sử giá lần lượt từng món: giỏ 20 món là 20 lượt đọc Firestore nối nhau, màn so sánh giá và giá ước tính chậm theo số món.

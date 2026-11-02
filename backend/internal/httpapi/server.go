@@ -32,6 +32,14 @@ type (
 	TokenVerifier interface {
 		VerifyIDToken(ctx context.Context, idToken string) (uid string, err error)
 	}
+	// Accounts xóa tài khoản và dữ liệu (B10). SignedInAt kiểm tra token kèm thu hồi và trả
+	// lúc đăng nhập gần nhất, để buộc vừa đăng nhập lại trước khi xóa.
+	Accounts interface {
+		Delete(ctx context.Context, p authz.Principal) error
+	}
+	SignInChecker interface {
+		SignedInAt(ctx context.Context, idToken string) (uid string, at time.Time, err error)
+	}
 	AppCheckVerifier interface {
 		VerifyAppCheck(ctx context.Context, token string) error
 	}
@@ -153,6 +161,8 @@ type Deps struct {
 	Households Households // nil: các route nhà trả 501
 	Pricing    Pricing    // nil: các route lịch sử giá trả 501
 	History    History    // nil: lịch sử mua hàng trả 404
+	Accounts   Accounts   // nil: DELETE /me trả 501
+	SignIn     SignInChecker
 	Ready      ReadinessChecker
 	Metrics    Metrics // nil: không ghi metric
 }
@@ -160,6 +170,8 @@ type Deps struct {
 type Server struct {
 	log        *slog.Logger
 	tokens     TokenVerifier
+	accounts   Accounts
+	signIn     SignInChecker
 	appCheck   AppCheckVerifier
 	principals PrincipalLoader
 	profiles   Profiles
@@ -203,7 +215,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		return nil, errors.New("httpapi: missing required dependency")
 	}
 	s := &Server{
-		log: d.Log, tokens: d.Tokens, appCheck: d.AppCheck, principals: d.Principals,
+		log: d.Log, tokens: d.Tokens, accounts: d.Accounts, signIn: d.SignIn, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
 		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, history: d.History,
@@ -316,6 +328,10 @@ func (s *Server) Handler() http.Handler {
 		private("POST /orders/{id}/refund", s.readTimeout, s.refundOrder)
 	}
 
+	if s.accounts != nil && s.signIn != nil {
+		private("DELETE /me", s.defaultTimeout, s.deleteMe)
+	}
+
 	// Các endpoint còn lại đã có trong api/openapi.yaml nhưng chưa dựng ở khung này.
 	for _, p := range notYetImplemented {
 		if s.implemented(p) {
@@ -333,6 +349,8 @@ func (s *Server) Handler() http.Handler {
 // implemented: route trong notYetImplemented đã có handler khi phụ thuộc tương ứng được nối.
 func (s *Server) implemented(p string) bool {
 	switch {
+	case p == "DELETE /me":
+		return s.accounts != nil && s.signIn != nil
 	case strings.Contains(p, "/recurring") || p == "GET /forecast":
 		return s.recurring != nil && p != "POST /recurring/scan"
 	case strings.Contains(p, "/households") && !strings.Contains(p, "/asks"):

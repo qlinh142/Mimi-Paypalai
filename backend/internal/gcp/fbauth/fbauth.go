@@ -6,6 +6,7 @@ package fbauth
 import (
 	"context"
 	"fmt"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/appcheck"
@@ -47,6 +48,16 @@ func (v *Verifier) VerifyIDToken(ctx context.Context, idToken string) (string, e
 		return "", err
 	}
 	return t.UID, nil
+}
+
+// SignedInAt kiểm tra token kèm cả thu hồi (gọi mạng) và trả lúc người dùng đăng nhập
+// gần nhất (auth_time). Dùng cho thao tác nhạy cảm như xóa tài khoản (B10).
+func (v *Verifier) SignedInAt(ctx context.Context, idToken string) (string, time.Time, error) {
+	t, err := v.auth.VerifyIDTokenAndCheckRevoked(ctx, idToken)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return t.UID, time.Unix(t.AuthTime, 0), nil
 }
 
 func (v *Verifier) VerifyAppCheck(_ context.Context, token string) error {
