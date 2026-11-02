@@ -9,6 +9,7 @@ import type { Assignment } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { formatVnd } from "../lib/text";
 import { useRelations } from "../lib/relation";
+import { LoadState } from "../components/LoadState";
 import { whenText } from "./PlanList";
 
 /** Một dòng trên danh sách đi mua. `mine` = món khác trên hóa đơn (khối "Của tôi"). */
@@ -81,7 +82,8 @@ export function ShoppingRun() {
   const a = d.data?.to_me.find((x) => x.assignment_id === id);
   const [doneView, setDoneView] = useState<DoneInfo | null>(null);
   if (doneView) return <Done {...doneView} />;
-  if (d.isPending) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><p className="hint">…</p></div></MainFrame>;
+  // A10: lỗi tải (mất mạng, máy chủ lỗi) khác với lần nhờ mua không còn nữa.
+  if (!a && (d.isPending || d.isError)) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><LoadState q={d} hasData={false} /></div></MainFrame>;
   if (!a) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><p className="hint">{m15.run.gone}</p></div></MainFrame>;
   return <RunList a={a} onDone={setDoneView} />;
 }

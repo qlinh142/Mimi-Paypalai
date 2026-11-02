@@ -11,6 +11,7 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { recurringTier } from "../components/RecurringList";
 import { goodsTier } from "../lib/displayUnit";
 import { addMonths, currentMonth, formatDayMonth, formatVnd } from "../lib/text";
+import { LoadState } from "../components/LoadState";
 
 const TOP_CATS = 5;
 const ym = (s: string) => s.split("-").map(Number) as [number, number];
@@ -217,6 +218,9 @@ function Upcoming() {
   const recTotal = sum(recRows);
   const goodsTotal = sum(goodsRows);
 
+  // A10: một trong hai nguồn lỗi thì báo kèm Thử lại, không hiện 0đ như thể chưa có khoản nào.
+  if (rec.isError && !rec.data) return <LoadState q={rec} hasData={false} />;
+  if (items.isError && !items.data) return <LoadState q={items} hasData={false} />;
   if (rec.isPending || items.isPending) return <p className="hint">{t.common.loading}</p>;
 
   const lines = [

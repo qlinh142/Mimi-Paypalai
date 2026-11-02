@@ -5,6 +5,23 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Rà màn đang tải và báo lỗi ở mọi màn (A10)
+
+- Thêm `LoadState` dùng chung: lần tải đầu hiện "Đang tải"; lỗi mà chưa có dữ liệu thì báo đúng lý do (mất mạng, mạng chậm, lỗi máy chủ) kèm nút Thử lại; đang có dữ liệu đã lưu thì không che màn.
+- Các chỗ đã sửa:
+  - Chi tiết hóa đơn (4d): hóa đơn không còn hoặc lỗi thì trước đây quay "Đang tải" mãi, giờ báo "Mục này không còn nữa" hoặc lỗi kèm Thử lại.
+  - Lịch sử mua hàng (4c), danh sách kế hoạch, chi tiết kế hoạch, lịch sử giá trong Chi tiết món: thêm báo lỗi và Thử lại (trước đây lỗi trông như danh sách trống).
+  - Màn đi mua hộ: mất mạng không còn báo nhầm "Lần nhờ mua này không còn nữa".
+  - Sổ chi tiêu, phần Sắp chi: lỗi tải không còn hiện 0đ như thể chưa có khoản nào.
+  - Chi tiết khoản định kỳ: phân biệt "không còn" với lỗi tải.
+  - Trang chủ: không tải được số liệu thì báo một dòng kèm Thử lại, các ô vẫn bấm được.
+- Các màn khác (Đồ dùng, Thông báo, Quét, Cài đặt, Online) đã có đủ trạng thái tải và lỗi.
+
+### Cách kiểm tra
+- `tsc`, `npm run build` qua; chạy thử ở chế độ mẫu các màn Trang chủ, Kế hoạch, Lịch sử, Chi tiết hóa đơn không tồn tại, Đồ dùng, Thông báo, không có lỗi trên console.
+
+---
+
 ## 2026-11-02 · Thông báo trong nhà qua hàng đợi, có thử lại (B9)
 
 - Mẹ gửi, cập nhật hay hủy kế hoạch thì người mua nhận thông báo; người mua bấm "Mua hàng xong" hay từ chối thì mẹ nhận thông báo; món chưa mua sang kế hoạch mới cũng báo mẹ.

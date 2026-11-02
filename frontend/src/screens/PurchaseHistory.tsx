@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
 import { useReceiptDetail, useReceiptHistory } from "../api/hooks";
+import { LoadState } from "../components/LoadState";
 import type { HistoryReceipt } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
@@ -118,7 +119,7 @@ export function PurchaseHistory() {
           </select>
         </label>
 
-        {h.isPending && <p className="hint">{t.common.loading}</p>}
+        <LoadState q={h} hasData={!!h.data} />
         {h.data && groups.length === 0 && <p className="hint">{m15.history.empty}</p>}
         {groups.map(({ m, rows }) => {
           const shown = open[m] ? rows : rows.slice(0, 3);
@@ -143,7 +144,8 @@ export function PurchaseHistory() {
 export function ReceiptDetailScreen() {
   const { id = "" } = useParams();
   const nav = useNavigate();
-  const r = useReceiptDetail(id).data;
+  const dq = useReceiptDetail(id);
+  const r = dq.data;
   const { relationOf } = useRelations();
   return (
     <MainFrame>
@@ -156,7 +158,7 @@ export function ReceiptDetailScreen() {
           <h1 className="run15__title">{m15.history.detail}</h1>
         </div>
         {!r ? (
-          <p className="hint">{t.common.loading}</p>
+          <LoadState q={dq} hasData={false} notFound={m15.history.gone} />
         ) : (
           <>
             <section className="box15 ph15__store">
