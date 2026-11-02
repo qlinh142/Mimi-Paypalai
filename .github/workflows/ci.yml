@@ -82,6 +82,15 @@ jobs:
       - run: git diff --exit-code -- src/api/schema.d.ts
       # build chạy tsc, gồm src/api/contract.ts so tên trường giữa types.ts và OpenAPI.
       - run: npm run build
+      # Kịch bản demo chạy trên bản thử (dữ liệu mẫu): quét bill → Đồ dùng → Sổ chi tiêu → Kế hoạch.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
 
   secrets:
     runs-on: ubuntu-latest

@@ -380,7 +380,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
     const body = JSON.parse(String(init.body)) as Record<string, unknown> & { receipt_id: string; lines?: Record<string, unknown>[] };
     const top = ["receipt_id", "store", "purchased_on", "currency", "discount_total", "lines", "use_for_prediction", "confirm_duplicate", "source_plan_id", "assignment_id"];
     const lineKeys = ["line_id", "name", "qty", "unit", "amount", "category_key", "group_key", "habit",
-      "raw_name", "brand", "product_name", "source_language", "package_count", "package_size", "package_unit"];
+      "raw_name", "brand", "product_name", "source_language", "package_count", "package_size", "package_unit", "plans", "price_source"];
     const unknown =
       Object.keys(body).some((k) => !top.includes(k)) ||
       (body.lines ?? []).some((l) => Object.keys(l).some((k) => !lineKeys.includes(k)));

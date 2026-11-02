@@ -5,6 +5,17 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Test tự động cho kịch bản demo
+
+- Thêm test Playwright `frontend/e2e/demo.spec.ts` chạy kịch bản demo trên bản thử: đăng nhập, quét bill, xem lại và lưu, Đồ dùng (Cần mua ngay, Sắp hết, Dầu gội còn 5 ngày), Sổ chi tiêu (tổng tháng, nhãn danh mục), Kế hoạch (gợi ý mua, dự kiến chi, ba cách mua với Mimi đang khóa).
+- CI chạy test này sau bước build. Khi lỗi thì tải được báo cáo `playwright-report`.
+- Lỗi test bắt được: bản thử báo "Unknown field" khi lưu hóa đơn, vì danh sách trường của backend giả thiếu `plans` và `price_source`. Đã sửa, bây giờ lưu hóa đơn trên bản thử chạy lại được.
+
+### Cách kiểm tra
+- `npm run build && npm run test:e2e` qua (trên máy có sẵn Chromium thì đặt `PW_CHROMIUM_PATH`).
+
+---
+
 ## 2026-11-02 · Danh mục chi tiêu một nguồn (V2)
 
 - 27 danh mục chi tiêu (khóa và nhãn tiếng Việt, tiếng Anh) cùng hai danh mục hệ thống `hoa-don-dinh-ky`, `chua-phan-loai` nay nằm ở một file: `backend/internal/taxonomy/categories.json`.
