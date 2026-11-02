@@ -72,7 +72,8 @@ import json,sys
 c=json.load(sys.stdin)
 print("VITE_API_MODE=live")
 print("VITE_FIREBASE_API_KEY="+c["apiKey"])
-print("VITE_FIREBASE_AUTH_DOMAIN="+c["authDomain"])
+# Google redirect cần authDomain trùng tên miền app (web.app), nếu không trình duyệt chặn cookie và quay về trắng.
+print("VITE_FIREBASE_AUTH_DOMAIN="+c["projectId"]+".web.app")
 print("VITE_FIREBASE_PROJECT_ID="+c["projectId"])
 print("VITE_FIREBASE_APP_ID="+c["appId"])
 print("VITE_USE_EMULATORS=false")' > "$ROOT/frontend/.env.production"
@@ -89,3 +90,4 @@ firebase projects:list >/dev/null 2>&1 || firebase login --no-localhost
 
 say "Xong. Mở app: https://$PROJECT.web.app"
 echo "Kiểm tra máy chủ: curl -s https://$PROJECT.web.app/api/ready"
+echo "Lần đầu: thêm https://$PROJECT.web.app/__/auth/handler vào Authorized redirect URIs của OAuth client Web (APIs & Services → Credentials) để đăng nhập Google chạy."
