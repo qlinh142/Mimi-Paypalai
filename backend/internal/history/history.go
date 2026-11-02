@@ -44,6 +44,8 @@ type Line struct {
 	// B3: Kế hoạch mà dòng đã trừ vào. PlanSet false: dòng lưu trước B3, theo SourcePlanID.
 	PlanIDs []string
 	PlanSet bool
+	// B7: receipt | manual | estimate | missing; rỗng ở dòng lưu trước B7.
+	PriceSource string
 }
 
 // Receipt là hóa đơn đã lưu của chính người gọi.
@@ -97,6 +99,8 @@ type DetailLine struct {
 	Amount      *int64  `json:"amount"`
 	CategoryKey string  `json:"category_key,omitempty"`
 	Tag         string  `json:"tag,omitempty"` // for_owner | mine, khi hóa đơn có món mua hộ
+	// PriceSource (B7): estimate thì app ghi "Ước tính"; missing là chưa có giá.
+	PriceSource string `json:"price_source,omitempty"`
 }
 
 type PlanRef struct {
@@ -245,7 +249,10 @@ func keys(m map[string]bool) []string {
 }
 
 func detailLine(l Line) DetailLine {
-	d := DetailLine{Name: l.Name, Spec: l.Structure, Qty: l.Qty, Amount: l.VND, CategoryKey: l.CategoryKey}
+	d := DetailLine{Name: l.Name, Spec: l.Structure, Qty: l.Qty, Amount: l.VND, CategoryKey: l.CategoryKey, PriceSource: l.PriceSource}
+	if l.VND == nil {
+		d.PriceSource = "missing"
+	}
 	if l.VND != nil && l.Qty > 0 {
 		u := int64(float64(*l.VND)/l.Qty + 0.5)
 		d.UnitPrice = &u

@@ -150,7 +150,7 @@ func lineDoc(l receipt.Line) map[string]any {
 		"product_key": l.ProductKey, "source_language": l.SourceLang,
 		"package_count": l.PackageCount, "package_size": l.PackageSize, "package_unit": l.PackageUnit,
 		"structure": l.Structure, "canonical_quantity": l.CanonicalQty, "canonical_unit": l.CanonicalUnit,
-		"needs_review": l.NeedsReview, "inventory_owner": l.InventoryOwner,
+		"needs_review": l.NeedsReview, "inventory_owner": l.InventoryOwner, "price_source": l.PriceSource,
 	}
 	if l.PlanSet {
 		// B3: Kế hoạch mà dòng này đã trừ vào. Dòng cũ không có ô này: đọc theo source_plan_id.

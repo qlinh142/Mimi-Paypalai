@@ -179,7 +179,19 @@ type Line struct {
 	// PlanSet true với Plans rỗng: người dùng chọn "không trừ vào kế hoạch nào".
 	Plans   []PlanShare
 	PlanSet bool
+	// PriceSource (B7): giá của dòng lấy từ đâu. Xem các hằng Price*.
+	PriceSource string
 }
+
+// Nguồn giá của một dòng hóa đơn (B7). PriceOnline để dành cho giá quét online sau này
+// (bước 13): kiểu dữ liệu đã có chỗ, máy chủ chưa nhận giá trị này từ app.
+const (
+	PriceReceipt  = "receipt"  // in trên hóa đơn, hoặc người dùng sửa trên màn Xác nhận
+	PriceManual   = "manual"   // người đi mua tự nhập khi không có hóa đơn
+	PriceEstimate = "estimate" // không nhập, lấy giá mua gần nhất; app ghi "Ước tính"
+	PriceMissing  = "missing"  // chưa có giá: không tính vào tổng, nhắc nhập sau
+	PriceOnline   = "online"   // để dành
+)
 
 // PlanShare là phần của một dòng hóa đơn trừ vào một Kế hoạch.
 type PlanShare struct {

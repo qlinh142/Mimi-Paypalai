@@ -146,6 +146,29 @@ func (s *Service) runReceipt(ctx context.Context, p authz.Principal, a Assignmen
 		PurchasedOn:      domain.Today(s.now(), domain.Location(p.Timezone)).String(),
 		UseForPrediction: true, ConfirmDuplicate: true, SourcePlanID: "",
 	}
+	// B7: làm thủ công (không có hóa đơn) mà không nhập giá thì lấy giá mua gần nhất, ghi "Ước tính".
+	// Món của người nhờ theo giá người nhờ từng mua, món của mình theo giá của mình.
+	// Chưa từng có giá thì để trống (chưa có giá), không tính 0đ.
+	est := map[bool]map[string]int64{}
+	if !req.Scanned {
+		need := map[bool][]string{}
+		for _, l := range req.Lines {
+			if l.Ticked && l.Price == nil && l.Key != "" {
+				need[l.Mine] = append(need[l.Mine], l.Key)
+			}
+		}
+		for mine, keys := range need {
+			uid := a.OwnerUID
+			if mine {
+				uid = p.UID
+			}
+			m, err := s.plans.LastUnitPrices(ctx, uid, keys)
+			if err != nil {
+				return receipt.SaveRequest{}, err
+			}
+			est[mine] = m
+		}
+	}
 	for i, l := range req.Lines {
 		if !l.Ticked {
 			continue
@@ -157,16 +180,22 @@ func (s *Service) runReceipt(ctx context.Context, p authz.Principal, a Assignmen
 		if qty <= 0 || math.IsNaN(qty) {
 			qty = 1
 		}
-		amount := ""
+		amount, source := "", ""
 		if l.Price != nil {
 			if *l.Price < 0 || math.IsNaN(*l.Price) || *l.Price > 1e9 {
 				return receipt.SaveRequest{}, apperr.New(apperr.CodeValidation, "Giá của món này chưa hợp lệ.").With("field", "lines").With("key", l.Key)
 			}
 			amount = fmt.Sprintf("%d", int64(math.Round(*l.Price*qty)))
+			source = receipt.PriceReceipt
+			if !req.Scanned {
+				source = receipt.PriceManual
+			}
+		} else if u, ok := est[l.Mine][l.Key]; ok {
+			amount, source = fmt.Sprintf("%d", int64(math.Round(float64(u)*qty))), receipt.PriceEstimate
 		}
 		sr.Lines = append(sr.Lines, receipt.SaveLine{
 			LineID: fmt.Sprintf("l%d", i+1), Name: l.Name, Qty: qty, Unit: l.Unit, Amount: amount,
-			CategoryKey: l.Category, GroupKey: l.Key, Habit: true,
+			CategoryKey: l.Category, GroupKey: l.Key, Habit: true, PriceSource: source,
 		})
 	}
 	return sr, nil

@@ -167,6 +167,33 @@ func (s *Store) Prices(ctx context.Context, uid string, groups []string) ([]doma
 	return out, nil
 }
 
+// LastUnitPrices: đơn giá lần mua gần nhất của từng nhóm, ở bất kỳ cửa hàng nào (B7).
+func (s *Store) LastUnitPrices(ctx context.Context, uid string, groups []string) (map[string]int64, error) {
+	out := map[string]int64{}
+	if len(groups) == 0 {
+		return out, nil
+	}
+	lp, err := s.Prices(ctx, uid, groups)
+	if err != nil {
+		return nil, err
+	}
+	return latestUnitPrices(lp), nil
+}
+
+func latestUnitPrices(lp []domain.LastPrice) map[string]int64 {
+	out := map[string]int64{}
+	at := map[string]string{}
+	for _, p := range lp {
+		if p.Unit <= 0 {
+			continue
+		}
+		if d := p.On.String(); at[p.GroupKey] == "" || d > at[p.GroupKey] {
+			at[p.GroupKey], out[p.GroupKey] = d, int64(p.Unit)
+		}
+	}
+	return out
+}
+
 // asFloat: qty lưu dạng số thực, nhưng giá trị nguyên có thể được đọc về dạng int64.
 func asFloat(v any) float64 {
 	switch n := v.(type) {

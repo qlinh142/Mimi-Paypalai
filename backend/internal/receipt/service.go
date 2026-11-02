@@ -603,6 +603,8 @@ type SaveLine struct {
 	// Plans (B3): Kế hoạch mà dòng này trừ vào, theo thứ tự app đã chia (kế hoạch đi mua
 	// sớm nhất trước, người dùng đổi được). Vắng: dùng source_plan_id. Mảng rỗng: không trừ.
 	Plans *[]PlanShare `json:"plans,omitempty"`
+	// PriceSource (B7): receipt | manual | estimate. Vắng là receipt; dòng không có giá luôn là missing.
+	PriceSource string `json:"price_source,omitempty"`
 }
 
 // MaxLinePlans: một dòng chia vào tối đa ngần này Kế hoạch (MaxPlans + Plan mặc định).
@@ -783,9 +785,18 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 		// Dòng chưa đủ phân loại vẫn được lưu (purchase + chi tiêu) nhưng chưa vào tồn kho
 		// và dự đoán cho tới khi người dùng phân loại (BUG-06 mục 5.3, 0.1 mục 20).
 		line.NeedsReview = len(reviewReasons(cat, group, extra)) > 0
+		line.PriceSource = PriceMissing
 		if ok {
 			line.VND = &v
 			r.TotalVND += v
+			switch l.PriceSource {
+			case "", PriceReceipt:
+				line.PriceSource = PriceReceipt
+			case PriceManual, PriceEstimate:
+				line.PriceSource = l.PriceSource
+			default:
+				return Receipt{}, lineErr(apperr.CodeValidation, "price_source", "Nguồn giá không hợp lệ.")
+			}
 		}
 		r.Lines = append(r.Lines, line)
 	}

@@ -129,6 +129,9 @@ type Plans interface {
 	OpenLineInfo(ctx context.Context, uid, planID string, keys []string) (map[string]AssignmentItem, error)
 	// PlanTrip đọc tên và chuyến mua của Plan; Plan đã xóa trả Trip rỗng, không lỗi.
 	PlanTrip(ctx context.Context, uid, planID string) (Trip, error)
+	// LastUnitPrices: đơn giá lần mua gần nhất của từng nhóm (B7, để ước tính khi người mua
+	// không nhập giá). Nhóm chưa từng có giá thì không có trong map.
+	LastUnitPrices(ctx context.Context, uid string, groups []string) (map[string]int64, error)
 }
 
 type Service struct {

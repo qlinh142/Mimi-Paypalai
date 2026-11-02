@@ -31,6 +31,18 @@ func (runPlans) PlanTrip(context.Context, string, string) (Trip, error) {
 	return Trip{TripNote: "Bách Hóa Xanh"}, nil
 }
 
+// Giá gần nhất: người nhờ (lan) từng mua nước mắm 40.000đ; người mua (minh) từng mua bánh mì 5.000đ.
+func (runPlans) LastUnitPrices(_ context.Context, uid string, groups []string) (map[string]int64, error) {
+	known := map[string]map[string]int64{"lan": {"nuoc-mam": 40000}, "minh": {"banh-mi": 5000}}
+	out := map[string]int64{}
+	for _, g := range groups {
+		if v, ok := known[uid][g]; ok {
+			out[g] = v
+		}
+	}
+	return out, nil
+}
+
 type saver struct {
 	got   *receipt.SaveRequest
 	store *runStore
@@ -68,7 +80,9 @@ func TestCompleteWritesReceipt(t *testing.T) {
 	if r.ReceiptID != "run-trip-ab12" || r.AssignmentID != "trip-ab12" || r.Store != "Bách Hóa Xanh" || r.PurchasedOn != "2026-11-02" || len(r.Lines) != 2 {
 		t.Fatalf("receipt %+v", r)
 	}
-	if r.Lines[0].GroupKey != "sua-tuoi" || r.Lines[0].Amount != "58000" || r.Lines[1].Amount != "" {
+	// B7: không có hóa đơn mà không nhập giá thì lấy giá mua gần nhất của người mua (món của mình).
+	if r.Lines[0].GroupKey != "sua-tuoi" || r.Lines[0].Amount != "58000" || r.Lines[0].PriceSource != receipt.PriceManual ||
+		r.Lines[1].Amount != "15000" || r.Lines[1].PriceSource != receipt.PriceEstimate {
 		t.Fatalf("lines %+v", r.Lines)
 	}
 
@@ -78,6 +92,40 @@ func TestCompleteWritesReceipt(t *testing.T) {
 		t.Fatalf("replay: %+v %v", again, err)
 	}
 	_ = st
+}
+
+// B7: ước tính theo giá của đúng người; chưa từng có giá thì để trống; có hóa đơn thì không ước tính.
+func TestCompletePriceSources(t *testing.T) {
+	svc, _, sv := runSetup()
+	if _, err := svc.Complete(context.Background(), minh, "trip-ab12", CompleteRequest{Lines: []RunLine{
+		{Key: "nuoc-mam", Name: "Nước mắm", Qty: 2, Ticked: true},            // giá của lan
+		{Key: "sua-tuoi", Name: "Sữa tươi", Qty: 1, Ticked: true},            // chưa từng có giá
+		{Key: "banh-mi", Name: "Bánh mì", Qty: 1, Ticked: true, Mine: false}, // không thuộc vòng
+	}}); apperr.From(err).Code != apperr.CodeValidation {
+		t.Fatalf("món ngoài vòng: %v", err)
+	}
+	svc, _, sv = runSetup()
+	if _, err := svc.Complete(context.Background(), minh, "trip-ab12", CompleteRequest{Lines: []RunLine{
+		{Key: "nuoc-mam", Name: "Nước mắm", Qty: 2, Ticked: true},
+		{Key: "sua-tuoi", Name: "Sữa tươi", Qty: 1, Ticked: true},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	l := sv.got.Lines
+	if l[0].Amount != "80000" || l[0].PriceSource != receipt.PriceEstimate || l[1].Amount != "" || l[1].PriceSource != "" {
+		t.Fatalf("manual %+v", l)
+	}
+	svc, _, sv = runSetup()
+	if _, err := svc.Complete(context.Background(), minh, "trip-ab12", CompleteRequest{Scanned: true, Lines: []RunLine{
+		{Key: "nuoc-mam", Name: "Nước mắm", Qty: 2, Ticked: true},
+		{Key: "sua-tuoi", Name: "Sữa tươi", Qty: 1, Price: price(30000), Ticked: true},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	l = sv.got.Lines
+	if l[0].Amount != "" || l[1].PriceSource != receipt.PriceReceipt {
+		t.Fatalf("scanned %+v", l)
+	}
 }
 
 func TestCompleteRules(t *testing.T) {
