@@ -10,7 +10,7 @@ set -euo pipefail
 
 PROJECT="${1:?Cách dùng: bash deploy/cloudshell-setup.sh <project-id>}"
 REGION="asia-southeast1"
-GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.8-flash}  # dòng 2.5 đã bị Google tắt ngày 20/10/2026"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 say() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
