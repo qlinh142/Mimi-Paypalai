@@ -19,6 +19,7 @@ type Config struct {
 	FirestoreDB      string
 	GeminiModel      string
 	GeminiLocation   string
+	GeminiThinking   string // MINIMAL | LOW | MEDIUM | HIGH; rỗng: để model tự chọn
 	AppCheckRequired bool
 
 	ReceiptDailyLimit int
@@ -52,6 +53,7 @@ func Load() (Config, error) {
 		Env:               get("MIMI_ENV", "dev"),
 		FirestoreDB:       get("FIRESTORE_DATABASE", "(default)"),
 		GeminiModel:       os.Getenv("GEMINI_MODEL"),
+		GeminiThinking:    get("GEMINI_THINKING", "LOW"),    // chép chữ trên bill không cần nghĩ lâu; nghĩ ít thì trả lời nhanh hơn
 		GeminiLocation:    get("GEMINI_LOCATION", "global"), // checklist 48h Gate 1: Vertex AI gọi endpoint global
 		AppCheckRequired:  get("APP_CHECK_REQUIRED", "true") == "true",
 		TasksQueue:        os.Getenv("TASKS_QUEUE"),

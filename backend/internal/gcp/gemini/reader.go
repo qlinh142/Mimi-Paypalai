@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"google.golang.org/genai"
 
@@ -23,6 +24,19 @@ type Reader struct {
 	model    string
 	taxonomy []string
 	groups   []string // group_key của taxonomy 0.2 làm enum; rỗng: model tự đặt
+	thinking genai.ThinkingLevel
+}
+
+// SetThinking đặt mức "suy nghĩ" của model Gemini 3.x (MINIMAL, LOW, MEDIUM, HIGH). Rỗng: mặc định của model.
+func (r *Reader) SetThinking(level string) {
+	r.thinking = genai.ThinkingLevel(strings.ToUpper(strings.TrimSpace(level)))
+}
+
+func (r *Reader) thinkingConfig() *genai.ThinkingConfig {
+	if r.thinking == "" {
+		return nil
+	}
+	return &genai.ThinkingConfig{ThinkingLevel: r.thinking}
 }
 
 var _ receipt.Reader = (*Reader)(nil)
@@ -143,6 +157,7 @@ func (r *Reader) ReadPage(ctx context.Context, img receipt.Image, lang string) (
 			ResponseMIMEType:  "application/json",
 			ResponseSchema:    r.schema(),
 			Temperature:       &temp,
+			ThinkingConfig:    r.thinkingConfig(),
 		})
 	if err != nil {
 		return receipt.Page{}, classify(err)

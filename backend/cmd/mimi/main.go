@@ -101,6 +101,9 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	}
 	taxonomy := groupTaxonomy.SpendingKeys()
 	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy, groupTaxonomy.Keys())
+	if err == nil {
+		reader.SetThinking(cfg.GeminiThinking)
+	}
 	if err != nil {
 		return err
 	}
