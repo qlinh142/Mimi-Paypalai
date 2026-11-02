@@ -351,7 +351,17 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
   const submit = (confirmDuplicate: boolean) => {
     if (save.isPending) return;
     if (kept.length === 0) return setLocalError(m1.receiptEdit.keepOne);
-    save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate, planId: currentPlanId(), assignmentId }, kept));
+    // B3: gửi đúng phần chia đang hiện cho từng món (tự chia, hoặc kế hoạch người dùng chọn, hoặc không trừ).
+    const linePlans = new Map<string, { plan_id: string; qty: number }[]>();
+    if (!assignmentId) {
+      for (const l of kept) {
+        if (l.discount || !l.group_key) continue;
+        const o = override[l.line_id];
+        linePlans.set(l.line_id, o === "none" ? [] : o ? [{ plan_id: o, qty: l.qty }]
+          : (alloc.get(l.line_id) ?? []).map((a) => ({ plan_id: a.planId, qty: a.qty })));
+      }
+    }
+    save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate, planId: currentPlanId(), assignmentId, linePlans }, kept));
   };
 
   if (save.isSuccess) {

@@ -5,6 +5,19 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Mỗi món trong hóa đơn trừ vào đúng kế hoạch của nó (B3)
+
+- Trước đây màn Xác nhận đã hiện "→ Mua đồ cho bé" cho từng món, nhưng lúc lưu chỉ gửi một kế hoạch cho cả hóa đơn. Món thuộc kế hoạch khác nên không được đánh dấu đã mua.
+- Giờ mỗi dòng gửi kèm `plans: [{plan_id, qty}]`, đúng như phần chia đang hiện: tự chia theo kế hoạch đi mua sớm nhất, hoặc kế hoạch người dùng chọn, hoặc "không trừ". Máy chủ đối chiếu từng kế hoạch theo đúng số lượng được chia.
+- Dòng hóa đơn lưu thêm ô `plans`. Chi tiết hóa đơn (4d) và Lịch sử (4c) hiện mọi kế hoạch hóa đơn đã trừ vào.
+- Hóa đơn cũ không cần chuyển dữ liệu: dòng không có `plans` vẫn đọc theo `source_plan_id` như trước.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestPlanBuys`, cùng "per-line plans are validated and kept" trong `TestSave`.
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Số phiên bản dữ liệu và bước chuyển dữ liệu (A4)
 
 - Mỗi `users/{uid}` có ô `schema_version`. Người dùng mới được ghi phiên bản hiện tại (1). Dữ liệu cũ chưa có ô này được coi là bản 0 và được nâng lên 1 ở lần đăng nhập tới. Mỗi người chỉ có một ô số, nên dữ liệu không phình ra.

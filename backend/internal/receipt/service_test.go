@@ -294,6 +294,33 @@ func TestSave(t *testing.T) {
 		}
 	})
 
+	// B3: mỗi dòng mang danh sách Kế hoạch nó trừ vào.
+	t.Run("per-line plans are validated and kept", func(t *testing.T) {
+		st := &fakeStore{saved: map[string]Receipt{}}
+		s := newSvc(t, nil, &fakeQuota{}, st)
+		r := req
+		r.ReceiptID = "r-13"
+		ps := []PlanShare{{PlanID: "p-be", Qty: 1}, {PlanID: "", Qty: 1}}
+		none := []PlanShare{}
+		r.Lines = []SaveLine{req.Lines[0], req.Lines[1]}
+		r.Lines[0].Plans, r.Lines[1].Plans = &ps, &none
+		if _, err := s.Save(context.Background(), owner, r); err != nil {
+			t.Fatal(err)
+		}
+		got := st.saved["r-13"].Lines
+		if !got[0].PlanSet || len(got[0].Plans) != 2 || got[0].Plans[1].PlanID != "default" || !got[1].PlanSet || len(got[1].Plans) != 0 {
+			t.Fatalf("plans: %+v", got)
+		}
+		dup := []PlanShare{{PlanID: "p-be"}, {PlanID: "p-be"}}
+		bad := r
+		bad.ReceiptID = "r-14"
+		bad.Lines = []SaveLine{req.Lines[0]}
+		bad.Lines[0].Plans = &dup
+		if _, err := s.Save(context.Background(), owner, bad); code(err) != apperr.CodeValidation {
+			t.Fatalf("kế hoạch lặp phải bị từ chối, got %v", err)
+		}
+	})
+
 	t.Run("prediction switch off marks every line habit=false", func(t *testing.T) {
 		st := &fakeStore{saved: map[string]Receipt{}}
 		s := newSvc(t, nil, &fakeQuota{}, st)

@@ -890,6 +890,11 @@ components:
               package_count: { type: number }
               package_size: { type: number }
               package_unit: { type: string }
+              plans:
+                type: array
+                maxItems: 11
+                description: "B3: Kế hoạch mà dòng trừ vào, theo thứ tự đã chia; vắng thì theo source_plan_id, mảng rỗng là không trừ"
+                items: { type: object, additionalProperties: false, properties: { plan_id: { type: string }, qty: { type: number, minimum: 0 } } }
     SaveResult:
       type: object
       properties:

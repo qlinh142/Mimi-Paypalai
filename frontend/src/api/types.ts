@@ -156,6 +156,8 @@ export type SaveReceiptRequest = {
     source_language?: string;
     package_count?: number;
     package_size?: number;
+    /** B3: kế hoạch mà dòng này trừ vào, theo thứ tự đã chia. Vắng: theo source_plan_id. [] = không trừ. */
+    plans?: { plan_id: string; qty: number }[];
     package_unit?: string;
   }[];
   use_for_prediction: boolean;

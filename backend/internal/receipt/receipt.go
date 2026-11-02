@@ -174,6 +174,17 @@ type Line struct {
 	// InventoryOwner: uid nhận hàng vào tồn kho. Rỗng là người lưu hóa đơn; khác người lưu
 	// khi dòng khớp một vòng mua hộ (4.1 mục 7): payer vẫn là người lưu hóa đơn.
 	InventoryOwner string
+	// B3: dòng trừ vào những Kế hoạch nào của người lưu, theo thứ tự, mỗi Kế hoạch bao
+	// nhiêu (theo Qty của dòng). PlanSet false: dùng SourcePlanID của hóa đơn như trước.
+	// PlanSet true với Plans rỗng: người dùng chọn "không trừ vào kế hoạch nào".
+	Plans   []PlanShare
+	PlanSet bool
+}
+
+// PlanShare là phần của một dòng hóa đơn trừ vào một Kế hoạch.
+type PlanShare struct {
+	PlanID string  `json:"plan_id"`
+	Qty    float64 `json:"qty"`
 }
 
 // ForInventory báo dòng được cộng vào tồn kho và dự đoán.
