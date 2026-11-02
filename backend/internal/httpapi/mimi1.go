@@ -236,6 +236,22 @@ func (s *Server) cancelAssignment(w http.ResponseWriter, r *http.Request) {
 	s.reply(w, r, http.StatusOK, out, err)
 }
 
+// Spec 1.5 mục 2: người được nhờ báo mua xong (ghi hóa đơn từ danh sách đã mua) hoặc từ chối.
+func (s *Server) completeAssignment(w http.ResponseWriter, r *http.Request) {
+	var req household.CompleteRequest
+	if err := decodeJSON(w, r, &req, maxJSONBody); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	out, err := s.households.Complete(r.Context(), principalFrom(r.Context()), r.PathValue("id"), req)
+	s.reply(w, r, http.StatusOK, out, err)
+}
+
+func (s *Server) declineAssignment(w http.ResponseWriter, r *http.Request) {
+	out, err := s.households.Decline(r.Context(), principalFrom(r.Context()), r.PathValue("id"))
+	s.reply(w, r, http.StatusOK, out, err)
+}
+
 func (s *Server) getDelegated(w http.ResponseWriter, r *http.Request) {
 	out, err := s.households.Delegated(r.Context(), principalFrom(r.Context()))
 	s.reply(w, r, http.StatusOK, out, err)
@@ -255,4 +271,15 @@ func nonNilStrings(xs []string) []string {
 		return []string{}
 	}
 	return xs
+}
+
+// Spec 1.5 mục 4: Lịch sử mua hàng (4c) và Chi tiết hóa đơn (4d).
+func (s *Server) getReceiptHistory(w http.ResponseWriter, r *http.Request) {
+	out, err := s.history.History(r.Context(), principalFrom(r.Context()))
+	s.reply(w, r, http.StatusOK, map[string]any{"receipts": out}, err)
+}
+
+func (s *Server) getReceiptDetail(w http.ResponseWriter, r *http.Request) {
+	out, err := s.history.Detail(r.Context(), principalFrom(r.Context()), r.PathValue("id"))
+	s.reply(w, r, http.StatusOK, out, err)
 }

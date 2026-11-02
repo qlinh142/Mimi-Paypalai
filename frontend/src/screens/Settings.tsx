@@ -1,5 +1,5 @@
 import { t, uiLang } from "../i18n";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Bell, ChevronRight, Copy, Globe, Info, LogOut, Package, Plus, ShieldCheck, UsersRound, Wallet,
@@ -14,7 +14,7 @@ import { m1 } from "../i18n/m1";
 import { useAuth } from "../lib/auth";
 import { useQueue } from "../lib/offlineQueue";
 import { flushQueue } from "../api/client";
-import { RELATIONS, relationOf, setRelation } from "../lib/relation";
+import { RELATIONS, useRelations } from "../lib/relation";
 import { formatDayMonth } from "../lib/text";
 import { wipeDeviceData } from "../lib/localData";
 
@@ -278,6 +278,7 @@ export function SettingsMembers() {
   const [copied, setCopied] = useState(false);
   const [soon, setSoon] = useState(false);
   const [code, setCode] = useState("");
+  const { relationOf } = useRelations();
   const data = h.data;
   if (!data) return <Sub title={S.members}><p className="hint">{t.common.loading}</p></Sub>;
   const isOwner = data.my_role === "owner";
@@ -386,8 +387,8 @@ export function SettingsMember() {
   const h = useHousehold();
   const act = useHouseholdActions();
   const nav = useNavigate();
-  const [rel, setRel] = useState(() => relationOf(uid));
-  useEffect(() => setRelation(uid, rel), [uid, rel]);
+  const { relationOf, setRelation, error: relErr } = useRelations();
+  const rel = relationOf(uid);
   const m = h.data?.members.find((x) => x.uid === uid);
   if (!h.data) return <Sub title={S.members}><p className="hint">{t.common.loading}</p></Sub>;
   if (!m) return <Sub title={S.members}><p className="hint">{t.common.genericError}</p></Sub>;
@@ -402,12 +403,13 @@ export function SettingsMember() {
         </p>
         <label className="field15">
           <span>{S.relation}</span>
-          <select className="pick15" value={rel} onChange={(e) => setRel(e.target.value)}>
+          <select className="pick15" value={rel} onChange={(e) => setRelation(uid, e.target.value)}>
             <option value="">{S.relationNone}</option>
             {RELATIONS.map((r) => <option key={r} value={r}>{S.relations[r]}</option>)}
           </select>
         </label>
         <p className="hint">{S.relationNote}</p>
+        {relErr && <p className="error" role="alert">{t.common.genericError}</p>}
       </section>
       {canRemove && (
         <button

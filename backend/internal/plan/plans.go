@@ -45,6 +45,34 @@ type Meta struct {
 	ItemCount int       `json:"item_count"`
 	CreatedAt time.Time `json:"created_at"`
 	BuyDate   string    `json:"buy_date,omitempty"`
+	Icon      string    `json:"icon"` // khóa trong PlanIcons; trống khi đọc thì trả DefaultIcon
+}
+
+// PlanIcons là bộ biểu tượng chung của app (ảnh mẫu 5b). Máy chủ chỉ lưu khóa, hình vẽ
+// nằm trong app, nên đăng nhập lại ở máy nào cũng ra đúng biểu tượng.
+var PlanIcons = []string{"bag", "family", "kid", "gift", "home", "food"}
+
+// DefaultIcon dùng khi Kế hoạch chưa chọn biểu tượng.
+const DefaultIcon = "bag"
+
+func validIcon(k string) bool {
+	for _, x := range PlanIcons {
+		if x == k {
+			return true
+		}
+	}
+	return false
+}
+
+func iconOrDefault(k string) string {
+	if validIcon(k) {
+		return k
+	}
+	return DefaultIcon
+}
+
+func badIcon() error {
+	return apperr.New(apperr.CodeValidation, "Biểu tượng không có trong bộ của app.").With("field", "icon")
 }
 
 // PlansStore là phần Firestore của danh sách Plan. ItemCount do Store đếm (dòng open + assigned).
@@ -55,6 +83,9 @@ type PlansStore interface {
 	UpdatePlan(ctx context.Context, uid string, m Meta) error
 	// DeletePlan xóa Plan và các dòng của nó. Dòng đang giao cho người khác mua chặn việc xóa.
 	DeletePlan(ctx context.Context, uid, id string) error
+	// Plan mặc định không có tài liệu riêng: biểu tượng của nó nằm trên users/{uid}.
+	DefaultPlanIcon(ctx context.Context, uid string) (string, error)
+	SetDefaultPlanIcon(ctx context.Context, uid, icon string) error
 }
 
 // WithPlans bật nhiều Plan. Không có thì chỉ Plan mặc định.
@@ -98,6 +129,7 @@ func validPlanID(id string) bool {
 type PlanInput struct {
 	Name   *string `json:"name,omitempty"`
 	Status *string `json:"status,omitempty"`
+	Icon   *string `json:"icon,omitempty"`
 }
 
 func cleanPlanName(n string) (string, error) {
@@ -121,13 +153,21 @@ func (s *Service) Plans(ctx context.Context, p authz.Principal) ([]Meta, error) 
 	if err != nil {
 		return nil, err
 	}
-	out := []Meta{{ID: DefaultPlanID, Name: "Kế hoạch chính", Status: "active", Default: true, ItemCount: len(lines), BuyDate: st.BuyDate}}
+	out := []Meta{{ID: DefaultPlanID, Name: "Kế hoạch chính", Status: "active", Default: true, ItemCount: len(lines), BuyDate: st.BuyDate, Icon: DefaultIcon}}
 	if s.plans == nil {
 		return out, nil
 	}
+	icon, err := s.plans.DefaultPlanIcon(ctx, p.UID)
+	if err != nil {
+		return nil, err
+	}
+	out[0].Icon = iconOrDefault(icon)
 	named, err := s.plans.ListPlans(ctx, p.UID)
 	if err != nil {
 		return nil, err
+	}
+	for i := range named {
+		named[i].Icon = iconOrDefault(named[i].Icon)
 	}
 	sort.SliceStable(named, func(i, j int) bool {
 		if (named[i].Status == "archived") != (named[j].Status == "archived") {
@@ -165,7 +205,14 @@ func (s *Service) CreatePlan(ctx context.Context, p authz.Principal, in PlanInpu
 	if active >= MaxPlans {
 		return Meta{}, apperr.New(apperr.CodeValidation, "Đã đủ 10 Kế hoạch đang dùng.").With("limit", MaxPlans)
 	}
-	m := Meta{ID: "p-" + s.now().UTC().Format("060102150405.000"), Name: name, Status: "active", CreatedAt: s.now()}
+	icon := DefaultIcon
+	if in.Icon != nil {
+		if !validIcon(*in.Icon) {
+			return Meta{}, badIcon()
+		}
+		icon = *in.Icon
+	}
+	m := Meta{ID: "p-" + s.now().UTC().Format("060102150405.000"), Name: name, Status: "active", CreatedAt: s.now(), Icon: icon}
 	m.ID = strings.ReplaceAll(m.ID, ".", "")
 	if err := s.plans.CreatePlan(ctx, p.UID, m); err != nil {
 		return Meta{}, err
@@ -177,12 +224,22 @@ func (s *Service) UpdatePlan(ctx context.Context, p authz.Principal, id string, 
 	if err := authz.Can(p, authz.ActionWritePlan); err != nil {
 		return Meta{}, err
 	}
-	if s.plans == nil || id == DefaultPlanID || !validPlanID(id) {
+	if s.plans == nil || !validPlanID(id) {
 		return Meta{}, apperr.ErrNotFound
+	}
+	if in.Icon != nil && !validIcon(*in.Icon) {
+		return Meta{}, badIcon()
+	}
+	if id == DefaultPlanID {
+		return s.updateDefaultPlan(ctx, p, in)
 	}
 	m, err := s.plans.GetPlan(ctx, p.UID, id)
 	if err != nil {
 		return Meta{}, err
+	}
+	m.Icon = iconOrDefault(m.Icon)
+	if in.Icon != nil {
+		m.Icon = *in.Icon
 	}
 	if in.Name != nil {
 		if m.Name, err = cleanPlanName(*in.Name); err != nil {
@@ -199,6 +256,24 @@ func (s *Service) UpdatePlan(ctx context.Context, p authz.Principal, id string, 
 		return Meta{}, err
 	}
 	return m, nil
+}
+
+// updateDefaultPlan: Plan mặc định chỉ đổi được biểu tượng, không đổi tên hay lưu trữ.
+func (s *Service) updateDefaultPlan(ctx context.Context, p authz.Principal, in PlanInput) (Meta, error) {
+	if in.Name != nil || in.Status != nil {
+		return Meta{}, apperr.New(apperr.CodeValidation, "Kế hoạch chính chỉ đổi được biểu tượng.").With("field", "name")
+	}
+	if in.Icon == nil {
+		return Meta{}, apperr.New(apperr.CodeValidation, "Chưa có thay đổi nào để lưu.")
+	}
+	if err := s.plans.SetDefaultPlanIcon(ctx, p.UID, *in.Icon); err != nil {
+		return Meta{}, err
+	}
+	all, err := s.Plans(ctx, p)
+	if err != nil {
+		return Meta{}, err
+	}
+	return all[0], nil
 }
 
 func (s *Service) DeletePlan(ctx context.Context, p authz.Principal, id string) error {

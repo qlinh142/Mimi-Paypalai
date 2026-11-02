@@ -25,6 +25,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fbauth"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/gemini"
+	"github.com/smartlife-lab/mimi/backend/internal/history"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
 	"github.com/smartlife-lab/mimi/backend/internal/httpapi"
@@ -130,8 +131,9 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Orders:   orders,
 		// Bộ spec Mimi 1.0: khoản định kỳ + dự báo (2.1), nhà + mua hộ (4.1), lịch sử giá (8.1).
 		Recurring:  recurring.NewService(store, store, store, nil),
-		Households: household.New(store, store, nil),
+		Households: household.New(store, store, nil).WithReceipts(receipts),
 		Pricing:    pricing.New(store, store, nil),
+		History:    history.New(store),
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)))
 	if err != nil {
 		return err

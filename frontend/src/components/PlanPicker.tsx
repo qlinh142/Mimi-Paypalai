@@ -66,7 +66,7 @@ export function PlanPicker({ planKey, name, body, onClose }: { planKey: string; 
         {list.map((p, i) => {
           const c = carts[i]?.data;
           const has = (c?.items ?? []).some((x) => x.key === planKey);
-          const Icon = iconOf(planIcon(p.id));
+          const Icon = iconOf(planIcon(p));
           return (
             <li key={p.id}>
               <button type="button" className="pick15list__row" aria-disabled={has || busy || undefined} onClick={() => !has && !busy && put(p)}>

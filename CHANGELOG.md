@@ -12,6 +12,66 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Người được nhờ báo mua xong hoặc từ chối (B2)
+
+- `POST /households/shopping-assignments/{id}/complete`: ghi các món đã tick thành một hóa đơn của người mua, đi qua cùng đường lưu hóa đơn có `assignment_id`. Kết quả:
+  - Món nhờ mua đã tick thành "done" và vào tồn kho của người nhờ.
+  - Món chưa tick trả về Kế hoạch của người nhờ.
+  - Món "của mình" vào tồn kho của người mua.
+  - Chi tiêu tính cho người trả tiền.
+  - Mã hóa đơn là `run-{mã vòng}`, nên hàng đợi offline gửi lại cũng không ghi trùng.
+- Món chưa nhập giá được lưu là chưa rõ giá (A7). Không tick món nào thì vòng kết thúc ở trạng thái "mua một phần" và mọi món trả về Kế hoạch.
+- `POST /households/shopping-assignments/{id}/decline`: người được nhờ từ chối. Vòng chuyển sang trạng thái `declined`, mọi món trả về Kế hoạch của người nhờ.
+- Chỉ người được nhờ mới báo xong hoặc từ chối được. Vòng đã kết thúc thì báo `invalid_state`.
+- App gửi đủ danh sách, chỉ gồm các trường máy chủ cần.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestCompleteWritesReceipt`, `TestCompleteRules`, `TestDecline`.
+- `npm run build` qua.
+
+---
+
+## 2026-11-02 · Món chưa rõ giá không bịa số, không tính 0đ (A7)
+
+- Lưu hóa đơn (`POST /receipts`): dòng có ô giá trống được lưu là "chưa rõ giá" (giá null). Món vẫn vào tồn kho và lịch sử, nhưng không cộng vào tổng, chi tiêu tháng hay lịch sử giá. Giá có ghi mà sai dạng thì vẫn báo lỗi như cũ.
+- Màn Xác nhận hóa đơn: món chưa rõ giá hiện mờ với chữ "Chưa rõ giá", kèm dòng "n món chưa rõ giá, không tính vào tổng".
+- Chi tiết hóa đơn (4d): món chưa rõ giá hiện mờ, có ghi chú dưới tổng tiền.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: "blank amount is saved as unknown price" trong `TestSave`.
+- `npm run build` qua.
+
+---
+
+## 2026-11-02 · Lịch sử mua hàng và Chi tiết hóa đơn chạy bằng dữ liệu thật (B1)
+
+- `GET /receipts/history` (màn 4c) trả mọi hóa đơn, mới nhất trước. Gồm hóa đơn tự lưu (tối đa 500), phần món người nhà mua hộ (gom theo hóa đơn của người mua, mã `d-...`, chỉ các món của mình) và khoản định kỳ trả tay.
+- `GET /receipts/{id}` (màn 4d) trả các món, tạm tính, giảm giá và kế hoạch đã trừ. Hóa đơn có món mua hộ thì chia phần "của người nhờ" và "của mình".
+- Người mua hộ có kèm `buyer_uid`, nên app hiện đúng tên gọi người dùng đã đặt (Anh, Bố...), không có thì hiện tên hiển thị.
+- Món chưa rõ giá có `amount` là null, không cộng vào tổng, và được đếm ở `missing_price`. App ghi "chưa có giá" thay cho 0đ. Phần làm mờ thuộc A7.
+- Chỉ đọc dữ liệu đã có (receipts, purchases, recurring_occurrences), không thêm collection hay index.
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...` qua. Test mới: `TestHistory`, `TestDetail`.
+- `npm run build` qua. Đã chạy thử màn 4c và 4d ở chế độ mock, console không có lỗi.
+
+---
+
+## 2026-11-02 · Icon kế hoạch và tên gọi người nhà lưu trên máy chủ (B11)
+
+- Biểu tượng của Kế hoạch lưu cùng Kế hoạch trên máy chủ (`icon` trong `GET/POST /plans`, `PATCH /plans/{id}`). Kế hoạch chính chỉ đổi được biểu tượng, lưu ở `default_plan_icon` trên users/{uid}. Máy chủ chỉ nhận 6 khóa trong bộ biểu tượng chung của app: bag, family, kid, gift, home, food.
+- Tên gọi người nhà (Anh, Chị, Bố...) lưu trong `settings.relations` theo uid, riêng cho từng tài khoản. `PUT /settings {relations: {uid: "anh"}}` chỉ gửi phần đổi, `""` là xóa, tối đa 50 tên.
+- App không còn giữ hai thứ này trên máy, nên đăng xuất rồi đăng nhập lại, hoặc đổi máy, vẫn còn nguyên. Đây là phần sửa cho lỗi đăng xuất làm mất icon và tên gọi (từ PR #7).
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...` qua. Test mới: `TestPlanIconStoredOnServer`, `TestRelations`.
+- `npm run build` qua.
+
+### Còn thiếu
+- Icon và tên gọi đã đặt trên máy trước bản này không được chuyển lên máy chủ. Từ PR #7 trở đi, đăng xuất đã xóa chúng rồi.
+
+---
+
 ## 2026-11-02 · Chi tiết món đọc đủ lịch sử mua (lỗi V3)
 
 - Mọi lần mua vẫn được lưu như trước (không bao giờ xóa). Sửa ở chỗ đọc: Chi tiết một món đọc tới 500 lần mua thay cho 20 (chia đợt hàng) và 30 (giá thấp nhất, giá trung bình), nên lần mua cũ không còn bị bỏ qua.

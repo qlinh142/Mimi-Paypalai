@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Assignment } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { formatVnd } from "../lib/text";
-import { relationOf } from "../lib/relation";
+import { useRelations } from "../lib/relation";
 import { whenText } from "./PlanList";
 
 /** Một dòng trên danh sách đi mua. `mine` = món khác trên hóa đơn (khối "Của tôi"). */
@@ -83,6 +83,7 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: DoneInfo) => void }
   const [confirmDecline, setConfirmDecline] = useState(false);
   useEffect(() => saveRun(a.assignment_id, run), [a.assignment_id, run]);
 
+  const { relationOf } = useRelations();
   const rel = relationOf(a.owner_uid);
   const owner = rel ? m15.settings.relations[rel] : a.owner_display_name;
   const planName = a.trip?.plan_name || m15.plan.main;
@@ -104,7 +105,11 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: DoneInfo) => void }
   const finish = async () => {
     if (finishing) return;
     setFinishing(true);
-    const result = { scanned: run.scanned, note: run.note, lines: run.lines.filter((l) => l.ticked) };
+    // Gửi đủ danh sách (cả món chưa tick) để máy chủ biết món nào trả về kế hoạch của người nhờ.
+    const result = {
+      scanned: run.scanned, note: run.note, store: st?.trip_note || undefined,
+      lines: run.lines.map(({ key, name, qty, unit, price, ticked, mine, category }) => ({ key, name, qty, unit, price, ticked, mine, category })),
+    };
     try {
       const r = await apiSendQueued("POST", `/households/shopping-assignments/${encodeURIComponent(a.assignment_id)}/complete`, result, m15.run.queueLabel(owner));
       saveRun(a.assignment_id, null);

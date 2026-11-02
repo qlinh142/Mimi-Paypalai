@@ -60,6 +60,7 @@ let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase
 }));
 
 let receiptCount = 5;
+let defaultPlanIcon = "bag";
 let mockSettings: Me["settings"] & { display_name?: string } = {
   lead_days: 7, lang: "vi", timezone: "Asia/Ho_Chi_Minh", remind_enabled: true, digest_time: "08:00",
 };
@@ -101,7 +102,7 @@ let planState: PlanState = { buy_date: new Date(Date.now() + 2 * 86_400_000).toI
 const extraNames = new Map<string, string>();
 
 /** Nhiều Kế hoạch (3.1): mỗi Kế hoạch đặt tên có giỏ riêng; "default" dùng các biến ở trên. */
-type MockPlan = { name: string; status: "active" | "archived"; created: number; cart: Set<string>; lines: Map<string, MockLine>; state: PlanState };
+type MockPlan = { name: string; status: "active" | "archived"; icon?: string; created: number; cart: Set<string>; lines: Map<string, MockLine>; state: PlanState };
 const namedPlans = new Map<string, MockPlan>([
   ["p-be", {
     name: L ? "Baby shopping" : "Mua đồ cho bé", status: "active", created: 1, cart: new Set(["sua-tuoi", "giay-ve-sinh", "nuoc-mam"]), lines: new Map([
@@ -218,7 +219,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       role: "owner",
       receipt_count: receiptCount,
       settings: { lead_days: mockSettings.lead_days, lang: mockSettings.lang, timezone: mockSettings.timezone,
-        remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time },
+        remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {} },
     };
     return json(me);
   }
@@ -388,7 +389,12 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
 
   if (method === "PUT" && p === "/settings") {
     const body = JSON.parse(String(init.body ?? "{}")) as Partial<typeof mockSettings>;
-    mockSettings = { ...mockSettings, ...body };
+    const rels = { ...(mockSettings.relations ?? {}) };
+    for (const [uid, rel] of Object.entries(body.relations ?? {})) {
+      if (rel) rels[uid] = rel;
+      else delete rels[uid];
+    }
+    mockSettings = { ...mockSettings, ...body, relations: rels };
     return json({ ...mockSettings, display_name: mockSettings.display_name ?? "Lan" });
   }
 
@@ -757,7 +763,7 @@ function histDetail(id: string): ReceiptDetail | null {
       { name: L ? "Fresh milk" : "Sữa tươi Vinamilk", spec: "900ml", qty: 2, unit_price: 29_000, amount: 58_000, category_key: "sua" },
       { name: L ? "Toilet paper" : "Giấy vệ sinh Pulppy", spec: "10 cuộn", qty: 1, unit_price: 72_000, amount: 72_000, category_key: "hoa-pham" },
     ];
-    return { receipt_id: id, store: "Bách Hóa Xanh", purchased_at: histDate(0, 17), total_vnd: 130_000, item_names: [], kind: "delegated", buyer_name: "Minh", plan_name: L ? "Baby shopping" : "Mua đồ cho bé", plans: [{ id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }], lines, subtotal: 130_000, discount: 0 };
+    return { receipt_id: id, store: "Bách Hóa Xanh", purchased_at: histDate(0, 17), total_vnd: 130_000, item_names: [], kind: "delegated", buyer_uid: "mock-minh", buyer_name: "Minh", plan_name: L ? "Baby shopping" : "Mua đồ cho bé", plans: [{ id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }], lines, subtotal: 130_000, discount: 0 };
   }
   const src = HIST_SRC.find((h) => h[0] === id);
   if (!src) return null;
@@ -794,8 +800,8 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
 
   // Nhiều Kế hoạch
   if (p === "/plans" && method === "GET") {
-    const main = { id: "default", name: "", status: "active", default: true, item_count: cart.size, buy_date: planState.buy_date };
-    const named = [...namedPlans.entries()].map(([id, x]) => ({ id, name: x.name, status: x.status, default: false, item_count: x.cart.size, created: x.created }))
+    const main = { id: "default", name: "", status: "active", default: true, item_count: cart.size, buy_date: planState.buy_date, icon: defaultPlanIcon };
+    const named = [...namedPlans.entries()].map(([id, x]) => ({ id, name: x.name, status: x.status, icon: x.icon ?? "bag", default: false, item_count: x.cart.size, created: x.created }))
       .sort((a, b) => b.created - a.created);
     return json({ plans: [main, ...named] });
   }
@@ -803,18 +809,25 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
     const name = String(body().name ?? "").trim();
     if (!name) return json({ code: "validation_failed", message: "name" }, 422);
     const id = `p-${Date.now()}`;
-    namedPlans.set(id, { name, status: "active", created: Date.now(), cart: new Set(), lines: new Map(), state: { buy_date: "", buy_hour: null, trip_note: "" } });
-    return json({ id, name, status: "active", default: false, item_count: 0 }, 201);
+    const icon = typeof body().icon === "string" ? String(body().icon) : "bag";
+    namedPlans.set(id, { name, status: "active", icon, created: Date.now(), cart: new Set(), lines: new Map(), state: { buy_date: "", buy_hour: null, trip_note: "" } });
+    return json({ id, name, status: "active", icon, default: false, item_count: 0 }, 201);
   }
   const planM = p.match(/^\/plans\/([^/]+)$/);
+  if (planM && planM[1] === "default" && method === "PATCH") {
+    const b = body() as { icon?: string };
+    if (b.icon) defaultPlanIcon = b.icon;
+    return json({ id: "default", name: "", status: "active", default: true, item_count: cart.size, icon: defaultPlanIcon });
+  }
   if (planM) {
     const x = namedPlans.get(planM[1]);
     if (!x) return notFound();
     if (method === "PATCH") {
-      const b = body() as { name?: string; status?: "active" | "archived" };
+      const b = body() as { name?: string; status?: "active" | "archived"; icon?: string };
       if (b.name) x.name = b.name;
       if (b.status) x.status = b.status;
-      return json({ id: planM[1], name: x.name, status: x.status, default: false, item_count: x.cart.size });
+      if (b.icon) x.icon = b.icon;
+      return json({ id: planM[1], name: x.name, status: x.status, icon: x.icon ?? "bag", default: false, item_count: x.cart.size });
     }
     if (method === "DELETE") {
       namedPlans.delete(planM[1]);

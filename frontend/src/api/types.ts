@@ -16,6 +16,7 @@ export type Me = {
     timezone: string;
     remind_enabled?: boolean;
     digest_time?: string;      // HH:MM
+    relations?: Record<string, string>; // tên gọi người nhà theo uid, lưu trên máy chủ
   };
 };
 
@@ -231,11 +232,14 @@ export type PlanPrices = {
 export type HistoryReceipt = {
   receipt_id: string; store: string; purchased_at: string; total_vnd: number; /** Tên các món, để tìm theo món. */ item_names: string[];
   /** "delegated" = khoản người nhà mua hộ, chỉ phần món của mình, không có hóa đơn gốc. */
-  kind?: "own" | "delegated" | "recurring"; buyer_name?: string; plan_name?: string;
+  kind?: "own" | "delegated" | "recurring"; buyer_uid?: string; buyer_name?: string; plan_name?: string;
+  /** Số món chưa rõ giá, không tính vào total_vnd. */
+  missing_price?: number;
   /** kind "recurring": khoản định kỳ đã trả, bấm thì mở chi tiết khoản (góp ý 01/11). */
   recurring_id?: string;
 };
-export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number; amount: number; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
+/** unit_price, amount null: món chưa rõ giá, không tính vào tổng. */
+export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
 export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };
 export type ReceiptSummary = { receipt_id: string; store?: string; purchased_on: string; total_vnd: number; discount_vnd: number };
 export type SpendingReport = {
@@ -266,6 +270,8 @@ export type SettingsPatch = Partial<{
   digest_time: string;
   timezone: string;
   lang: "vi" | "en";
+  /** Chỉ gửi phần đổi; "" là xóa tên gọi của uid đó. */
+  relations: Record<string, string>;
 }>;
 
 export type ApiErrorBody = { code: string; message: string; fields?: Record<string, unknown>; retryable?: boolean };
@@ -365,6 +371,7 @@ export type TaxonomyGroup = {
 /** 3.1: một Kế hoạch trong danh sách. */
 export type PlanMeta = {
   id: string; name: string; status: "active" | "archived"; default: boolean; item_count: number; buy_date?: string;
+  icon?: string; // khóa trong PLAN_ICONS, máy chủ lưu
 };
 
 /** 2.1: khoản định kỳ và kỳ thanh toán. */

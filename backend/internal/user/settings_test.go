@@ -99,3 +99,31 @@ func TestSettingsServiceUpdate(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+// B11: tên gọi người nhà lưu trên máy chủ, riêng cho từng tài khoản; "" là xóa.
+func TestRelations(t *testing.T) {
+	ctx := context.Background()
+	st := &memSettings{doc: Stored{Settings: map[string]any{"lang": "vi"}}}
+	svc := NewSettingsService(st, nil)
+	p := authz.Principal{UID: "u1", Role: authz.RoleOwner}
+	if _, err := svc.Update(ctx, p, SettingsPatch{Relations: map[string]string{"uid-minh": "anh", "uid-bo": "bo"}}); err != nil {
+		t.Fatal(err)
+	}
+	view, err := svc.Update(ctx, p, SettingsPatch{Relations: map[string]string{"uid-minh": ""}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rels, _ := view["relations"].(map[string]any)
+	if len(rels) != 1 || rels["uid-bo"] != "bo" || view["lang"] != "vi" {
+		t.Fatalf("relations: %v", view)
+	}
+	for name, patch := range map[string]SettingsPatch{
+		"vai lạ": {Relations: map[string]string{"uid-minh": "sep"}},
+		"uid lạ": {Relations: map[string]string{"../x": "anh"}},
+		"rỗng":   {Relations: map[string]string{}},
+	} {
+		if err := patch.Validate(); apperr.From(err).Code != apperr.CodeValidation {
+			t.Errorf("%s: got %v", name, err)
+		}
+	}
+}
