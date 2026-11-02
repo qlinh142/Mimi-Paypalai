@@ -734,7 +734,10 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 		if l.Qty <= 0 || l.Qty > 1000 || math.IsNaN(l.Qty) {
 			return Receipt{}, lineErr(apperr.CodeInvalidQuantity, "qty", "Số lượng của món này chưa hợp lệ.")
 		}
-		if !ok && currency == "VND" {
+		// A7: ô giá để trống là "chưa rõ giá" (AI không đọc được hoặc người mua chưa nhập).
+		// Món vẫn được lưu, không bịa số và không tính 0đ: VND nil, không cộng vào tổng.
+		// Giá có ghi nhưng sai dạng thì vẫn báo lỗi để người dùng sửa.
+		if !ok && currency == "VND" && strings.TrimSpace(l.Amount) != "" {
 			return Receipt{}, lineErr(apperr.CodeInvalidLineTotal, "amount", "Giá của món này chưa hợp lệ.")
 		}
 		group := canonicalGroup(l.GroupKey)

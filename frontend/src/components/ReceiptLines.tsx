@@ -43,11 +43,15 @@ export function ReceiptLines({
         const bad = l.line_id === badLine;
         const group = groupLabel(l.group_key);
         const open = editing === l.line_id || bad;
+        // A7: ô giá trống là "chưa rõ giá": không bịa số, không tính 0đ, hiện mờ.
+        const noPrice = !l.discount && l.amount.trim() === "";
         return (
           <li key={l.line_id} className={bad ? "lines__bad" : undefined} aria-invalid={bad || undefined}
             style={l.removed ? { opacity: 0.55 } : undefined}>
             <span style={l.removed ? { textDecoration: "line-through" } : undefined}>{title}</span>
-            <span className="num">{l.amount_vnd != null ? formatVnd(l.amount_vnd) : `${l.amount} ${currency}`}</span>
+            <span className="num" style={noPrice ? { opacity: 0.55 } : undefined}>
+              {noPrice ? t.confirm.noPrice : l.amount_vnd != null ? formatVnd(l.amount_vnd) : `${l.amount} ${currency}`}
+            </span>
             <span className="sub" style={{ gridColumn: "1 / -1" }}>
               {l.removed
                 ? m1.receiptEdit.removed
@@ -55,7 +59,7 @@ export function ReceiptLines({
                   ? t.confirm.discountLine
                   : [
                       l.canonical_quantity ? formatQty(l.canonical_quantity, l.canonical_unit ?? "item", pc) : t.confirm.qty(l.qty),
-                      l.amount_vnd == null ? t.confirm.notConverted : "",
+                      noPrice ? t.confirm.noPriceNote : l.amount_vnd == null ? t.confirm.notConverted : "",
                       l.needs_review ? (l.review_reasons ?? []).map((r) => m1.scan.reviewReasons[r]).join(", ") || m1.scan.needsReview : "",
                     ].filter(Boolean).join(" · ")}
             </span>

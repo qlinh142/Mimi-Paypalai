@@ -5,6 +5,18 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Món chưa rõ giá không bịa số, không tính 0đ (A7)
+
+- Lưu hóa đơn (`POST /receipts`): dòng có ô giá trống được lưu là "chưa rõ giá" (giá null). Món vẫn vào tồn kho và lịch sử, nhưng không cộng vào tổng, chi tiêu tháng hay lịch sử giá. Giá có ghi mà sai dạng thì vẫn báo lỗi như cũ.
+- Màn Xác nhận hóa đơn: món chưa rõ giá hiện mờ với chữ "Chưa rõ giá", kèm dòng "n món chưa rõ giá, không tính vào tổng".
+- Chi tiết hóa đơn (4d): món chưa rõ giá hiện mờ, có ghi chú dưới tổng tiền.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: "blank amount is saved as unknown price" trong `TestSave`.
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Lịch sử mua hàng và Chi tiết hóa đơn chạy bằng dữ liệu thật (B1)
 
 - `GET /receipts/history` (màn 4c) trả mọi hóa đơn, mới nhất trước. Gồm hóa đơn tự lưu (tối đa 500), phần món người nhà mua hộ (gom theo hóa đơn của người mua, mã `d-...`, chỉ các món của mình) và khoản định kỳ trả tay.
