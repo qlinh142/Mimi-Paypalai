@@ -85,7 +85,7 @@ say "7/7 Đưa rules, index Firestore và frontend lên Firebase"
 command -v firebase >/dev/null || npm install -g firebase-tools
 firebase projects:list >/dev/null 2>&1 || firebase login --no-localhost
 (cd "$ROOT/backend" && firebase deploy --only firestore:rules,firestore:indexes --project "$PROJECT" --non-interactive)
-(cd "$ROOT/frontend" && firebase deploy --only hosting --project "$PROJECT" --non-interactive)
+(cd "$ROOT/frontend" && FIREBASE_HOSTING_UPLOAD_CONCURRENCY=5 firebase deploy --only hosting --project "$PROJECT" --non-interactive)
 
 say "Xong. Mở app: https://$PROJECT.web.app"
 echo "Kiểm tra máy chủ: curl -s https://$PROJECT.web.app/api/ready"
