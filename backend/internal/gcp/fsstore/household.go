@@ -300,6 +300,11 @@ func (s *Store) readReturns(tx *firestore.Transaction, open []*firestore.Documen
 }
 
 func (s *Store) writeCancel(tx *firestore.Transaction, open []*firestore.DocumentSnapshot, returns map[string][]*firestore.DocumentRef, now time.Time) error {
+	return s.writeEnd(tx, open, returns, now, "cancelled")
+}
+
+// writeEnd kết thúc các vòng còn mở với status cho trước; món chưa mua trả về Plan của Owner.
+func (s *Store) writeEnd(tx *firestore.Transaction, open []*firestore.DocumentSnapshot, returns map[string][]*firestore.DocumentRef, now time.Time, status string) error {
 	seen := map[string]bool{}
 	for _, d := range open {
 		if seen[d.Ref.Path] {
@@ -313,7 +318,7 @@ func (s *Store) writeCancel(tx *firestore.Transaction, open []*firestore.Documen
 			}
 		}
 		if err := tx.Update(d.Ref, []firestore.Update{
-			{Path: "status", Value: "cancelled"}, {Path: "closed_at", Value: now}, {Path: "items", Value: assignmentItemsDoc(a.Items)},
+			{Path: "status", Value: status}, {Path: "closed_at", Value: now}, {Path: "items", Value: assignmentItemsDoc(a.Items)},
 		}); err != nil {
 			return err
 		}
@@ -330,6 +335,30 @@ func (s *Store) writeCancel(tx *firestore.Transaction, open []*firestore.Documen
 }
 
 func (s *Store) CancelAssignment(ctx context.Context, hid, id, ownerUID string) (household.Assignment, error) {
+	return s.endAssignment(ctx, hid, id, "cancelled", func(a household.Assignment) bool { return a.OwnerUID == ownerUID })
+}
+
+// EndByBuyer: người được nhờ từ chối (declined) hoặc báo xong mà không mua được món nào
+// (closed_partial). Mọi món trả về Plan của Owner.
+func (s *Store) EndByBuyer(ctx context.Context, hid, id, buyerUID, status string) (household.Assignment, error) {
+	return s.endAssignment(ctx, hid, id, status, func(a household.Assignment) bool { return a.BuyerUID == buyerUID })
+}
+
+func (s *Store) Assignment(ctx context.Context, hid, id string) (household.Assignment, error) {
+	if hid == "" || id == "" || len(id) > 80 {
+		return household.Assignment{}, apperr.ErrNotFound
+	}
+	snap, err := s.household(hid).Collection("shopping_assignments").Doc(id).Get(ctx)
+	if isNotFound(err) {
+		return household.Assignment{}, apperr.ErrNotFound
+	}
+	if err != nil {
+		return household.Assignment{}, fmt.Errorf("assignment: %w", err)
+	}
+	return decodeAssignment(snap), nil
+}
+
+func (s *Store) endAssignment(ctx context.Context, hid, id, status string, allowed func(household.Assignment) bool) (household.Assignment, error) {
 	if hid == "" || id == "" || len(id) > 80 {
 		return household.Assignment{}, apperr.ErrNotFound
 	}
@@ -344,7 +373,7 @@ func (s *Store) CancelAssignment(ctx context.Context, hid, id, ownerUID string) 
 			return err
 		}
 		a := decodeAssignment(snap)
-		if a.OwnerUID != ownerUID {
+		if !allowed(a) {
 			return apperr.ErrForbidden
 		}
 		if !a.Active() {
@@ -355,10 +384,10 @@ func (s *Store) CancelAssignment(ctx context.Context, hid, id, ownerUID string) 
 		if err != nil {
 			return err
 		}
-		if err := s.writeCancel(tx, open, returns, time.Now()); err != nil {
+		if err := s.writeEnd(tx, open, returns, time.Now(), status); err != nil {
 			return err
 		}
-		a.Status = "cancelled"
+		a.Status = status
 		for i := range a.Items {
 			if a.Items[i].Status == "assigned" {
 				a.Items[i].Status = "returned"

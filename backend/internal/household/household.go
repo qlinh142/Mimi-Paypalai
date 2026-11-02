@@ -69,7 +69,7 @@ type Assignment struct {
 	BuyerUID         string           `json:"buyer_uid"`
 	BuyerName        string           `json:"buyer_display_name"`
 	PlanID           string           `json:"plan_id"`
-	Status           string           `json:"status"` // assigned | shopping | completed | closed_partial | cancelled
+	Status           string           `json:"status"` // assigned | shopping | completed | closed_partial | cancelled | declined
 	Note             string           `json:"note,omitempty"`
 	Items            []AssignmentItem `json:"items"`
 	CreatedAt        time.Time        `json:"created_at"`
@@ -110,6 +110,10 @@ type Store interface {
 	CreateAssignment(ctx context.Context, hid string, a Assignment) (Assignment, error)
 	// CancelAssignment: vòng còn mở → cancelled, món trả về open (Case 4).
 	CancelAssignment(ctx context.Context, hid, id, ownerUID string) (Assignment, error)
+	// EndByBuyer: người được nhờ kết thúc vòng (declined, hoặc closed_partial khi không mua
+	// được món nào); món chưa mua trả về Plan của Owner.
+	EndByBuyer(ctx context.Context, hid, id, buyerUID, status string) (Assignment, error)
+	Assignment(ctx context.Context, hid, id string) (Assignment, error) // apperr.ErrNotFound
 	// Assignments trả các vòng có field (buyer_uid | owner_uid) = uid, mới nhất trước.
 	Assignments(ctx context.Context, hid, field, uid string, limit int) ([]Assignment, error)
 }
@@ -122,9 +126,10 @@ type Plans interface {
 }
 
 type Service struct {
-	store Store
-	plans Plans
-	now   func() time.Time
+	store    Store
+	plans    Plans
+	receipts ReceiptSaver // nil: chưa bật báo xong việc mua hộ
+	now      func() time.Time
 }
 
 func New(store Store, plans Plans, now func() time.Time) *Service {

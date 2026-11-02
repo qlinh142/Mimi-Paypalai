@@ -676,6 +676,51 @@ paths:
       summary: "Case 4: Owner hủy vòng còn mở; món chưa mua trả về open"
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Assignment" } } } } }
+  /households/shopping-assignments/{id}/complete:
+    post:
+      tags: [household]
+      summary: "Spec 1.5 mục 2: người được nhờ bấm Mua hàng xong"
+      description: |
+        Ghi các món đã tick thành một hóa đơn của người mua (mã run-{id}, gửi lại không ghi trùng), qua cùng đường
+        với POST /receipts có assignment_id: món nhờ mua đã tick thành done và vào tồn kho người nhờ, món chưa tick trả về
+        Kế hoạch của người nhờ, món mine vào tồn kho người mua. price null là chưa rõ giá. Không tick món nào: closed_partial.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                scanned: { type: boolean }
+                note: { type: string, maxLength: 200 }
+                store: { type: string }
+                lines:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      key: { type: string }
+                      name: { type: string }
+                      qty: { type: number }
+                      unit: { type: string }
+                      price: { type: [number, "null"], description: "Đơn giá VND; null là chưa rõ giá" }
+                      ticked: { type: boolean }
+                      mine: { type: boolean }
+                      category: { type: string }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Assignment" } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /households/shopping-assignments/{id}/decline:
+    post:
+      tags: [household]
+      summary: "Spec 1.5 câu 5: người được nhờ từ chối; mọi món trả về Kế hoạch của người nhờ (status declined)"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Assignment" } } } } }
   /households/needs:
     get:
       tags: [household]
@@ -1112,7 +1157,7 @@ components:
         buyer_uid: { type: string }
         buyer_display_name: { type: string }
         plan_id: { type: string }
-        status: { type: string, enum: [assigned, shopping, completed, closed_partial, cancelled] }
+        status: { type: string, enum: [assigned, shopping, completed, closed_partial, cancelled, declined] }
         note: { type: string }
         items:
           type: array
