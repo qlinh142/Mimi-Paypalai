@@ -5,6 +5,17 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Tìm tên món không phân biệt cách gõ dấu (A2)
+
+- Cùng chữ "ầ" có thể đến ở hai dạng: một ký tự (bàn phím điện thoại) hoặc "a" kèm dấu rời (dán từ máy Mac, chữ AI đọc từ ảnh). Trước đây hai dạng nhìn giống nhau nhưng máy chủ coi là khác nhau.
+- Máy chủ đưa mọi chữ gửi lên (tên món, tên kế hoạch, ghi chú, tên gọi người nhà) về một dạng chuẩn (NFC) trước khi lưu. Tên món AI đọc từ hóa đơn cũng vậy.
+- Tìm không dấu tách hẳn dấu ra rồi bỏ, nên "dau goi" khớp "Dầu gội" ở cả hai dạng; dữ liệu cũ đã lưu ở dạng dấu rời vẫn tìm ra.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestNFCAndFoldDecomposed`, `TestDecodeJSONNormalizesNFC`.
+
+---
+
 ## 2026-11-02 · Báo khi hai máy cùng sửa một kế hoạch (A1)
 
 - Mỗi kế hoạch có số phiên bản `rev` (lưu ở `plan_rev`), tăng mỗi lần lưu ngày, giờ, ghi chú.
