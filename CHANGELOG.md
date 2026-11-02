@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Bật App Check (reCAPTCHA Enterprise)
+
+Nhánh `deploy/app-check`, xếp chồng lên PR #36.
+
+- `deploy/appcheck.sh <project>`: bật API, tạo khóa reCAPTCHA `mimi-web` cho `web.app` và `firebaseapp.com`, đăng ký khóa với App Check của app web, build lại frontend có `VITE_RECAPTCHA_ENTERPRISE_KEY` và đưa lên Hosting. Máy chủ chưa bắt buộc.
+- `deploy/appcheck.sh <project> on`: máy chủ bắt buộc App Check (`APP_CHECK_REQUIRED=true`). `off` để quay lại.
+- `deploy/cloudshell-setup.sh` chạy lại vẫn giữ App Check đang bật hay tắt, và tự thêm khóa reCAPTCHA vào frontend nếu đã có.
+- Kiểm tra: `bash -n`; chạy thật trên mimi-1-5 rồi thử đăng nhập, lưu hóa đơn trước khi `on`.
+- Còn thiếu: `MIMI_ENV=prod` chờ có nhà cung cấp email.
+
 ## 2026-11-02 · Lệnh dựng và deploy bản demo từ Cloud Shell
 
 - `deploy/cloudshell-setup.sh <project-id>`: tạo tài khoản dịch vụ (sa-api, sa-jobs, sa-scheduler) và cấp quyền, deploy `mimi-api` lên Cloud Run từ mã nguồn, tạo các job (fx-sync, cleanup, migrate, seed-demo), lịch chạy fx-sync 06:00 và cleanup 03:00, lấy cấu hình web Firebase qua API (không commit khóa), build frontend và đưa rules, index, Hosting lên Firebase.

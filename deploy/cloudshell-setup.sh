@@ -4,8 +4,8 @@
 #
 #   bash deploy/cloudshell-setup.sh mimi-1-5
 #
-# Bản demo: MIMI_ENV=dev (thư chỉ ghi log, chưa gửi thật), App Check tắt.
-# Khi đã chọn nhà cung cấp email và bật App Check, chạy lại với MIMI_ENV=prod.
+# Bản demo: MIMI_ENV=dev (thư chỉ ghi log, chưa gửi thật).
+# App Check bật riêng bằng deploy/appcheck.sh; chạy lại script này vẫn giữ nguyên trạng thái App Check.
 set -euo pipefail
 
 PROJECT="${1:?Cách dùng: bash deploy/cloudshell-setup.sh <project-id>}"
@@ -32,7 +32,13 @@ gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$NUM-
   --role roles/run.builder --condition=None >/dev/null
 
 say "2/7 Backend mimi-api lên Cloud Run (build mất khoảng 3 đến 5 phút)"
-ENV_VARS="GOOGLE_CLOUD_PROJECT=$PROJECT,MIMI_ENV=dev,APP_CHECK_REQUIRED=false,GEMINI_MODEL=$GEMINI_MODEL,GEMINI_LOCATION=global,PAYPAL_MODE=off"
+# Giữ nguyên App Check đang bật/tắt (deploy/appcheck.sh) khi deploy lại.
+APP_CHECK="$(gcloud run services describe mimi-api --region "$REGION" --format=json 2>/dev/null |
+  python3 -c 'import json,sys
+try: e=json.load(sys.stdin)["spec"]["template"]["spec"]["containers"][0].get("env",[])
+except Exception: e=[]
+print(next((x.get("value","") for x in e if x.get("name")=="APP_CHECK_REQUIRED"),"false"))' || echo false)"
+ENV_VARS="GOOGLE_CLOUD_PROJECT=$PROJECT,MIMI_ENV=dev,APP_CHECK_REQUIRED=$APP_CHECK,GEMINI_MODEL=$GEMINI_MODEL,GEMINI_LOCATION=global,PAYPAL_MODE=off"
 gcloud run deploy mimi-api --source "$ROOT/backend" --region "$REGION" \
   --service-account "sa-api@$PROJECT.iam.gserviceaccount.com" \
   --set-env-vars "$ENV_VARS" --args serve-api \
@@ -78,6 +84,8 @@ print("VITE_FIREBASE_AUTH_DOMAIN="+c["projectId"]+".web.app")
 print("VITE_FIREBASE_PROJECT_ID="+c["projectId"])
 print("VITE_FIREBASE_APP_ID="+c["appId"])
 print("VITE_USE_EMULATORS=false")' > "$ROOT/frontend/.env.production"
+KEY="$(gcloud recaptcha keys list --filter="displayName=mimi-web" --format='value(name)' 2>/dev/null | head -1)"
+[ -n "$KEY" ] && echo "VITE_RECAPTCHA_ENTERPRISE_KEY=${KEY##*/}" >> "$ROOT/frontend/.env.production"
 echo "  đã ghi frontend/.env.production"
 
 say "6/7 Build frontend"
