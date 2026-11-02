@@ -15,6 +15,7 @@ const vi = {
   scan: {
     privacy: "Chú ý: không chụp thông tin cá nhân (số thẻ, số điện thoại, địa chỉ…)",
     nextBill: "Bill tiếp",
+    systemCamera: "Bấm nút chụp để mở camera của máy",
     reviewOnly: "Xong, xem hóa đơn",
     bgReading: "Bill 1: Mimi đang đọc…",
     bgDone: "Bill 1: Mimi đọc xong rồi",
@@ -376,6 +377,7 @@ const en: typeof vi = {
   scan: {
     privacy: "Note: don't capture personal info (card numbers, phone numbers, addresses…)",
     nextBill: "Next receipt",
+    systemCamera: "Tap the shutter to open your phone camera",
     reviewOnly: "Done, review receipts",
     bgReading: "Receipt 1: Mimi is reading…",
     bgDone: "Receipt 1: read",

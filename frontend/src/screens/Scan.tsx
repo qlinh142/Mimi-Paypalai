@@ -70,6 +70,14 @@ export function Scan() {
 }
 
 /**
+ * Tạm thời (02/11, mẹ chốt): trên iPhone/iPad, trình duyệt hỏi lại quyền camera mỗi lần mở trang.
+ * Ở đó nút chụp mở camera có sẵn của máy (<input capture>), không cần quyền. Khi có app cài
+ * trên máy thì bỏ nhánh này. Android nhớ quyền theo trang nên vẫn dùng camera trong trang.
+ */
+const SYSTEM_CAMERA = typeof navigator !== "undefined" &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+/**
  * Mở camera MỘT lần cho cả màn quét, giữ luồng qua mọi bill và mọi lần gửi lỗi, tắt khi rời màn.
  * iPhone hỏi lại quyền camera mỗi lần gọi getUserMedia, nên không tắt rồi bật lại giữa chừng.
  */
@@ -77,6 +85,7 @@ function useCamera(): { stream: MediaStream | null; failed: boolean } {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
+    if (SYSTEM_CAMERA) return; // iPhone: dùng camera của máy, không xin quyền
     let s: MediaStream | undefined;
     let stopped = false;
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -271,7 +280,16 @@ function ScanSession({ camera, onNext, bg, canAddBill, onNextBill, onRetryBg, on
       <p className="scan__privacy" role="note">⚠️ {m15.scan.privacy}</p>
 
       <div className="scan__view">
-        {!cameraFailed ? (
+        {SYSTEM_CAMERA ? (
+          photos.length > 0 ? (
+            <img className="scan__last" src={photos[photos.length - 1].url} alt={t.scan.photoAlt(photos.length, false)} />
+          ) : (
+            <button type="button" className="scan__fallback scan__system" onClick={() => cameraRef.current?.click()}>
+              <Camera size={48} aria-hidden />
+              <span>{m15.scan.systemCamera}</span>
+            </button>
+          )
+        ) : !cameraFailed ? (
           <video ref={videoRef} autoPlay playsInline muted aria-label={t.scan.camera} />
         ) : (
           <div className="scan__fallback">

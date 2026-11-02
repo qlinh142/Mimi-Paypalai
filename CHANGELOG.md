@@ -15,6 +15,7 @@ Nhánh `feat/quet-2-bill` (dựa trên `fix/quet-hoa-don-that`).
 - Mỗi bill vẫn tính 1 lượt quét như cũ. Không đổi backend.
 - Thử trên iPhone: bị hỏi quyền camera mỗi lần sang bill 2 hoặc gửi lỗi. Camera giờ mở một lần cho cả màn quét (`useCamera`), không tắt khi gửi đọc, tắt khi rời màn.
 - Thử `GEMINI_THINKING=MINIMAL`: mọi bill báo "tạm thời chưa đọc được" (AI từ chối). Script deploy giữ LOW, ghi chú không dùng MINIMAL.
+- Tạm thời (mẹ chốt): trên iPhone/iPad, nút chụp mở camera có sẵn của máy (`<input capture>`), không gọi camera trong trang nên không bị hỏi quyền. Khung hiện ảnh vừa chụp. Android giữ camera trong trang. Có app cài trên máy thì bỏ nhánh này.
 - Kiểm tra: tsc, build, chạy luồng 2 bill trên bản thử (giả lập iPhone 13, camera giả).
 
 ## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ
