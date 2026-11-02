@@ -178,7 +178,8 @@ type Server struct {
 	ready      ReadinessChecker
 	metrics    Metrics
 	limiter    *windowLimiter
-	idem       idem.Store // nil: không giữ kết quả theo Idempotency-Key
+	shared     SharedLimiter // nil: chỉ đếm tại instance này
+	idem       idem.Store    // nil: không giữ kết quả theo Idempotency-Key
 
 	readTimeout    time.Duration
 	defaultTimeout time.Duration

@@ -145,7 +145,8 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Households: household.New(store, store, nil).WithReceipts(receipts),
 		Pricing:    pricing.New(store, store, nil),
 		History:    history.New(store),
-	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)))
+	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)),
+		httpapi.WithSharedLimiter(fsstore.NewRateLimiter(store)))
 	if err != nil {
 		return err
 	}

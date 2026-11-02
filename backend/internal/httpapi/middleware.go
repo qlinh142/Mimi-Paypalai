@@ -107,12 +107,40 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 // (tối đa 3 instance). Không thay quota hóa đơn, chỉ chặn spam và client lỗi lặp vô hạn.
 func (s *Server) limitWrites(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && !s.limiter.allow(principalFrom(r.Context()).UID, time.Now()) {
+		if r.Method != http.MethodGet && !s.allowWrite(r.Context(), principalFrom(r.Context()).UID, time.Now()) {
 			s.writeError(w, r, apperr.New(apperr.CodeRateLimited, "Thao tác quá nhanh, đợi một chút rồi thử lại."))
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// SharedLimiter đếm số thao tác ghi của một người trong một phút ở nơi mọi instance cùng
+// thấy (Firestore). Cloud Run chạy nhiều instance, mỗi instance chỉ đếm phần mình nhận,
+// nên chỉ đếm tại chỗ thì một người có thể ghi gấp số instance lần giới hạn (vấn đề 79).
+type SharedLimiter interface {
+	Allow(ctx context.Context, key string, limit int, now time.Time) (bool, error)
+}
+
+// WithSharedLimiter bật đếm dùng chung. Bộ đếm tại chỗ vẫn chạy trước, chặn ngay
+// lượt vượt rõ ràng mà không tốn một lần ghi Firestore.
+func WithSharedLimiter(l SharedLimiter) Option { return func(s *Server) { s.shared = l } }
+
+func (s *Server) allowWrite(ctx context.Context, uid string, now time.Time) bool {
+	if !s.limiter.allow(uid, now) {
+		return false
+	}
+	if s.shared == nil {
+		return true
+	}
+	ok, err := s.shared.Allow(ctx, uid, s.limiter.limit, now)
+	if err != nil {
+		// Firestore lỗi thì không chặn người dùng vì bộ đếm: bộ đếm tại chỗ vẫn giữ giới hạn
+		// cho từng instance.
+		s.log.WarnContext(ctx, "shared rate limit", "err", err)
+		return true
+	}
+	return ok
 }
 
 // windowLimiter: cửa sổ cố định một phút, bộ nhớ có giới hạn.

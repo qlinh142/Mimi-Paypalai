@@ -165,6 +165,12 @@
       "indexes": []
     },
     {
+      "collectionGroup": "rate",
+      "fieldPath": "expire_at",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "idempotency",
       "fieldPath": "expire_at",
       "ttl": true,
