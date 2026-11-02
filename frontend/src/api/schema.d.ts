@@ -187,8 +187,11 @@ export interface paths {
         post?: never;
         /**
          * Xóa hết dữ liệu của mình
-         * @description Xóa đệ quy users/{uid}, giải tán nhà nếu là chủ, rồi xóa tài khoản Auth sau cùng.
-         *     Gọi lại sau khi lỗi giữa chừng sẽ chạy tiếp (idempotent). Yêu cầu token chưa bị thu hồi.
+         * @description B10. Chủ nhà: mời từng người ra (vòng mua hộ còn mở bị hủy, món trả về kế hoạch người nhờ) rồi
+         *     xóa nhà; thành viên: rời nhà. Sau đó xóa đệ quy users/{uid}, rồi xóa tài khoản Auth sau cùng.
+         *     Gọi lại sau khi lỗi giữa chừng sẽ chạy tiếp (idempotent), nên không giữ kết quả theo Idempotency-Key.
+         *     Token phải chưa bị thu hồi và của lần đăng nhập trong 5 phút gần nhất; không thì 403
+         *     reauth_required: app cho người dùng đăng nhập lại (Google hoặc link email) rồi gọi lại.
          */
         delete: {
             parameters: {
@@ -207,6 +210,15 @@ export interface paths {
                     content?: never;
                 };
                 401: components["responses"]["Error"];
+                /** @description reauth_required: cần đăng nhập lại */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         options?: never;
@@ -2821,7 +2833,7 @@ export interface components {
         Vnd: number;
         Error: {
             /** @enum {string} */
-            code: "bad_request" | "validation_failed" | "unauthenticated" | "app_check_failed" | "forbidden" | "not_found" | "conflict" | "receipt_conflict" | "possible_duplicate" | "payload_too_large" | "unsupported_media" | "quota_exceeded" | "rate_limited" | "receipt_unreadable" | "ai_unavailable" | "not_implemented" | "internal" | "timeout" | "mandate_blocked" | "approval_required" | "invalid_state" | "payment_failed" | "payment_not_enabled" | "payment_unavailable" | "too_many_images" | "image_too_large" | "unreadable_image" | "no_items" | "read_failed" | "invalid_purchase_date" | "invalid_line_total" | "invalid_quantity" | "transaction_conflict" | "idempotency_in_flight" | "idempotency_mismatch";
+            code: "bad_request" | "validation_failed" | "unauthenticated" | "app_check_failed" | "forbidden" | "reauth_required" | "not_found" | "conflict" | "receipt_conflict" | "possible_duplicate" | "payload_too_large" | "unsupported_media" | "quota_exceeded" | "rate_limited" | "receipt_unreadable" | "ai_unavailable" | "not_implemented" | "internal" | "timeout" | "mandate_blocked" | "approval_required" | "invalid_state" | "payment_failed" | "payment_not_enabled" | "payment_unavailable" | "too_many_images" | "image_too_large" | "unreadable_image" | "no_items" | "read_failed" | "invalid_purchase_date" | "invalid_line_total" | "invalid_quantity" | "transaction_conflict" | "idempotency_in_flight" | "idempotency_mismatch";
             /** @description true: thử lại cùng yêu cầu có thể thành công (lỗi tạm thời, xung đột transaction) */
             retryable?: boolean;
             /** @description Câu tiếng Việt ngắn, an toàn để hiển thị */

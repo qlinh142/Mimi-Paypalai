@@ -72,14 +72,17 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
     delete:
       tags: [me]
-      x-status: planned
       summary: Xóa hết dữ liệu của mình
       description: |
-        Xóa đệ quy users/{uid}, giải tán nhà nếu là chủ, rồi xóa tài khoản Auth sau cùng.
-        Gọi lại sau khi lỗi giữa chừng sẽ chạy tiếp (idempotent). Yêu cầu token chưa bị thu hồi.
+        B10. Chủ nhà: mời từng người ra (vòng mua hộ còn mở bị hủy, món trả về kế hoạch người nhờ) rồi
+        xóa nhà; thành viên: rời nhà. Sau đó xóa đệ quy users/{uid}, rồi xóa tài khoản Auth sau cùng.
+        Gọi lại sau khi lỗi giữa chừng sẽ chạy tiếp (idempotent), nên không giữ kết quả theo Idempotency-Key.
+        Token phải chưa bị thu hồi và của lần đăng nhập trong 5 phút gần nhất; không thì 403
+        reauth_required: app cho người dùng đăng nhập lại (Google hoặc link email) rồi gọi lại.
       responses:
         "204": { description: Đã xóa }
         "401": { $ref: "#/components/responses/Error" }
+        "403": { description: "reauth_required: cần đăng nhập lại", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /settings:
     put:
       tags: [me]
@@ -815,7 +818,7 @@ components:
       properties:
         code:
           type: string
-          enum: [bad_request, validation_failed, unauthenticated, app_check_failed, forbidden, not_found,
+          enum: [bad_request, validation_failed, unauthenticated, app_check_failed, forbidden, reauth_required, not_found,
                  conflict, receipt_conflict, possible_duplicate, payload_too_large, unsupported_media,
                  quota_exceeded, rate_limited, receipt_unreadable, ai_unavailable, not_implemented, internal, timeout,
                  mandate_blocked, approval_required, invalid_state, payment_failed, payment_not_enabled, payment_unavailable,

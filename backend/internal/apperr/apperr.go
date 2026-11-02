@@ -12,11 +12,14 @@ import (
 type Code string
 
 const (
-	CodeBadRequest         Code = "bad_request"
-	CodeValidation         Code = "validation_failed"
-	CodeUnauthenticated    Code = "unauthenticated"
-	CodeAppCheck           Code = "app_check_failed"
-	CodeForbidden          Code = "forbidden"
+	CodeBadRequest      Code = "bad_request"
+	CodeValidation      Code = "validation_failed"
+	CodeUnauthenticated Code = "unauthenticated"
+	CodeAppCheck        Code = "app_check_failed"
+	CodeForbidden       Code = "forbidden"
+	// CodeReauthRequired: thao tác nhạy cảm cần vừa đăng nhập lại. Dùng 403, không phải 401,
+	// để app không tự đăng xuất như khi phiên hết hạn.
+	CodeReauthRequired     Code = "reauth_required"
 	CodeNotFound           Code = "not_found"
 	CodeConflict           Code = "conflict"
 	CodeReceiptConflict    Code = "receipt_conflict"
@@ -59,6 +62,7 @@ var statusByCode = map[Code]int{
 	CodeUnauthenticated:     http.StatusUnauthorized,
 	CodeAppCheck:            http.StatusUnauthorized,
 	CodeForbidden:           http.StatusForbidden,
+	CodeReauthRequired:      http.StatusForbidden,
 	CodeNotFound:            http.StatusNotFound,
 	CodeConflict:            http.StatusConflict,
 	CodeReceiptConflict:     http.StatusConflict,

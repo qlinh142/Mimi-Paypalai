@@ -1,12 +1,12 @@
 import { t, uiLang } from "../i18n";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Bell, ChevronRight, Copy, Globe, Info, LogOut, Package, Plus, ShieldCheck, UsersRound, Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { ApiError } from "../api/client";
-import { useHousehold, useHouseholdActions, useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
+import { useDeleteAccount, useHousehold, useHouseholdActions, useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
 import type { Mandate, MandateCategory, Me } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { m15 } from "../i18n/m15";
@@ -433,7 +433,113 @@ export function SettingsPrivacy() {
       <section className="box15 set15__page">
         {S.privacyPage.map((p) => <p key={p}>{p}</p>)}
       </section>
+      <DeleteAccount />
     </Sub>
+  );
+}
+
+/**
+ * B10: xóa tài khoản. Bấm Xóa vĩnh viễn thì gọi DELETE /me; máy chủ chỉ nhận khi vừa đăng
+ * nhập lại trong 5 phút, không thì trả reauth_required và màn này mời đăng nhập lại (Google
+ * chuyển trang, hoặc link email quay về đúng trang này), rồi mẹ bấm Xóa vĩnh viễn lần nữa.
+ */
+function DeleteAccount() {
+  const D = S.del;
+  const auth = useAuth();
+  const me = useMeData();
+  const h = useHousehold();
+  const del = useDeleteAccount();
+  const nav = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [needReauth, setNeedReauth] = useState(false);
+  const [reauthBusy, setReauthBusy] = useState(false);
+
+  // Quay về từ Google hoặc từ link email sau khi đăng nhập lại.
+  useEffect(() => {
+    auth.completeReauthIfPresent().then((r) => {
+      if (r === "ok") {
+        setOpen(true);
+        setNeedReauth(false);
+        setNote(D.reauthed);
+      } else if (r === "expired") {
+        setOpen(true);
+        setNeedReauth(true);
+        setNote(D.linkExpired);
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const others = (h.data?.members.length ?? 1) - 1;
+  const isOwner = !h.data || h.data.owner_uid === me?.uid;
+  const reauthErr = del.error instanceof ApiError && del.error.code === "reauth_required";
+
+  const remove = () => {
+    if (del.isPending) return;
+    setNote(null);
+    del.mutate(undefined, {
+      onSuccess: async () => {
+        await wipeDeviceData();
+        await auth.signOut();
+        nav("/", { replace: true });
+      },
+      onError: (e) => {
+        if (e instanceof ApiError && e.code === "reauth_required") setNeedReauth(true);
+      },
+    });
+  };
+  const reauth = async () => {
+    if (reauthBusy) return;
+    setReauthBusy(true);
+    try {
+      const r = await auth.startReauth("/settings/privacy");
+      if (r === "done") {
+        setNeedReauth(false);
+        setNote(D.reauthed);
+      } else if (r === "link_sent") {
+        setNote(D.linkSent(auth.session?.email ?? ""));
+      }
+    } catch {
+      setNote(t.common.genericError);
+    } finally {
+      setReauthBusy(false);
+    }
+  };
+
+  return (
+    <section className="box15 set15__page" aria-labelledby="del-h">
+      <h2 id="del-h">{D.title}</h2>
+      <p>{D.body}</p>
+      {h.data && others > 0 && <p>{isOwner ? D.ownerNote(others) : D.memberNote}</p>}
+      {!open ? (
+        <button type="button" className="btn btn--block btn--danger" onClick={() => setOpen(true)}>{D.start}</button>
+      ) : (
+        <>
+          {needReauth && !note && <p className="hint" role="status">{D.needReauth}</p>}
+          {note && <p className="hint" role="status">{note}</p>}
+          {del.isError && !reauthErr && <p className="error" role="alert">{errText(del.error)}</p>}
+          {needReauth ? (
+            <button type="button" className="btn btn--primary btn--block" aria-disabled={reauthBusy || undefined} onClick={reauth}>{D.reauth}</button>
+          ) : (
+            <button type="button" className="btn btn--block btn--danger" aria-disabled={del.isPending || undefined} onClick={remove}>
+              {del.isPending ? D.deleting : D.confirm}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn--block"
+            onClick={() => {
+              setOpen(false);
+              setNeedReauth(false);
+              setNote(null);
+              del.reset();
+            }}
+          >
+            {D.cancel}
+          </button>
+        </>
+      )}
+    </section>
   );
 }
 

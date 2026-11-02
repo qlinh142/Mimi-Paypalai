@@ -39,7 +39,9 @@ func WithIdempotency(st idem.Store) Option { return func(s *Server) { s.idem = s
 func (s *Server) idempotent(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Header.Get("Idempotency-Key")
-		if s.idem == nil || key == "" || r.Method == http.MethodGet || r.Method == http.MethodHead {
+		// DELETE /me xóa cả users/{uid}/idempotency; ghi kết quả sau đó sẽ để lại rác của
+		// tài khoản đã xóa. Gọi lại DELETE /me vốn an toàn nên không cần giữ kết quả.
+		if s.idem == nil || key == "" || r.Method == http.MethodGet || r.Method == http.MethodHead || r.Pattern == "DELETE /me" {
 			next.ServeHTTP(w, r)
 			return
 		}

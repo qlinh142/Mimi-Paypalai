@@ -22,6 +22,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 
+	"github.com/smartlife-lab/mimi/backend/internal/account"
 	"github.com/smartlife-lab/mimi/backend/internal/config"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fbauth"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
@@ -145,6 +146,8 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Households: household.New(store, store, nil).WithReceipts(receipts),
 		Pricing:    pricing.New(store, store, nil),
 		History:    history.New(store),
+		Accounts:   account.New(store, store, auth),
+		SignIn:     auth,
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)),
 		httpapi.WithSharedLimiter(fsstore.NewRateLimiter(store)))
 	if err != nil {
