@@ -99,7 +99,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	if err != nil {
 		return err
 	}
-	taxonomy := loadTaxonomy()
+	taxonomy := groupTaxonomy.SpendingKeys()
 	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy, groupTaxonomy.Keys())
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		}
 		var rs *receipt.Service
 		// Thiếu WithTaxonomy thì mọi danh mục bị coi là chưa phân loại và không vào tồn kho.
-		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(loadTaxonomy())); err == nil {
+		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(groupTaxonomy.SpendingKeys())); err == nil {
 			var n int
 			n, err = demo.Seed(ctx, rs, uid, time.Now())
 			log.InfoContext(ctx, "seed-demo done", "receipts", n)
@@ -319,15 +319,4 @@ func listen(ctx context.Context, log *slog.Logger, port string, h http.Handler) 
 	defer cancel()
 	log.Info("shutting down")
 	return srv.Shutdown(shutdownCtx)
-}
-
-// loadTaxonomy: KHÓA TẠM do khung dự án đặt cho đủ 27 danh mục. Thay bằng taxonomy thật
-// trong gói mimi_taxonomy của spec, nhúng từ taxonomy.json bằng go:embed.
-func loadTaxonomy() []string {
-	return []string{
-		"sua", "do-uong", "tuoi-song", "rau-cu", "trai-cay", "do-kho", "gia-vi", "do-dong-lanh",
-		"banh-keo", "an-vat", "me-be", "hoa-pham", "ve-sinh", "my-pham", "giay", "do-dung-bep",
-		"thu-cung", "thuoc", "van-phong-pham", "dien-gia-dung", "do-choi", "quan-ao", "giat-say",
-		"nha-cua", "the-thao", "dich-vu", "khac",
-	}
 }

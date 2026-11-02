@@ -1,4 +1,5 @@
 import type { Messages } from "./en";
+import { categoryLabels } from "./categories";
 
 /** Bản tiếng Việt giữ nguyên chữ của spec. Kiểu Messages bảo đảm không thiếu khóa nào so với bản tiếng Anh. */
 export const vi: Messages = {
@@ -194,37 +195,7 @@ export const vi: Messages = {
     settings: "Gia đình & Cài đặt",
     notifications: "Thông báo",
   },
-  categories: {
-    "hoa-don-dinh-ky": "Khoản chi định kỳ",
-    "sua": "Sữa và chế phẩm sữa",
-    "do-uong": "Đồ uống",
-    "tuoi-song": "Thịt, cá, trứng",
-    "rau-cu": "Rau củ",
-    "trai-cay": "Trái cây",
-    "do-kho": "Đồ khô",
-    "gia-vi": "Gia vị",
-    "do-dong-lanh": "Đồ đông lạnh",
-    "banh-keo": "Bánh kẹo",
-    "an-vat": "Đồ ăn vặt",
-    "me-be": "Mẹ và bé",
-    "hoa-pham": "Hóa phẩm gia đình",
-    "ve-sinh": "Chăm sóc cá nhân",
-    "my-pham": "Mỹ phẩm",
-    "giay": "Giấy các loại",
-    "do-dung-bep": "Đồ dùng bếp",
-    "thu-cung": "Thú cưng",
-    "thuoc": "Thuốc và sức khỏe",
-    "van-phong-pham": "Văn phòng phẩm",
-    "dien-gia-dung": "Điện gia dụng",
-    "do-choi": "Đồ chơi",
-    "quan-ao": "Quần áo",
-    "giat-say": "Giặt sấy",
-    "nha-cua": "Nhà cửa",
-    "the-thao": "Thể thao",
-    "dich-vu": "Dịch vụ",
-    "khac": "Khác",
-    "chua-phan-loai": "Chưa phân loại",
-  },
+  categories: categoryLabels("vi"),
   plan: {
     title: "Kế hoạch mua sắm",
     needsTitle: "Sắp hết",

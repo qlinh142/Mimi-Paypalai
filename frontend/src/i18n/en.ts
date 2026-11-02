@@ -1,3 +1,5 @@
+import { categoryLabels } from "./categories";
+
 /**
  * English UI copy (default for the AI Builder Cup demo).
  * Vocabulary rules from the spec, section 7:
@@ -216,38 +218,8 @@ export const en = {
     settings: "Home & Settings",
     notifications: "Notifications",
   },
-  /** Nhãn nhóm hàng theo category_key của backend (taxonomy trong cmd/mimi). */
-  categories: {
-    "hoa-don-dinh-ky": "Recurring bills",
-    "sua": "Dairy & milk",
-    "do-uong": "Drinks",
-    "tuoi-song": "Meat, fish & eggs",
-    "rau-cu": "Vegetables",
-    "trai-cay": "Fruit",
-    "do-kho": "Pantry staples",
-    "gia-vi": "Condiments & spices",
-    "do-dong-lanh": "Frozen food",
-    "banh-keo": "Sweets & biscuits",
-    "an-vat": "Snacks",
-    "me-be": "Baby care",
-    "hoa-pham": "Household cleaning",
-    "ve-sinh": "Personal care",
-    "my-pham": "Cosmetics",
-    "giay": "Paper products",
-    "do-dung-bep": "Kitchenware",
-    "thu-cung": "Pet supplies",
-    "thuoc": "Medicine & health",
-    "van-phong-pham": "Stationery",
-    "dien-gia-dung": "Home appliances",
-    "do-choi": "Toys",
-    "quan-ao": "Clothing",
-    "giat-say": "Laundry",
-    "nha-cua": "Home & living",
-    "the-thao": "Sports",
-    "dich-vu": "Services",
-    "khac": "Other",
-    "chua-phan-loai": "Uncategorized",
-  },
+  /** Nhãn danh mục chi tiêu: một nguồn ở backend/internal/taxonomy/categories.json. */
+  categories: categoryLabels("en"),
   plan: {
     title: "Shopping list",
     needsTitle: "Running low",

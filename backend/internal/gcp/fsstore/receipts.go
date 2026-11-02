@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/receipt"
+	"github.com/smartlife-lab/mimi/backend/internal/taxonomy"
 )
 
 var (
@@ -165,7 +166,7 @@ func lineDoc(l receipt.Line) map[string]any {
 
 func catOrOther(c string) string {
 	if c == "" {
-		return "chua-phan-loai"
+		return taxonomy.CategoryUncategorized
 	}
 	return c
 }
