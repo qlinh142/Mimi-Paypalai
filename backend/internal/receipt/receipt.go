@@ -222,6 +222,16 @@ type SaveOutcome struct {
 	// Recurring: các kỳ thanh toán định kỳ đã khớp hóa đơn này (2.1 Rule R3), không cộng
 	// chi tiêu lần hai.
 	Recurring []string
+	// Split: món chưa mua của Kế hoạch vừa chốt đã chuyển sang Kế hoạch mới "· còn lại" (B6).
+	Split *SplitResult
+}
+
+// SplitResult: Kế hoạch mới tạo từ món chưa mua.
+type SplitResult struct {
+	FromPlanID string `json:"from_plan_id"`
+	PlanID     string `json:"plan_id"`
+	Name       string `json:"name"`
+	Moved      int    `json:"moved"` // số món đã chuyển
 }
 
 // AssignmentResult tóm tắt một vòng mua hộ sau khi Buyer xác nhận hóa đơn.

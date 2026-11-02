@@ -73,8 +73,11 @@ function Mine() {
       {typeof saved === "string" && <p className="sent15" role="status">{saved}</p>}
       {list.length === 0 && <p className="hint">{m15.plan.mineEmpty}</p>}
       <ul className="plans15">
-        {list.map((p, i) => {
-          const c = carts[i]?.data;
+        {/* B6: kế hoạch "Đã mua xong" xuống cuối danh sách và mờ đi. */}
+        {list
+          .map((p, i) => ({ p, c: carts[i]?.data }))
+          .sort((a, b) => Number(a.c?.phase === "reconciled") - Number(b.c?.phase === "reconciled"))
+          .map(({ p, c }) => {
           const Icon = iconOf(planIcon(p));
           const buyer = (delegated.data?.from_me ?? []).find(
             (a) => a.plan_id === p.id && (a.status === "assigned" || a.status === "shopping"),
@@ -84,7 +87,7 @@ function Mine() {
           const declined = !buyer && (delegated.data?.from_me ?? []).some((x) => x.plan_id === p.id && x.status === "declined");
           return (
             <li key={p.id}>
-              <button type="button" className="plancard15" onClick={() => open(p.id)} aria-label={m15.plan.open(planName(p))}>
+              <button type="button" className={c?.phase === "reconciled" ? "plancard15 plancard15--done" : "plancard15"} onClick={() => open(p.id)} aria-label={m15.plan.open(planName(p))}>
                 <span className="plancard15__icon"><Icon size={26} aria-hidden /></span>
                 <span className="plancard15__body">
                   <span className="plancard15__name">{planName(p)}</span>
