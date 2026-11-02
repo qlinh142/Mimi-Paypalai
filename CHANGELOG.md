@@ -5,6 +5,15 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
+
+Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.
+
+- Máy chủ: mã nhà không còn hết hạn sau 48 giờ. Bỏ `expires_at` khỏi API, vào nhà chỉ kiểm tra mã đúng và nhà chưa đủ 8 người. Job cleanup không gỡ mã mời nữa; mã cũ đang có (kể cả còn trường `invite_expires_at`) giữ nguyên và dùng tiếp.
+- `POST /households/invites` giờ là "tạo hoặc đổi mã": mã cũ hết hiệu lực, người đã ở trong nhà không ảnh hưởng.
+- Cài đặt → Thành viên: chưa có mã thì nút "Mời thành viên" tạo mã; có mã rồi thì hiện "Mã cố định, dùng như ID của nhà", nút "Sao chép mã" và nút "Đổi mã" (bấm 2 lần để xác nhận).
+- Kiểm tra: `go test ./...`, test emulator cleanup sửa lại (mã cũ không bị gỡ), `tsc`, build, bản thử đổi mã trên iPhone 13.
+
 ## 2026-11-02 · Quét giá theo nước và sổ nguồn
 
 Nhánh `feat/gia-theo-nuoc` (trên `feat/gia-nha-minh`). Mẹ chốt 02/11. Luật đầy đủ: `docs/mimi15/luat-gia.md`.

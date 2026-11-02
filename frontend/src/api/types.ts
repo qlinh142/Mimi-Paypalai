@@ -424,7 +424,7 @@ export type Forecast = {
 export type HouseholdMember = { uid: string; display_name: string; role: "owner" | "member"; joined_at: string };
 export type Household = {
   id: string; name: string; owner_uid: string; my_role: "owner" | "member";
-  members: HouseholdMember[]; invite?: { code: string; expires_at: string };
+  members: HouseholdMember[]; invite?: { code: string };
 };
 export type AssignmentItem = { consumption_group_key: string; name_display: string; qty?: number; unit?: string; status: "assigned" | "done" | "returned"; unit_price?: number; category_key?: string };
 export type Assignment = {

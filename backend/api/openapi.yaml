@@ -692,8 +692,8 @@ paths:
   /households/invites:
     post:
       tags: [household]
-      summary: Tạo mã mời 8 ký tự, hết hạn 48 giờ (mã cũ hết hiệu lực)
-      responses: { "201": { description: Created, content: { application/json: { schema: { type: object, properties: { code: { type: string }, expires_at: { type: string, format: date-time } } } } } } }
+      summary: Tạo mã nhà 8 ký tự, cố định không hết hạn. Gọi lại là đổi mã, mã cũ hết hiệu lực
+      responses: { "201": { description: Created, content: { application/json: { schema: { type: object, properties: { code: { type: string } } } } } } }
   /households/join:
     post:
       tags: [household]
@@ -1276,7 +1276,7 @@ components:
         owner_uid: { type: string }
         my_role: { type: string, enum: [owner, member] }
         members: { type: array, items: { type: object, properties: { uid: { type: string }, display_name: { type: string }, role: { type: string }, joined_at: { type: string, format: date-time } } } }
-        invite: { type: object, properties: { code: { type: string }, expires_at: { type: string, format: date-time } } }
+        invite: { type: object, properties: { code: { type: string } } }
     Assignment:
       type: object
       properties:
