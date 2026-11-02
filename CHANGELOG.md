@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Job cleanup hằng ngày (Đợt 4)
+
+- `mimi job cleanup` (Cloud Scheduler gọi mỗi ngày) giờ chạy thật thay vì báo "chưa làm":
+  - Gỡ mã mời đã hết hạn khỏi nhà. Chủ nhà vừa tạo mã mới trong lúc job chạy thì bỏ qua, không gỡ nhầm.
+  - Xóa thông báo trong app quá 90 ngày (màn Thông báo chỉ hiện 30 ngày gần nhất).
+- Thông báo mới có `expire_at` = lúc tạo + 90 ngày, `firestore.indexes.json` thêm TTL cho `events`; job dọn nốt thông báo cũ chưa có trường này.
+- Bộ đếm hạn mức, bản nháp hóa đơn, chống gửi trùng, bộ đếm giới hạn vẫn do TTL của Firestore tự xóa.
+- Rà lại index: mọi truy vấn nhiều điều kiện đều đã có index, không cần thêm.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestCleanupEmulator` chạy trong job emulator của CI.
+
+---
+
 ## 2026-11-02 · Xóa tài khoản, đăng nhập lại để xác nhận (B10)
 
 - Cài đặt → Quyền riêng tư & bảo mật có mục Xóa tài khoản. Bấm Xóa vĩnh viễn: nếu mẹ chưa đăng nhập lại trong 5 phút, Mimi mời đăng nhập lại (Google, hoặc link gửi về email rồi quay lại đúng trang này), sau đó mẹ bấm Xóa vĩnh viễn lần nữa.

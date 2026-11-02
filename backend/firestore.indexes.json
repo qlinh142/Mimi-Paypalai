@@ -165,6 +165,12 @@
       "indexes": []
     },
     {
+      "collectionGroup": "events",
+      "fieldPath": "expire_at",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "rate",
       "fieldPath": "expire_at",
       "ttl": true,

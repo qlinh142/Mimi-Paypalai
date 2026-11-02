@@ -41,6 +41,9 @@ func (s *Store) user(uid string) *firestore.DocumentRef { return s.c.Collection(
 
 func isNotFound(err error) bool { return status.Code(err) == codes.NotFound }
 
+// isPrecondition: tài liệu đã đổi sau lần đọc (LastUpdateTime không khớp).
+func isPrecondition(err error) bool { return status.Code(err) == codes.FailedPrecondition }
+
 // ---------- Sẵn sàng ----------
 
 func (s *Store) Ready(ctx context.Context) error {

@@ -36,6 +36,7 @@ func (s *Store) writeEvent(tx *firestore.Transaction, uid string, ev event) (pen
 	err := tx.Set(s.user(uid).Collection("events").Doc(ev.ID), map[string]any{
 		"kind": ev.Kind, "at": ev.At, "actor_name": ev.ActorName, "plan_id": ev.PlanID, "plan_owner_uid": ev.planOwner,
 		"assignment_id": ev.AssignmentID, "items": ev.Items, "returned": ev.Returned, "read": false, "delivery": "pending",
+		"expire_at": ev.At.Add(EventRetention), // TTL policy xóa; job cleanup dọn bản cũ chưa có trường này
 	})
 	return pendingEvent{uid: uid, id: ev.ID}, err
 }
