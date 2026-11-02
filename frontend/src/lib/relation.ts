@@ -1,23 +1,20 @@
+import { useMe, useSaveSettings } from "../api/hooks";
+
 /**
- * Vai trong nhà của từng người (Anh, Chị, Bố, Mẹ...). API chưa có trường này nên tạm lưu trên máy;
- * khi backend thêm trường thì chuyển sang lưu cùng thành viên.
+ * Tên gọi người nhà (Anh, Chị, Bố, Mẹ...) mà mỗi tài khoản tự đặt cho người khác. Lưu trên máy
+ * chủ trong settings.relations, nên đăng nhập lại vẫn còn. Danh sách khớp user.Relations ở backend.
  */
 export const RELATIONS = ["anh", "chi", "em", "bo", "me", "con", "ong", "ba", "khac"] as const;
-const KEY = (uid: string) => `mimi.relation.${uid}`;
 
-export function relationOf(uid: string): string {
-  try {
-    return localStorage.getItem(KEY(uid)) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-export function setRelation(uid: string, rel: string) {
-  try {
-    if (rel) localStorage.setItem(KEY(uid), rel);
-    else localStorage.removeItem(KEY(uid));
-  } catch {
-    // bỏ qua
-  }
+export function useRelations() {
+  const me = useMe();
+  const save = useSaveSettings();
+  // Đang lưu thì hiện ngay giá trị vừa chọn, không chờ /me tải lại.
+  const map = { ...(me.data?.settings.relations ?? {}), ...(save.isPending ? save.variables?.relations : undefined) };
+  return {
+    relationOf: (uid: string): string => map[uid] || "",
+    setRelation: (uid: string, rel: string) => save.mutate({ relations: { [uid]: rel } }),
+    saving: save.isPending,
+    error: save.isError,
+  };
 }

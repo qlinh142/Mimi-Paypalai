@@ -16,6 +16,7 @@ export type Me = {
     timezone: string;
     remind_enabled?: boolean;
     digest_time?: string;      // HH:MM
+    relations?: Record<string, string>; // tên gọi người nhà theo uid, lưu trên máy chủ
   };
 };
 
@@ -266,6 +267,8 @@ export type SettingsPatch = Partial<{
   digest_time: string;
   timezone: string;
   lang: "vi" | "en";
+  /** Chỉ gửi phần đổi; "" là xóa tên gọi của uid đó. */
+  relations: Record<string, string>;
 }>;
 
 export type ApiErrorBody = { code: string; message: string; fields?: Record<string, unknown>; retryable?: boolean };
@@ -365,6 +368,7 @@ export type TaxonomyGroup = {
 /** 3.1: một Kế hoạch trong danh sách. */
 export type PlanMeta = {
   id: string; name: string; status: "active" | "archived"; default: boolean; item_count: number; buy_date?: string;
+  icon?: string; // khóa trong PLAN_ICONS, máy chủ lưu
 };
 
 /** 2.1: khoản định kỳ và kỳ thanh toán. */

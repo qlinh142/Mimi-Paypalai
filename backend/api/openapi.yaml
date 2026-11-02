@@ -460,7 +460,7 @@ paths:
   /plans/{id}:
     patch:
       tags: [plan]
-      summary: Đổi tên hoặc lưu trữ (archived chặn ghi)
+      summary: "Đổi tên, lưu trữ (archived chặn ghi) hoặc đổi biểu tượng; id=default chỉ đổi được icon"
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PlanInput" } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlanMeta" } } } } }
@@ -741,6 +741,11 @@ components:
         replacement_enabled: { type: boolean }
         sale_enabled: { type: boolean }
         lang: { type: string, enum: [vi, en], description: "Ngôn ngữ dịch hóa đơn, không phải ngôn ngữ giao diện" }
+        relations:
+          type: object
+          maxProperties: 50
+          description: "Tên gọi người nhà theo uid, riêng từng tài khoản. PUT chỉ gửi phần đổi; \"\" là xóa"
+          additionalProperties: { type: string, enum: [anh, chi, em, bo, me, con, ong, ba, khac, ""] }
     Profile:
       type: object
       properties:
@@ -975,12 +980,19 @@ components:
         default: { type: boolean }
         item_count: { type: integer }
         buy_date: { type: string }
+        icon: { $ref: "#/components/schemas/PlanIcon" }
+    PlanIcon:
+      type: string
+      enum: [bag, family, kid, gift, home, food]
+      default: bag
+      description: "Khóa trong bộ biểu tượng chung của app; hình vẽ nằm trong app"
     PlanInput:
       type: object
       additionalProperties: false
       properties:
         name: { type: string, maxLength: 40 }
         status: { type: string, enum: [active, archived] }
+        icon: { $ref: "#/components/schemas/PlanIcon" }
     PriceObservation:
       type: object
       properties:

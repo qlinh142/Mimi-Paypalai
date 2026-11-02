@@ -26,6 +26,25 @@ type SettingsPatch struct {
 	ReplacementEnabled *bool     `json:"replacement_enabled"`
 	SaleEnabled        *bool     `json:"sale_enabled"`
 	Lang               *string   `json:"lang"`
+	// Relations: tên gọi người nhà mà người này đặt, theo uid (Anh, Chị, Bố...). Chỉ gửi
+	// phần thay đổi; giá trị "" xóa tên gọi của uid đó. Mỗi tài khoản giữ bản riêng.
+	Relations map[string]string `json:"relations"`
+}
+
+// Relations là bộ tên gọi người nhà chung của app; app hiển thị theo ngôn ngữ đang dùng.
+var Relations = []string{"anh", "chi", "em", "bo", "me", "con", "ong", "ba", "khac"}
+
+const maxRelations = 50
+
+var relUIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+
+func validRelation(r string) bool {
+	for _, x := range Relations {
+		if x == r {
+			return true
+		}
+	}
+	return false
 }
 
 // Stored là phần tài liệu users/{uid} mà cài đặt được phép đọc và ghi.
@@ -50,7 +69,7 @@ func (p SettingsPatch) Validate() error {
 	bad := func(field, msg string) error {
 		return apperr.New(apperr.CodeValidation, msg).With("field", field)
 	}
-	if p == (SettingsPatch{}) {
+	if p.empty() {
 		return apperr.New(apperr.CodeValidation, "Chưa có thay đổi nào để lưu.")
 	}
 	if p.DisplayName != nil {
@@ -90,7 +109,21 @@ func (p SettingsPatch) Validate() error {
 	if p.Lang != nil && *p.Lang != "vi" && *p.Lang != "en" {
 		return bad("lang", "Ngôn ngữ dịch hóa đơn chỉ là vi hoặc en.")
 	}
+	if len(p.Relations) > maxRelations {
+		return bad("relations", "Tối đa 50 tên gọi người nhà.")
+	}
+	for uid, rel := range p.Relations {
+		if !relUIDRe.MatchString(uid) || (rel != "" && !validRelation(rel)) {
+			return bad("relations", "Tên gọi người nhà không hợp lệ.")
+		}
+	}
 	return nil
+}
+
+func (p SettingsPatch) empty() bool {
+	return p.DisplayName == nil && p.LeadDays == nil && p.RemindEnabled == nil && p.RemindFreq == nil &&
+		p.DigestTime == nil && p.Timezone == nil && p.Channels == nil && p.ReplacementEnabled == nil &&
+		p.SaleEnabled == nil && p.Lang == nil && len(p.Relations) == 0
 }
 
 // Apply gộp bản vá vào cài đặt hiện tại và tính lại lịch gửi bản tin khi cần.
@@ -135,6 +168,25 @@ func (p SettingsPatch) Apply(cur Stored, now time.Time) Stored {
 	if p.Lang != nil {
 		set("lang", *p.Lang)
 	}
+	if len(p.Relations) > 0 {
+		rels := map[string]any{}
+		if old, ok := cur.Settings["relations"].(map[string]any); ok {
+			for k, v := range old {
+				rels[k] = v
+			}
+		}
+		for uid, rel := range p.Relations {
+			if rel == "" {
+				delete(rels, uid)
+			} else {
+				rels[uid] = rel
+			}
+		}
+		if len(rels) > maxRelations {
+			rels = trimRelations(rels, p.Relations)
+		}
+		set("relations", rels)
+	}
 
 	// Đổi lịch nhắc thì tính lại lượt gửi kế tiếp; job digest chỉ đọc next_notify_at.
 	scheduleChanged := p.RemindEnabled != nil || p.DigestTime != nil || p.Timezone != nil
@@ -150,6 +202,23 @@ func (p SettingsPatch) Apply(cur Stored, now time.Time) Stored {
 		next.NextNotifyAt = &at
 	}
 	return next
+}
+
+// trimRelations giữ các tên vừa đặt rồi thêm tên cũ cho đủ maxRelations, để map không lớn mãi.
+func trimRelations(all map[string]any, fresh map[string]string) map[string]any {
+	out := map[string]any{}
+	for uid, rel := range fresh {
+		if rel != "" {
+			out[uid] = rel
+		}
+	}
+	for uid, v := range all {
+		if len(out) >= maxRelations {
+			break
+		}
+		out[uid] = v
+	}
+	return out
 }
 
 // View là phản hồi PUT /settings: cài đặt sau khi lưu, kèm tên hiển thị.
