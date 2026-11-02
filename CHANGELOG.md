@@ -5,6 +5,18 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Job fx-sync hằng ngày: tỷ giá cho hóa đơn ngoại tệ (Đợt 4)
+
+- `mimi job fx-sync` lấy tỷ giá mỗi ngày từ open.er-api.com (miễn phí, không cần khóa) và ghi `fx_rates/{ngoại tệ}_{ngày}` cho 12 ngoại tệ hay gặp (USD, EUR, JPY, KRW, CNY, THB, SGD, GBP, AUD, TWD, HKD, MYR).
+- Mỗi tỷ giá ghi rõ nguồn và lúc lấy; hóa đơn ngoại tệ dùng tỷ giá gần nhất không sau ngày mua, như đã thiết kế. Trước đây chưa có job này nên hóa đơn ngoại tệ không quy đổi được.
+- Tỷ giá tính bằng số hữu tỉ từ chuỗi gốc, không qua số thực, lưu 4 chữ số thập phân.
+- Nguồn lỗi hoặc thiếu VND thì job báo lỗi, không ghi gì; thiếu một ngoại tệ thì bỏ qua ngoại tệ đó.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; test mới `TestSyncFromERAPI`, `TestSyncRejectsBadTable` (máy chủ giả), `TestSaveRatesThenRateEmulator`.
+
+---
+
 ## 2026-11-02 · Job cleanup hằng ngày (Đợt 4)
 
 - `mimi job cleanup` (Cloud Scheduler gọi mỗi ngày) giờ chạy thật thay vì báo "chưa làm":
