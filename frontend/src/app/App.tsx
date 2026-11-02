@@ -5,6 +5,8 @@ import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router
 const Router = import.meta.env.VITE_ROUTER === "hash" ? HashRouter : BrowserRouter;
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { configureApi, flushQueue } from "../api/client";
+import { setQueueOwner } from "../lib/offlineQueue";
+import { claimDevice } from "../lib/localData";
 import { UndoProvider, UpdateBanner } from "../components/AppShell";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { queryClient, queryPersister } from "./queryClient";
@@ -50,7 +52,9 @@ function Gate() {
   }, [auth]);
 
   useEffect(() => {
+    setQueueOwner(auth.session?.uid ?? null);
     if (!auth.session) return;
+    void claimDevice(auth.session.uid);
     flushQueue();
     const onOnline = () => flushQueue();
     window.addEventListener("online", onOnline);

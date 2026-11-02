@@ -10,6 +10,7 @@ import { clearQueue } from "./offlineQueue";
  */
 const PREFIX = "mimi.";
 const KEEP = new Set(["mimi.uiLang"]);
+const OWNER_KEY = "mimi.deviceOwner";
 
 export function clearLocalUserData() {
   try {
@@ -30,4 +31,29 @@ export async function wipeDeviceData() {
   queryClient.clear();
   clearLocalUserData();
   await Promise.all([queryPersister.removeClient(), clearQueue()]);
+}
+
+/**
+ * Gọi mỗi khi có người đăng nhập. Nếu máy đang giữ dữ liệu của một tài khoản KHÁC (người trước bị
+ * tự đăng xuất vì hết phiên nên chưa kịp dọn), xóa cache và nháp của người đó trước khi hiện gì.
+ * Hàng đợi ghi không bị xóa ở đây: offlineQueue tự giấu và giữ thao tác của người khác.
+ */
+export async function claimDevice(uid: string) {
+  let prev: string | null = null;
+  try {
+    prev = localStorage.getItem(OWNER_KEY);
+  } catch {
+    return;
+  }
+  if (prev === uid) return;
+  if (prev !== null) {
+    queryClient.clear();
+    clearLocalUserData();
+    await queryPersister.removeClient();
+  }
+  try {
+    localStorage.setItem(OWNER_KEY, uid);
+  } catch {
+    // bỏ qua
+  }
 }
