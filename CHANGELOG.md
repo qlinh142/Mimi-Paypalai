@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Sửa 6 lỗ hổng từ bảng 100 vấn đề triển khai
+
+- Đăng xuất xóa sạch dữ liệu của người dùng trong máy: cache API, hàng đợi ghi và mọi khóa `mimi.*` trong localStorage (nháp kế hoạch, vòng đi mua hộ...). Chỉ giữ ngôn ngữ giao diện. (vấn đề 65)
+- App tự cắt request sau 20 giây (ảnh hóa đơn 65 giây), báo "Mạng chậm quá" thay vì quay mãi; lỗi hết giờ của GET được tự thử lại. (vấn đề 13, 90)
+- Thư tóm tắt gửi theo giờ người dùng chọn trong Cài đặt; gửi lỗi tạm thời thì thử lại sau 15 phút, tối đa 3 lần. (vấn đề 52, 58)
+- Mỗi giỏ và đơn PayPal ghi kèm nguồn và ngày của tỷ giá (`rate_source`, `rate_as_of`); `PAYPAL_MODE=live` bắt buộc khai báo tỷ giá. (vấn đề 44)
+- GitHub Actions: `go vet`, `go test -race`, build frontend, quét bí mật bằng gitleaks. (vấn đề 71, 95)
+- Chống gửi trùng cho mọi thao tác ghi nằm ở PR #6, cần gộp riêng.
+
+### Cách kiểm tra
+- `go vet ./...`, `go test ./...`, `npm run build` đều qua. Có test mới cho giờ gửi thư, gửi lại khi lỗi và thông tin tỷ giá.
+
+---
+
 ## 2026-10-31 · Mimi 1.5: màn 0–6 theo ảnh mẫu và các góp ý sau Cổng 3
 
 - PR #2 (đã gộp, `8ecf6a8`): màn 0–6 theo ảnh mẫu đã duyệt.

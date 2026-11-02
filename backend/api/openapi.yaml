@@ -1157,6 +1157,8 @@ components:
         total_vnd: { $ref: "#/components/schemas/Vnd" }
         amount_usd: { type: string }
         vnd_per_usd: { type: integer }
+        rate_source: { type: string, description: Tỷ giá lấy từ đâu }
+        rate_as_of: { type: string, format: date, description: Tỷ giá của ngày nào }
         snapshot_at: { type: string, format: date }
         decision: { $ref: "#/components/schemas/Decision" }
     Order:
@@ -1169,6 +1171,8 @@ components:
         total_vnd: { $ref: "#/components/schemas/Vnd" }
         amount_usd: { type: string }
         vnd_per_usd: { type: integer }
+        rate_source: { type: string, description: Tỷ giá lấy từ đâu }
+        rate_as_of: { type: string, format: date, description: Tỷ giá của ngày nào }
         decision: { $ref: "#/components/schemas/Decision" }
         approved_by_user: { type: boolean }
         paypal_order_id: { type: string }

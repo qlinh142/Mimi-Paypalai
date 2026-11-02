@@ -313,6 +313,8 @@ export type Basket = {
   total_vnd: number;
   amount_usd: string;
   vnd_per_usd: number;
+  rate_source?: string;
+  rate_as_of?: string;
   snapshot_at: string;
   decision: { result: MandateResult; reasons: MandateReason[] };
 };
@@ -333,6 +335,8 @@ export type Order = {
   total_vnd: number;
   amount_usd: string;
   vnd_per_usd: number;
+  rate_source?: string;
+  rate_as_of?: string;
   decision: { result: MandateResult; reasons: MandateReason[] };
   approved_by_user: boolean;
   paypal_order_id: string;

@@ -19,6 +19,7 @@ export const en = {
     prototype: "Prototype · sample data",
     offline: "Showing saved data. Changes will sync when you're back online.",
     sessionExpired: "Your session has expired. Sign in again.",
+    timeout: "The network is too slow and Mimi got no answer. Please try again.",
     genericError: "Something went wrong. Try again in a few minutes.",
   },
 

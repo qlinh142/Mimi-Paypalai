@@ -291,3 +291,17 @@ func TestCheckoutGuards(t *testing.T) {
 		t.Fatalf("bad id: %v", err)
 	}
 }
+
+// Vấn đề 44: đơn phải ghi lại tỷ giá đã dùng, lấy từ đâu và của ngày nào.
+func TestCheckoutRecordsRateInfo(t *testing.T) {
+	lines := planLines{{Key: "trung", Name: "Trứng", Qty: 20, Unit: "qua", CategoryKey: "tuoi-song"}}
+	svc, _ := setup(t, enabled, lines)
+	svc.WithRateInfo("vietcombank-ban-ra", "2026-11-01")
+	o, err := svc.Checkout(context.Background(), owner, CheckoutRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.VNDPerUSD != 25_000 || o.RateSource != "vietcombank-ban-ra" || o.RateAsOf != "2026-11-01" {
+		t.Fatalf("rate info %d %q %q", o.VNDPerUSD, o.RateSource, o.RateAsOf)
+	}
+}

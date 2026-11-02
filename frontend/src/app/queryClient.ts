@@ -12,10 +12,10 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       gcTime: 7 * 24 * 60 * 60 * 1000,
-      // Lỗi 4xx (401, 403, 404, 422) gọi lại cũng vậy: chỉ thử lại lỗi mạng và 5xx.
+      // Lỗi 4xx (401, 403, 404, 422) gọi lại cũng vậy: chỉ thử lại lỗi mạng, hết giờ (408) và 5xx.
       retry: (count, err) => {
         const status = (err as { status?: number }).status ?? 0;
-        return count < 2 && !(status >= 400 && status < 500);
+        return count < 2 && !(status >= 400 && status < 500 && status !== 408);
       },
       networkMode: "offlineFirst",
     },

@@ -13,6 +13,7 @@ export const vi: Messages = {
     prototype: "Bản thử nghiệm · dữ liệu mẫu",
     offline: "Đang xem bản đã lưu. Thay đổi sẽ đồng bộ khi có mạng.",
     sessionExpired: "Phiên đăng nhập đã hết, hãy đăng nhập lại.",
+    timeout: "Mạng chậm quá, Mimi chưa nhận được trả lời. Thử lại nhé.",
     genericError: "Có lỗi xảy ra, thử lại sau ít phút.",
   },
   nav: {

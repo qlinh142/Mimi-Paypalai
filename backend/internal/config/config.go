@@ -38,6 +38,10 @@ type Config struct {
 	PayPalClientID string
 	PayPalSecret   string // gắn từ Secret Manager
 	VNDPerUSD      int64  // PayPal không nhận VND: tỷ giá quy đổi cho đơn online
+	// Nguồn và ngày của tỷ giá (vấn đề 44): lưu kèm mỗi đơn để sau này biết đơn được quy đổi
+	// theo tỷ giá nào. PAYPAL_RATE_SOURCE, PAYPAL_RATE_AS_OF (YYYY-MM-DD).
+	VNDRateSource string
+	VNDRateAsOf   string
 }
 
 func Load() (Config, error) {
@@ -62,6 +66,8 @@ func Load() (Config, error) {
 		PayPalClientID:    os.Getenv("PAYPAL_CLIENT_ID"),
 		PayPalSecret:      os.Getenv("PAYPAL_CLIENT_SECRET"),
 		VNDPerUSD:         25_000,
+		VNDRateSource:     get("PAYPAL_RATE_SOURCE", "mac-dinh-cau-hinh"),
+		VNDRateAsOf:       os.Getenv("PAYPAL_RATE_AS_OF"),
 	}
 	var errs []error
 	if c.ProjectID == "" {
@@ -80,6 +86,15 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("PAYPAL_VND_PER_USD invalid: %q", v))
 		}
 		c.VNDPerUSD = n
+	}
+	if c.VNDRateAsOf != "" {
+		if _, err := time.Parse("2006-01-02", c.VNDRateAsOf); err != nil {
+			errs = append(errs, fmt.Errorf("PAYPAL_RATE_AS_OF invalid: %q (YYYY-MM-DD)", c.VNDRateAsOf))
+		}
+	}
+	// Tiền thật thì không được chạy bằng tỷ giá mặc định trong code.
+	if c.PayPalMode == "live" && (os.Getenv("PAYPAL_VND_PER_USD") == "" || c.VNDRateAsOf == "") {
+		errs = append(errs, errors.New("PAYPAL_VND_PER_USD and PAYPAL_RATE_AS_OF are required for PAYPAL_MODE=live"))
 	}
 	switch c.PayPalMode {
 	case "fake", "off":
