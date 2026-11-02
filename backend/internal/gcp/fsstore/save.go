@@ -138,8 +138,7 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		}
 
 		// Kế hoạch: Plan của người lưu (dòng cá nhân) và Plan của Owner (dòng mua hộ).
-		planTargets := map[string]map[string]planTarget{} // owner uid -> group -> dòng
-		planGroups := map[string]map[string]bool{}
+		planGroups := map[string]map[string]bool{} // owner uid -> các nhóm có trong hóa đơn
 		for _, l := range lines {
 			if l.GroupKey == "" {
 				continue
@@ -150,26 +149,26 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 			}
 			planGroups[owner][l.GroupKey] = true
 		}
-		for _, owner := range sortedKeys(planGroups) {
-			planID := r.SourcePlanID
-			if owner != uid {
-				planID = asg.planID
+		var asgPlan string
+		if asg != nil {
+			asgPlan = asg.planID
+		}
+		buys2 := planBuys(lines, uid, r.SourcePlanID, asgPlan)
+		planTargets := map[string]planTarget{} // planBuyKey -> dòng Kế hoạch sẽ đối chiếu
+		for _, k := range sortedKeys(buys2) {
+			b := buys2[k]
+			ref := s.planItems(b.owner, b.plan).Doc(b.group)
+			snap, err := tx.Get(ref)
+			if err != nil && !isNotFound(err) {
+				return err
 			}
-			planTargets[owner] = map[string]planTarget{}
-			for _, g := range sortedKeys(planGroups[owner]) {
-				ref := s.planItems(owner, planID).Doc(g)
-				snap, err := tx.Get(ref)
-				if err != nil && !isNotFound(err) {
-					return err
-				}
-				if err != nil {
-					continue
-				}
-				st := snap.Data()["status"]
-				// Dòng cá nhân chỉ đóng dòng open; dòng đang giao cho người khác mua giữ nguyên.
-				if (owner == uid && st == "open") || (owner != uid && st == "assigned") {
-					planTargets[owner][g] = planTarget{ref: ref, doc: snap.Data()}
-				}
+			if err != nil {
+				continue
+			}
+			st := snap.Data()["status"]
+			// Dòng cá nhân chỉ đóng dòng open; dòng đang giao cho người khác mua giữ nguyên.
+			if (b.owner == uid && st == "open") || (b.owner != uid && st == "assigned") {
+				planTargets[k] = planTarget{ref: ref, doc: snap.Data()}
 			}
 		}
 		// Dòng Kế hoạch của Owner cho các món chưa mua trong vòng (để trả về open).
@@ -294,27 +293,27 @@ func (s *Store) SaveReceipt(ctx context.Context, uid string, r receipt.Receipt, 
 		// Reconcile (3.1 mục 15, Mimi 2.0 mục 19): mua đủ số lượng thì dòng xong; mua thiếu
 		// (cùng chiều đo) thì giữ mở và ghi lượng đã mua. Dòng chưa nhập số lượng coi là đủ.
 		reconciled := map[string]*firestore.DocumentRef{} // doc Plan có món vừa đối chiếu
-		for _, owner := range sortedKeys(planTargets) {
-			for g, t := range planTargets[owner] {
-				if pd := t.ref.Parent.Parent; pd != nil {
-					reconciled[pd.Path] = pd
+		doneSeen := map[string]bool{}
+		for _, k := range sortedKeys(planTargets) {
+			t, b := planTargets[k], buys2[k]
+			if pd := t.ref.Parent.Parent; pd != nil {
+				reconciled[pd.Path] = pd
+			}
+			upd, done := reconcilePlanLine(t.doc, b.qty, b.unit, r.ID, now)
+			if b.owner != uid {
+				// Vòng mua hộ kết thúc sau hóa đơn này: mua thiếu cũng trả lại Owner.
+				upd = append(upd, firestore.Update{Path: "assigned_to_uid", Value: nil}, firestore.Update{Path: "assignment_id", Value: nil})
+				if !done {
+					upd = append(upd, firestore.Update{Path: "status", Value: "open"})
 				}
-				q, unit := lineQty(lines, g, owner, uid)
-				upd, done := reconcilePlanLine(t.doc, q, unit, r.ID, now)
-				if owner != uid {
-					// Vòng mua hộ kết thúc sau hóa đơn này: mua thiếu cũng trả lại Owner.
-					upd = append(upd, firestore.Update{Path: "assigned_to_uid", Value: nil}, firestore.Update{Path: "assignment_id", Value: nil})
-					if !done {
-						upd = append(upd, firestore.Update{Path: "status", Value: "open"})
-					}
-				}
-				upd = append(upd, firestore.Update{Path: "matched_receipt_id", Value: r.ID})
-				if err := tx.Update(t.ref, upd); err != nil {
-					return err
-				}
-				if done && owner == uid {
-					out.PlanDone = append(out.PlanDone, g)
-				}
+			}
+			upd = append(upd, firestore.Update{Path: "matched_receipt_id", Value: r.ID})
+			if err := tx.Update(t.ref, upd); err != nil {
+				return err
+			}
+			if done && b.owner == uid && !doneSeen[b.group] {
+				doneSeen[b.group] = true
+				out.PlanDone = append(out.PlanDone, b.group)
 			}
 		}
 		// Plan đã có hóa đơn đối chiếu → giai đoạn reconciled (3.1 mục 18).
@@ -534,22 +533,62 @@ func writeGroup(tx *firestore.Transaction, ref *firestore.DocumentRef, st *group
 
 // lineQty cộng lượng canonical của một nhóm trong hóa đơn cho một người nhận hàng, theo
 // chiều đo của dòng đầu tiên.
-func lineQty(lines []receipt.Line, group, owner, uid string) (float64, domain.Unit) {
-	var total float64
-	var unit domain.Unit
+// planBuy là lượng một nhóm trong hóa đơn trừ vào một dòng Kế hoạch (người, Plan, nhóm).
+type planBuy struct {
+	owner, plan, group string
+	qty                float64 // theo canonical unit
+	unit               domain.Unit
+}
+
+// planBuys chia các dòng hóa đơn vào dòng Kế hoạch. Dòng mua hộ trừ vào Plan của vòng.
+// Dòng cá nhân trừ vào các Plan app đã chia (B3, Line.Plans, theo Qty của dòng); dòng
+// không có phần chia thì trừ vào source_plan_id như trước. Lượng mua cộng theo canonical
+// unit đầu tiên gặp; đơn vị khác chiều đo bị bỏ (reconcilePlanLine coi là đủ).
+func planBuys(lines []receipt.Line, uid, sourcePlan, asgPlan string) map[string]*planBuy {
+	out := map[string]*planBuy{}
+	add := func(owner, planID, group string, q float64, u domain.Unit) {
+		if planID == "" {
+			planID = plan.DefaultPlanID
+		}
+		k := owner + "|" + planID + "|" + group
+		b := out[k]
+		if b == nil {
+			b = &planBuy{owner: owner, plan: planID, group: group}
+			out[k] = b
+		}
+		if q <= 0 {
+			return
+		}
+		if b.unit == "" {
+			b.unit = u
+		}
+		if u == b.unit {
+			b.qty += q
+		}
+	}
 	for _, l := range lines {
-		if l.GroupKey != group || ownerOf(l, uid) != owner || l.CanonicalQty <= 0 {
+		if l.GroupKey == "" {
 			continue
 		}
 		u := domain.Unit(l.CanonicalUnit)
-		if unit == "" {
-			unit = u
+		owner := ownerOf(l, uid)
+		if owner != uid {
+			add(owner, asgPlan, l.GroupKey, l.CanonicalQty, u)
+			continue
 		}
-		if u == unit {
-			total += l.CanonicalQty
+		if !l.PlanSet {
+			add(uid, sourcePlan, l.GroupKey, l.CanonicalQty, u)
+			continue
+		}
+		for _, ps := range l.Plans {
+			q := l.CanonicalQty
+			if l.Qty > 0 && ps.Qty > 0 {
+				q = l.CanonicalQty * ps.Qty / l.Qty
+			}
+			add(uid, ps.PlanID, l.GroupKey, q, u)
 		}
 	}
-	return total, unit
+	return out
 }
 
 // scheduleNext tạo kỳ tiếp theo (pending) của một khoản định kỳ và dời next_due_on

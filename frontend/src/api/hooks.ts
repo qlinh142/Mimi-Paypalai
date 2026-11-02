@@ -147,7 +147,11 @@ export function useSaveReceipt() {
  */
 export function toSaveRequest(
   draft: ReceiptDraft,
-  opts: { purchasedOn: string; usePrediction: boolean; confirmDuplicate: boolean; planId?: string; assignmentId?: string },
+  opts: {
+    purchasedOn: string; usePrediction: boolean; confirmDuplicate: boolean; planId?: string; assignmentId?: string;
+    /** B3: phần chia từng dòng vào kế hoạch (theo line_id), như màn Xác nhận đang hiện. */
+    linePlans?: Map<string, { plan_id: string; qty: number }[]>;
+  },
   lines: ReceiptDraftLine[] = draft.lines,
 ): SaveReceiptRequest {
   return {
@@ -175,6 +179,7 @@ export function toSaveRequest(
       package_count: l.package_count,
       package_size: l.package_size,
       package_unit: l.package_unit,
+      ...(opts.linePlans?.has(l.line_id) ? { plans: opts.linePlans.get(l.line_id) } : {}),
     })),
     use_for_prediction: opts.usePrediction,
     confirm_duplicate: opts.confirmDuplicate,

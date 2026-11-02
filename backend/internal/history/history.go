@@ -41,6 +41,9 @@ type Line struct {
 	PurchasedOn  string
 	SavedAt      time.Time
 	AssignmentID string
+	// B3: Kế hoạch mà dòng đã trừ vào. PlanSet false: dòng lưu trước B3, theo SourcePlanID.
+	PlanIDs []string
+	PlanSet bool
 }
 
 // Receipt là hóa đơn đã lưu của chính người gọi.
@@ -160,7 +163,7 @@ func (s *Service) History(ctx context.Context, p authz.Principal) ([]Entry, erro
 	}
 	out := make([]Entry, 0, len(rs))
 	for _, r := range rs {
-		e := Entry{ReceiptID: r.ID, Store: r.Store, PurchasedAt: s.at(r.PurchasedOn, r.SavedAt), TotalVND: r.TotalVND, Kind: "own", PlanName: plans[r.SourcePlanID]}
+		e := Entry{ReceiptID: r.ID, Store: r.Store, PurchasedAt: s.at(r.PurchasedOn, r.SavedAt), TotalVND: r.TotalVND, Kind: "own", PlanName: firstPlan(r, plans)}
 		e.ItemNames, e.MissingPrice = names(r.Lines)
 		out = append(out, e)
 	}
@@ -273,11 +276,9 @@ func (s *Service) Detail(ctx context.Context, p authz.Principal, id string) (Det
 		return Detail{}, err
 	}
 	d := Detail{Entry: Entry{ReceiptID: r.ID, Store: r.Store, PurchasedAt: s.at(r.PurchasedOn, r.SavedAt), TotalVND: r.TotalVND, Kind: "own",
-		PlanName: plans[r.SourcePlanID]}, Plans: []PlanRef{}, Discount: r.DiscountVND}
+		PlanName: firstPlan(r, plans)}, Plans: []PlanRef{}, Discount: r.DiscountVND}
 	d.ItemNames, d.MissingPrice = names(r.Lines)
-	if r.SourcePlanID != "" && plans[r.SourcePlanID] != "" {
-		d.Plans = append(d.Plans, PlanRef{ID: r.SourcePlanID, Name: plans[r.SourcePlanID]})
-	}
+	d.Plans = receiptPlans(r, plans)
 	sp := Split{}
 	for _, l := range r.Lines {
 		dl := detailLine(l)
@@ -308,6 +309,37 @@ func (s *Service) Detail(ctx context.Context, p authz.Principal, id string) (Det
 	sp.OwnerName = who[sp.OwnerUID]
 	d.Split = &sp
 	return d, nil
+}
+
+func firstPlan(r Receipt, names map[string]string) string {
+	if ps := receiptPlans(r, names); len(ps) > 0 {
+		return ps[0].Name
+	}
+	return ""
+}
+
+// receiptPlans: các Kế hoạch đặt tên mà hóa đơn đã trừ vào, theo thứ tự gặp. Dòng lưu
+// trước B3 dùng source_plan_id của hóa đơn. Kế hoạch chính và Kế hoạch đã xóa không hiện.
+func receiptPlans(r Receipt, names map[string]string) []PlanRef {
+	out := []PlanRef{}
+	seen := map[string]bool{}
+	add := func(id string) {
+		if id == "" || seen[id] || names[id] == "" {
+			return
+		}
+		seen[id] = true
+		out = append(out, PlanRef{ID: id, Name: names[id]})
+	}
+	for _, l := range r.Lines {
+		if !l.PlanSet {
+			add(r.SourcePlanID)
+			continue
+		}
+		for _, id := range l.PlanIDs {
+			add(id)
+		}
+	}
+	return out
 }
 
 func (s *Service) delegatedDetail(ctx context.Context, uid, id string) (Detail, error) {

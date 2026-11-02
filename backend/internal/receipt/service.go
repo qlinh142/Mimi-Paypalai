@@ -600,7 +600,13 @@ type SaveLine struct {
 	PackageCount float64 `json:"package_count,omitempty"`
 	PackageSize  float64 `json:"package_size,omitempty"`
 	PackageUnit  string  `json:"package_unit,omitempty"`
+	// Plans (B3): Kế hoạch mà dòng này trừ vào, theo thứ tự app đã chia (kế hoạch đi mua
+	// sớm nhất trước, người dùng đổi được). Vắng: dùng source_plan_id. Mảng rỗng: không trừ.
+	Plans *[]PlanShare `json:"plans,omitempty"`
 }
+
+// MaxLinePlans: một dòng chia vào tối đa ngần này Kế hoạch (MaxPlans + Plan mặc định).
+const MaxLinePlans = 11
 
 type SaveRequest struct {
 	ReceiptID        string     `json:"receipt_id"`
@@ -755,6 +761,24 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 				PackageCount: pk.Count, PackageSize: pk.Size, PackageUnit: pk.SizeUnit,
 				CanonicalQty: pk.Total, CanonicalUnit: string(pk.Unit),
 			},
+		}
+		if l.Plans != nil {
+			if len(*l.Plans) > MaxLinePlans {
+				return Receipt{}, lineErr(apperr.CodeValidation, "plans", "Một món chia vào quá nhiều kế hoạch.")
+			}
+			seen := map[string]bool{}
+			for _, ps := range *l.Plans {
+				id := ps.PlanID
+				if id == "" {
+					id = "default"
+				}
+				if !validID(id) || seen[id] || ps.Qty < 0 || math.IsNaN(ps.Qty) {
+					return Receipt{}, lineErr(apperr.CodeValidation, "plans", "Kế hoạch của món này không hợp lệ.")
+				}
+				seen[id] = true
+				line.Plans = append(line.Plans, PlanShare{PlanID: id, Qty: ps.Qty})
+			}
+			line.PlanSet = true
 		}
 		// Dòng chưa đủ phân loại vẫn được lưu (purchase + chi tiêu) nhưng chưa vào tồn kho
 		// và dự đoán cho tới khi người dùng phân loại (BUG-06 mục 5.3, 0.1 mục 20).

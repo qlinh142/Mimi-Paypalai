@@ -143,7 +143,7 @@ func lineDoc(l receipt.Line) map[string]any {
 	if l.VND != nil {
 		vnd = int64(*l.VND)
 	}
-	return map[string]any{
+	doc := map[string]any{
 		"line_id": l.ID, "name": l.Name, "name_norm": l.NameNorm, "qty": l.Qty, "unit": l.Unit, "orig": l.Orig,
 		"line_total_vnd": vnd, "category_key": l.CategoryKey, "group_key": l.GroupKey, "habit": l.Habit,
 		"raw_name": l.RawName, "brand": l.Brand, "product_name": l.ProductName, "detail_name": l.DetailName,
@@ -152,6 +152,15 @@ func lineDoc(l receipt.Line) map[string]any {
 		"structure": l.Structure, "canonical_quantity": l.CanonicalQty, "canonical_unit": l.CanonicalUnit,
 		"needs_review": l.NeedsReview, "inventory_owner": l.InventoryOwner,
 	}
+	if l.PlanSet {
+		// B3: Kế hoạch mà dòng này đã trừ vào. Dòng cũ không có ô này: đọc theo source_plan_id.
+		ps := make([]any, 0, len(l.Plans))
+		for _, p := range l.Plans {
+			ps = append(ps, map[string]any{"plan_id": p.PlanID, "qty": p.Qty})
+		}
+		doc["plans"] = ps
+	}
+	return doc
 }
 
 func catOrOther(c string) string {
