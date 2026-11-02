@@ -123,6 +123,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
       <section className="hero15" aria-label={m15.spending.spent}>
         <p className="hero15__num num">{formatVnd(r.spent)}</p>
         <p className="hero15__sub">{compare(r, month)}</p>
+        {(r.delegated_spent ?? 0) > 0 && <p className="hero15__sub">{m15.spending.delegated(formatVnd(r.delegated_spent ?? 0))}</p>}
       </section>
 
       {cats.length > 0 && (

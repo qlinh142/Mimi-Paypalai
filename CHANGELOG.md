@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Chia hóa đơn theo từng người (B4)
+
+- Trước đây cả hóa đơn cộng vào Sổ chi tiêu của người quét, kể cả món mua hộ.
+- Giờ mỗi người chỉ cộng phần của mình. Ví dụ hóa đơn 135.000đ có 120.000đ món của chủ giỏ và 15.000đ món của Minh: sổ chủ giỏ +120.000đ, sổ Minh +15.000đ.
+- Giảm giá cả hóa đơn trừ vào phần người trả tiền. Nếu giảm giá lớn hơn phần đó, phần người được mua hộ thu nhỏ theo tỉ lệ để tổng vẫn khớp hóa đơn.
+- Sổ chi tiêu của chủ giỏ có thêm dòng "Trong đó người nhà mua hộ …" (`delegated_spent`). Danh sách cửa hàng cũng gồm các lần được mua hộ (`delegated: true`), chỉ tính tiền món của mình.
+- Tháng cũ không tự sửa lại: chỉ hóa đơn lưu từ bản này mới chia.
+
+### Cách kiểm tra
+- `go test ./...` qua. Test mới: `TestSplitSpend`, `TestSplitCategories`, `TestDelegatedRows`. Test emulator mua hộ đổi kỳ vọng: sổ Owner +70.000đ, sổ Buyer 0đ.
+- `npm run build` qua.
+
+---
+
 ## 2026-11-02 · Mỗi món trong hóa đơn trừ vào đúng kế hoạch của nó (B3)
 
 - Trước đây màn Xác nhận đã hiện "→ Mua đồ cho bé" cho từng món, nhưng lúc lưu chỉ gửi một kế hoạch cho cả hóa đơn. Món thuộc kế hoạch khác nên không được đánh dấu đã mua.

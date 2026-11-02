@@ -142,14 +142,18 @@ func TestSaveReceiptAssignmentEmulator(t *testing.T) {
 	if out.Assignment == nil || out.Assignment.Status != "closed_partial" || len(out.Assignment.Returned) != 1 {
 		t.Fatalf("assignment %+v", out.Assignment)
 	}
-	// Tồn kho vào Owner, chi tiêu vào Buyer.
+	// Tồn kho vào Owner.
 	if _, err := ou.Collection("items").Doc("sua-tuoi").Get(ctx); err != nil {
 		t.Fatalf("owner inventory: %v", err)
 	}
 	if _, err := bu.Collection("items").Doc("sua-tuoi").Get(ctx); !isNotFound(err) {
 		t.Fatal("buyer must not get inventory")
 	}
-	if m := get(t, bu.Collection("months").Doc("2026-10")); asInt64(m["spent_vnd"]) != 70_000 {
+	// B4: mỗi người chỉ cộng phần của mình. Cả hóa đơn là món mua hộ nên vào sổ của Owner.
+	if m := get(t, ou.Collection("months").Doc("2026-10")); asInt64(m["spent_vnd"]) != 70_000 || asInt64(m["delegated_vnd"]) != 70_000 {
+		t.Fatalf("owner month %v", m)
+	}
+	if m := get(t, bu.Collection("months").Doc("2026-10")); asInt64(m["spent_vnd"]) != 0 || asInt64(m["receipts"]) != 1 {
 		t.Fatalf("buyer month %v", m)
 	}
 	if st := get(t, ou.Collection("plan_items").Doc("sua-tuoi"))["status"]; st != "done" {

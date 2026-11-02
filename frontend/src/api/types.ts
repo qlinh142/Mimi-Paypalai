@@ -243,7 +243,7 @@ export type HistoryReceipt = {
 /** unit_price, amount null: món chưa rõ giá, không tính vào tổng. */
 export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine" };
 export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };
-export type ReceiptSummary = { receipt_id: string; store?: string; purchased_on: string; total_vnd: number; discount_vnd: number };
+export type ReceiptSummary = { receipt_id: string; store?: string; purchased_on: string; total_vnd: number; discount_vnd: number; delegated?: boolean };
 export type SpendingReport = {
   month: string;
   spent: number;
@@ -254,6 +254,7 @@ export type SpendingReport = {
   online_spent?: number;       // chi qua PayPal (net sau refund), đã nằm trong spent
   online_orders?: number;
   refunded?: number;
+  delegated_spent?: number;    // người nhà mua hộ cho mình, đã nằm trong spent
   by_category: { key: string; amount: number; pct: number }[];
   top_saving_receipts: ReceiptSummary[];
   recent_receipts: ReceiptSummary[];

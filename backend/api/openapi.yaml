@@ -973,6 +973,7 @@ components:
         online_spent: { $ref: "#/components/schemas/Vnd" }
         online_orders: { type: integer }
         refunded: { $ref: "#/components/schemas/Vnd" }
+        delegated_spent: { $ref: "#/components/schemas/Vnd", description: "Phần người nhà mua hộ cho mình, đã nằm trong spent" }
         by_category: { type: array, items: { type: object, properties: { key: { type: string }, amount: { $ref: "#/components/schemas/Vnd" }, pct: { type: number } } } }
         top_saving_receipts: { type: array, maxItems: 3, items: { $ref: "#/components/schemas/ReceiptSummary" } }
         recent_receipts: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/ReceiptSummary" } }
@@ -984,6 +985,7 @@ components:
         purchased_on: { type: string, format: date }
         total_vnd: { $ref: "#/components/schemas/Vnd" }
         discount_vnd: { $ref: "#/components/schemas/Vnd" }
+        delegated: { type: boolean, description: "Phần người nhà mua hộ (receipt_id dạng d-{id}); total_vnd chỉ gồm món của mình" }
     Forecast:
       type: object
       properties:
