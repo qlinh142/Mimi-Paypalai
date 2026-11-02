@@ -17,7 +17,8 @@ var (
 )
 
 // Bảng giá chung (ADR-004): market_prices/{key} {name, group_key, prices[], updated_at}.
-// Lịch sử theo ngày: market_prices/{key}/history/{YYYY-MM-DD} (giữ 90 ngày, dọn ở job cleanup sau).
+// Lịch sử theo ngày: market_prices/{key}/price_history/{YYYY-MM-DD}, giữ 30 ngày (mẹ chốt 02/11):
+// expire_at để TTL policy của Firestore tự xóa (firestore.indexes.json).
 // Không có trường nào trỏ tới người dùng.
 func (s *Store) marketPrices() *firestore.CollectionRef { return s.c.Collection("market_prices") }
 
@@ -49,7 +50,9 @@ func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
 	b := s.c.Batch()
 	b.Set(ref, doc)
 	if len(prices) > 0 {
-		b.Set(ref.Collection("history").Doc(e.UpdatedAt.Format("2006-01-02")), map[string]any{"prices": prices, "at": e.UpdatedAt})
+		b.Set(ref.Collection("price_history").Doc(e.UpdatedAt.Format("2006-01-02")), map[string]any{
+			"prices": prices, "at": e.UpdatedAt, "expire_at": e.UpdatedAt.Add(market.HistoryRetention),
+		})
 	}
 	if _, err := b.Commit(ctx); err != nil {
 		return fmt.Errorf("market save %s: %w", e.Key, err)

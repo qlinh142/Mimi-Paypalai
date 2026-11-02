@@ -69,8 +69,10 @@ type Source interface {
 const (
 	DefaultLimit    = 200
 	DefaultFreshFor = 72 * time.Hour
-	maxPrices       = 5
-	minVND, maxVND  = 1_000, 50_000_000
+	// HistoryRetention: lịch sử giá mỗi món giữ 30 ngày gần nhất (mẹ chốt 02/11/2026).
+	HistoryRetention = 30 * 24 * time.Hour
+	maxPrices        = 5
+	minVND, maxVND   = 1_000, 50_000_000
 	// Lỗi liên tiếp quá ngưỡng thì dừng sớm: nguồn đang hỏng, chạy tiếp chỉ tốn tiền.
 	maxConsecutiveErrors = 5
 )
