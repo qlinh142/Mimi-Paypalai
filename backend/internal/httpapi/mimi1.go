@@ -256,3 +256,14 @@ func nonNilStrings(xs []string) []string {
 	}
 	return xs
 }
+
+// Spec 1.5 mục 4: Lịch sử mua hàng (4c) và Chi tiết hóa đơn (4d).
+func (s *Server) getReceiptHistory(w http.ResponseWriter, r *http.Request) {
+	out, err := s.history.History(r.Context(), principalFrom(r.Context()))
+	s.reply(w, r, http.StatusOK, map[string]any{"receipts": out}, err)
+}
+
+func (s *Server) getReceiptDetail(w http.ResponseWriter, r *http.Request) {
+	out, err := s.history.Detail(r.Context(), principalFrom(r.Context()), r.PathValue("id"))
+	s.reply(w, r, http.StatusOK, out, err)
+}

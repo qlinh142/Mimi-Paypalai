@@ -763,7 +763,7 @@ function histDetail(id: string): ReceiptDetail | null {
       { name: L ? "Fresh milk" : "Sữa tươi Vinamilk", spec: "900ml", qty: 2, unit_price: 29_000, amount: 58_000, category_key: "sua" },
       { name: L ? "Toilet paper" : "Giấy vệ sinh Pulppy", spec: "10 cuộn", qty: 1, unit_price: 72_000, amount: 72_000, category_key: "hoa-pham" },
     ];
-    return { receipt_id: id, store: "Bách Hóa Xanh", purchased_at: histDate(0, 17), total_vnd: 130_000, item_names: [], kind: "delegated", buyer_name: "Minh", plan_name: L ? "Baby shopping" : "Mua đồ cho bé", plans: [{ id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }], lines, subtotal: 130_000, discount: 0 };
+    return { receipt_id: id, store: "Bách Hóa Xanh", purchased_at: histDate(0, 17), total_vnd: 130_000, item_names: [], kind: "delegated", buyer_uid: "mock-minh", buyer_name: "Minh", plan_name: L ? "Baby shopping" : "Mua đồ cho bé", plans: [{ id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }], lines, subtotal: 130_000, discount: 0 };
   }
   const src = HIST_SRC.find((h) => h[0] === id);
   if (!src) return null;
