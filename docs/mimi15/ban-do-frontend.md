@@ -7,7 +7,7 @@ Ngày: 31/10/2026 17:10. Cập nhật 01/11/2026 05:30: mục 2b ghi các file �
 | Thứ | Ở đâu | Dùng để |
 |---|---|---|
 | Code gốc, đủ lịch sử | GitHub `qlinh142/Mimi-Test`, thư mục `frontend/` | Nơi chính thức. Mỗi lần sửa là một commit, quay lại bản cũ được bất cứ lúc nào |
-| Bản nén code frontend | `exports/frontend/mimi-frontend-1-5.zip` | Bản chụp lúc 17:06, gồm cả các góp ý trong PR #3 |
+| Bản nén code frontend | `exports/frontend/mimi-frontend-1-5.zip` | Bản chụp main lúc 01/11 08:09, sau khi gộp PR #3, #4 và #5 |
 | Prototype một file | `prototype/mimi-prototype.html` · link https://claude.ai/artifact/TNXorGatmm8XEv8LbEhvGu | Bấm thử, gửi người khác xem |
 | Mô tả app đúng như đang chạy | `notes/mimi-1-5-tong-the.md` | Bản spec 1.5. Mục 11 là bảng mọi góp ý và thay đổi theo giờ |
 | Ảnh chạy thử từng màn | `assets/mimi15-man-0-4/`, `mimi15-man-5/`, `mimi15-man-6/` | Đối chiếu trước và sau khi sửa |
@@ -71,7 +71,7 @@ Mỗi dòng là một bước sửa. Quay lại bất kỳ mốc nào được, 
 - `cefa24d` Kế hoạch: chữ tiếng Việt.
 - `c3167e9` Màn 6 Cài đặt.
 
-**Đang chờ gộp (PR #3):**
+**Đã gộp vào main (PR #3, 01/11 06:17):**
 - `69fd1a7` Prototype một file.
 - `40b55f4` Nút Xóa kế hoạch.
 - `9962c9f` Đổi tên thành Giỏ mua sắm.
@@ -82,7 +82,7 @@ Mỗi dòng là một bước sửa. Quay lại bất kỳ mốc nào được, 
 - `a04476c` Dấu tích và thùng rác.
 - `668b0b0` Lịch sử đủ hóa đơn.
 
-**Prototype theo Spec 1.5 (nhánh `feat/mimi15-spec-viec-moi`, 01/11):**
+**Đã gộp vào main (PR #4, 01/11 06:17) · Prototype theo Spec 1.5:**
 - `84426eb` Chọn người mua, nút máy bay giấy, Chưa hoàn thành.
 - `2f3f327` Màn đi mua hộ, mẹ xem tiến độ.
 - `2c0cfd0` Hóa đơn ghi → kế hoạch, quét lúc mất mạng.
@@ -99,3 +99,13 @@ Mỗi dòng là một bước sửa. Quay lại bất kỳ mốc nào được, 
 6. Gom vào PR. Mẹ nói "gộp" thì vào main.
 
 Nếu một bước sửa không ưng ý, Mimi bỏ riêng bước đó (`git revert`). Các bước khác giữ nguyên.
+
+## 2c. Phần E (góp ý 01/11, PR #5, đã gộp 08:09)
+
+| Việc | File |
+|---|---|
+| Màn chi tiết khoản chi định kỳ (`/items/recurring/:id`, `/items/recurring/new`) | `screens/RecurringDetail.tsx` (mới), `components/RecurringList.tsx`, `app/App.tsx` |
+| Dòng Khoản chi định kỳ ở Sổ chi tiêu sang Đồ dùng | `screens/Spending.tsx`, `styles/m15.css` (`.bars15__link`) |
+| Lịch sử mua hàng có khoản định kỳ đã trả | `screens/PurchaseHistory.tsx`, `api/mock.ts` (`/receipts/history`), `api/types.ts` (`kind: "recurring"`) |
+| Ô nhóm gõ có gợi ý (5 nhóm chuẩn) | `components/GroupInput.tsx` (mới), dùng ở `screens/ItemDetail.tsx` và `components/ReceiptLines.tsx` |
+| Chữ | `i18n/m15.ts` (`recd`, `groupInput`, `history.recurringTag`) |

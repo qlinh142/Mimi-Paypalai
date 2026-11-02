@@ -253,4 +253,16 @@ Những dữ liệu sau chưa có chỗ lưu ở máy chủ, nên đổi sang m�
 | 01/11 05:02 | Phải chọn người mua mới bấm được máy bay giấy; rời kế hoạch chưa Lưu thì kế hoạch ở trạng thái "Chưa hoàn thành" | Ghi vào việc 4 mục 3; chưa code |
 | 01/11 05:03 | Mẹ duyệt hết các phần Mimi bổ sung (câu 3, 4, 5, việc 4 mục 3). Bước 6 chốt xong | Chỉ sửa file md |
 | 01/11 05:15 | Viết Spec 1.5 phần việc mới (`spec-1-5-viec-moi.md`); cập nhật mục lục, bản đồ frontend (mục 2b), data model | Chỉ sửa file md, chưa đụng prototype |
-| 01/11 05:30 | Sửa prototype theo Spec 1.5 mục 1–8 (5 commit trên nhánh `feat/mimi15-spec-viec-moi`) | Ảnh ở `assets/mimi15-spec-moi/`; còn chờ đăng lại link prototype |
+| 01/11 05:30 | Sửa prototype theo Spec 1.5 mục 1–8 (5 commit trên nhánh `feat/mimi15-spec-viec-moi`, PR #4) | Ảnh ở `assets/mimi15-spec-moi/`; đăng lại link prototype 06:14 |
+| 01/11 06:17 | Gộp PR #3 và PR #4 vào main; xuất lại bản nén frontend | |
+| 01/11 06:18 | Mẹ góp ý 3 điểm: xem chi tiết khoản định kỳ đã chi, ô chọn nhóm để làm gì, gợi ý giá tốt ở danh sách kế hoạch | Ghi đề xuất vào bước 6 Phần E; chờ mẹ chốt |
+| 01/11 06:30 | Chốt góp ý 1: bấm Khoản chi định kỳ ở Sổ chi tiêu thì sang Đồ dùng (3c); Lịch sử mua hàng thêm khoản định kỳ đã trả | Ghi vào bước 6 Phần E; chưa sửa prototype |
+| 01/11 06:33 | Chốt góp ý 2: ô Nhóm sản phẩm ở chi tiết món là ô nhập chữ, gõ thì gợi ý 4–5 nhóm trong 300 nhóm chuẩn | Ghi vào bước 6 Phần E; chưa sửa prototype |
+| 01/11 06:34 | Chốt góp ý 4: khoản chi định kỳ có màn chi tiết riêng, giống chi tiết món ở Đồ dùng | Ghi vào bước 6 Phần E; chưa sửa prototype |
+| 01/11 06:39 | Góp ý 3 (gợi ý giá ở danh sách kế hoạch) treo làm sau; duyệt bổ sung góp ý 1 và bố cục góp ý 4; góp ý 2 phần bổ sung chờ giải thích | Chỉ sửa md |
+| 01/11 06:41 | Màn xác nhận hóa đơn dùng chung ô nhóm gõ có gợi ý với Đồ dùng; không thêm dòng giải thích. Phần E chốt hết (trừ góp ý 3 treo) | Bắt đầu sửa prototype |
+| 01/11 07:05 | Sửa prototype theo Phần E góp ý 1, 2, 4; ảnh ở `assets/mimi15-phan-e/` | PR #5 chờ duyệt; chưa đăng lại link xem thử |
+| 01/11 07:32 | Mẹ đồng ý; đăng lại link xem thử với bản Phần E | PR #5 chờ gộp |
+| 01/11 08:09 | Gộp PR #5 (Phần E) vào main | Bản nén frontend cập nhật |
+| 01/11 15:29 | Đưa các phần Google Cloud còn thiếu vào checklist: 10b (Cloud Tasks, 3 job, Calendar), 13 (dựng project, Secret Manager, App Check, Scheduler). Gợi ý giá tốt vẫn treo | Chỉ sửa checklist |
+| 02/11 10:33 | Gộp PR #6: Idempotency-Key cho mọi thao tác ghi (data model thay đổi 5) | Chờ chốt cách sửa lot (V3) |

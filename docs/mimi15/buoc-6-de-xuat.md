@@ -60,7 +60,7 @@ Ngày: 31/10/2026 16:55. **Bản 2 lập lại từ đầu theo prototype mẹ �
 | 3.4 | Chi tiết: sửa tên, nhóm | ✅ | P1 |
 | 3.5 | Chi tiết: số lượng −/+, Cập nhật sản phẩm | ✅ | P1 |
 | 3.6 | Chọn đơn vị hiển thị | 💾 | P3 |
-| 3.7 | Lịch sử mua hàng của món: giá gần nhất, thấp nhất, trung bình, từng lần mua | 🐞 V3: chỉ tính lại từ 20 lần mua gần nhất, lần cũ hơn bị mất | **P1 · cần sửa** |
+| 3.7 | Lịch sử mua hàng của món: giá gần nhất, thấp nhất, trung bình, từng lần mua | ✅ V3 đã sửa 02/11 (PR #9): đọc toàn bộ lịch sử, tối đa 500 lần mua | P1 |
 | 3.8 | Khoản chi định kỳ chia 3 nhóm | ✅ | P1 |
 | 3.9 | Sửa định kỳ trên thẻ: lưu, hủy, Đã trả kỳ này, Xóa | ✅ | P1 |
 | 3.10 | + Thêm khoản chi | ✅ | P1 |
@@ -485,3 +485,67 @@ Không biến cả app thành offline hoàn toàn.
 - Ví dụ: tiền điện 500.000đ là khoản định kỳ. Mẹ trả ở cửa hàng tiện lợi rồi quét hóa đơn đó.
 - Nếu không xử lý thì Sổ chi tiêu cộng 500.000đ hai lần: một lần từ khoản định kỳ, một lần từ hóa đơn.
 - Code hiện tại đã xử lý: kỳ đã khớp với hóa đơn thì không cộng nữa. Giữ nguyên cách này.
+
+---
+
+## Phần E · Góp ý sau khi xem prototype Spec 1.5 (01/11 06:18)
+
+Ảnh mẹ gửi: `assets/mau-thiet-ke/gop-y-0111-1-dinh-ky.png`, `-2-chon-nhom.png`, `-3-goi-y-gia.png`. Đã sửa prototype theo góp ý 1, 2, 4 (PR #5, 01/11 07:05; ảnh `assets/mimi15-phan-e/`). Góp ý 3 treo. Ô Nhóm ở màn khoản định kỳ chỉ hiện "Khoản chi định kỳ", không sửa, vì 300 nhóm chuẩn là nhóm sản phẩm.
+
+**Góp ý 1 · Chưa xem được chi tiết khoản chi định kỳ đã chi** ✅ Đã chốt (01/11 06:30)
+
+**Hiện tại:** bảng "Theo nhóm hàng" ở Sổ chi tiêu (Đã chi) chỉ là thanh số liệu. Bấm vào dòng nào cũng không mở gì.
+
+**Luật:**
+1. **Bấm dòng "Khoản chi định kỳ"** thì chuyển sang tab **Đồ dùng, phần Khoản chi định kỳ** (3c) đã có. Không mở danh sách riêng ở Sổ chi tiêu.
+2. **Lịch sử mua hàng (4c) có thêm các khoản chi định kỳ đã trả**, nằm chung với hóa đơn, xếp theo ngày.
+   - Mỗi dòng: biểu tượng lịch, tên khoản (ví dụ "Tiền điện"), nhãn "Định kỳ", ngày trả, số tiền.
+   - Bấm vào thì mở khoản đó trong Đồ dùng (3c).
+   - Tìm kiếm tìm được theo tên khoản. Số đếm của tháng tính cả khoản định kỳ, ví dụ "Tháng 10/2026 (8 hóa đơn, 3 khoản định kỳ)".
+   - Kỳ đã trả qua hóa đơn (câu 7) chỉ hiện một lần, là hóa đơn đó, để không trùng.
+   - Tóm tắt Lịch sử mua hàng ở Sổ chi tiêu cũng tính cả khoản định kỳ.
+
+**Bổ sung** ✅ (duyệt 01/11 06:39): các dòng nhóm hàng khác (Sữa, Thịt cá trứng…) giữ như hiện tại, chỉ để xem số.
+
+**Góp ý 2 · Ô "Nhóm sản phẩm"** ✅ Đã chốt (01/11 06:33)
+
+**Nhóm dùng để làm gì:** mỗi món được gắn vào một trong 300 nhóm chuẩn (file Taxonomy mẹ làm, ví dụ "Sữa tươi", "Nước rửa chén"). Nhờ nhóm, Mimi cộng món vào đúng món trong **Đồ dùng** (tồn kho, dự đoán ngày hết), so **giá** với lần mua trước, xếp vào **danh mục chi tiêu** và trừ vào **kế hoạch**. Món chưa có nhóm vẫn ghi tiền (mục "Chưa phân loại") nhưng không vào Đồ dùng, không có dự đoán.
+
+**Hiện tại:** ở chi tiết món (Đồ dùng → Hàng tiêu dùng → bấm món, 3b), ô "Nhóm sản phẩm" trông như danh sách thả xuống. Bấm vào mới mở ô tìm trống, phải gõ mới ra gợi ý, có thêm nút Hủy.
+
+**Luật:**
+- Ô **Nhóm sản phẩm là ô nhập chữ**, không phải danh sách thả xuống.
+- Ô hiện sẵn tên nhóm đang gắn. Mẹ gõ tên (ví dụ "sữa") thì ngay dưới ô hiện **4–5 nhóm gợi ý** lấy trong 300 nhóm chuẩn, tìm cả khi gõ không dấu.
+- Bấm một gợi ý là chọn, ô hiện tên nhóm mới. Không chọn gợi ý nào thì giữ nhóm cũ, không tạo nhóm mới ngoài 300 nhóm.
+
+**Bổ sung** ✅ (chốt 01/11 06:41):
+- Màn **xác nhận hóa đơn** dùng chung ô này với Đồ dùng: mỗi món có ô ghi tên nhóm, gõ thì gợi ý 4–5 nhóm. Bỏ nút "Đổi nhóm" và ô tìm cũ.
+- Không thêm dòng giải thích dưới ô.
+
+**Góp ý 3 · Chưa có phần Mimi gợi ý giá tốt trong Kế hoạch mua sắm** ⏸ Treo, làm sau (chốt 01/11 06:39)
+
+**Hiện tại:** gợi ý giá chỉ nằm trong chi tiết kế hoạch, ở ô "Dự kiến chi" (ví dụ "Bách Hóa Xanh · Đủ 3/3 món" và nút "Xem so sánh giá"). Danh sách kế hoạch (ảnh mẹ gửi) không có.
+
+**Mimi đề xuất:**
+- Mỗi thẻ kế hoạch thêm **một dòng gợi ý của Mimi**, có biểu tượng Mimi, ví dụ:
+  - "Mimi gợi ý: mua ở Bách Hóa Xanh, rẻ hơn khoảng 8.000đ."
+  - Khi chia 2 nơi rẻ hơn: "Mimi gợi ý: chia 2 nơi, tiết kiệm khoảng 15.000đ."
+  - Nơi mua mẹ đã chọn đã là rẻ nhất: "Nơi mua đã là giá tốt nhất."
+- Bấm dòng gợi ý thì mở chi tiết kế hoạch, mở sẵn phần **So sánh giá**.
+- Trong chi tiết, đưa ô "Dự kiến chi" lên ngay dưới danh sách món, đổi tiêu đề thành **"Mimi gợi ý giá tốt"** cho dễ thấy.
+- Chưa đủ lịch sử giá thì không hiện dòng gợi ý (không đoán bừa).
+
+**Góp ý 4 · Khoản chi định kỳ có màn chi tiết riêng** ✅ Đã chốt (01/11 06:34)
+
+**Hiện tại:** ở Đồ dùng → Khoản chi định kỳ (3c), bấm "Sửa" thì ô sửa mở ngay trong danh sách.
+
+**Luật:** bấm vào một khoản định kỳ thì **chuyển sang màn chi tiết riêng**, giống màn chi tiết món ở Đồ dùng (3b).
+
+**Bố cục** ✅ (duyệt 01/11 06:39), theo kiểu màn 3b:
+1. Nút ‹ và tên khoản, kèm biểu tượng nhóm.
+2. Ô **Tên khoản**, ô **Số tiền**, ô **Chu kỳ** (hằng tháng, hằng quý…), ô **Ngày đến hạn tiếp**, ô **Nhóm** (dùng ô gõ có gợi ý như góp ý 2).
+3. Thẻ **kỳ này**: đến hạn ngày nào, trạng thái (Chờ trả / Đã trả / Trả qua hóa đơn / Bỏ qua), nút **Đánh dấu đã trả**.
+4. **Lịch sử các kỳ**: mỗi dòng gồm ngày, số tiền, cách trả. Kỳ trả qua hóa đơn bấm được, mở Chi tiết hóa đơn (4d).
+5. Cuối màn: nút **Tạm dừng / Tiếp tục**, nút **Xóa** (bấm 2 lần như các nút Xóa khác), nút **Lưu**.
+
+Màn này cũng là nơi mở tới khi bấm một khoản định kỳ ở Lịch sử mua hàng (góp ý 1). Thêm khoản mới vẫn dùng nút "+ Thêm khoản định kỳ", mở màn này ở dạng trống.

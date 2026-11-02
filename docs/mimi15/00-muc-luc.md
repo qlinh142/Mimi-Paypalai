@@ -16,6 +16,7 @@ Ngày: 31/10/2026 17:15, cập nhật 01/11/2026 05:15. Memory của dự án đ
 | `assets/mimi15-man-*/` | Ảnh chạy thử từng màn | Sửa giao diện màn đó |
 | `prototype/mimi-prototype.html` + link prototype | Bản bấm thử | Mỗi lần sửa giao diện |
 | `exports/frontend/mimi-frontend-1-5.zip` | Bản nén code frontend | Sau mỗi lần gộp PR |
+| `notes/loi-trien-khai.md` | **Sổ lỗi triển khai:** lỗ hổng đối chiếu theo bảng 100 vấn đề, đã sửa ở PR nào, còn mở gì | Sửa hoặc tìm thấy một lỗi triển khai |
 | `notes/CHANGELOG.md` (bản sao của `CHANGELOG.md` trong repo) | Lịch sử theo đợt, mỗi PR một mục | Mỗi PR |
 | `notes/kich-ban-demo.md` | Kịch bản demo đã chốt | Đổi kịch bản |
 | `notes/huong-dan-chay-demo.md` | Cách chạy app với dữ liệu mẫu | Đổi cách chạy |
