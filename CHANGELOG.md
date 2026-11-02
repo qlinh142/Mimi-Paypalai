@@ -13,6 +13,15 @@ Mới nhất ở trên cùng.
 
 ### Cách kiểm tra
 - `go vet ./...`, `go test ./...` qua. Test mới: `TestItemReadsFullHistory`, `TestVisibleLots`.
+## 2026-11-02 · Hàng đợi offline và dữ liệu trong máy gắn với tài khoản
+
+- Mỗi thao tác chờ gửi ghi kèm uid. Người khác đăng nhập trên cùng máy thì không thấy và không gửi thao tác của người trước; người trước đăng nhập lại thì gửi tiếp. (vấn đề 63, 65)
+- Đăng nhập bằng tài khoản khác với tài khoản đang giữ dữ liệu trong máy (người trước bị tự đăng xuất vì hết phiên): xóa cache API và nháp của người trước trước khi dùng.
+- Đăng xuất chủ động chỉ xóa thao tác chờ gửi của chính mình.
+- Xả hàng đợi đọc lại kho mỗi vòng, nên thao tác thêm vào trong lúc đang gửi không bị mất.
+
+### Cách kiểm tra
+- `tsc -b`, `npm run build` qua. Chạy thử logic hàng đợi bằng kho giả trong bộ nhớ: đổi A → B → A, đúng người gửi đúng thao tác.
 
 ---
 
