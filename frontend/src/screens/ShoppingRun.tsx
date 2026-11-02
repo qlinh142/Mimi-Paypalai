@@ -13,24 +13,40 @@ import { whenText } from "./PlanList";
 
 /** Một dòng trên danh sách đi mua. `mine` = món khác trên hóa đơn (khối "Của tôi"). */
 type RunLine = { key: string; name: string; qty: number; unit: string; price: number | null; ticked: boolean; fixedName: boolean; mine: boolean; category: string };
-type Run = { lines: RunLine[]; note: string; scanned: boolean };
+type Run = { lines: RunLine[]; note: string; scanned: boolean; version?: string };
+
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 /** Lưu tạm danh sách đang mua trên máy (Spec 1.5 mục 2 và 8): thoát app mở lại vẫn còn, chưa ghi gì trước Mua hàng xong. */
 const KEY = (id: string) => `mimi.run.${id}`;
+function freshLines(a: Assignment): RunLine[] {
+  return a.items
+    .filter((i) => i.status === "assigned")
+    .map((i) => ({ key: i.consumption_group_key, name: i.name_display, qty: i.qty ?? 1, unit: i.unit ?? "", price: i.unit_price ?? null, ticked: false, fixedName: true, mine: false, category: i.category_key ?? "" }));
+}
+/** B5: người nhờ gửi bản cập nhật thì lấy danh sách theo bản mới. Món còn trong bản mới giữ dấu tick
+ *  và chỗ đã sửa, món bị bỏ thì mất, món mới thêm vào. Khối "Của tôi" giữ nguyên. */
 function loadRun(a: Assignment): Run {
+  const version = a.updated_at ?? "";
   try {
     const v = localStorage.getItem(KEY(a.assignment_id));
-    if (v) return JSON.parse(v) as Run;
+    if (v) {
+      const saved = JSON.parse(v) as Run;
+      if ((saved.version ?? "") === version) return saved;
+      const old = new Map(saved.lines.filter((l) => !l.mine).map((l) => [l.key, l]));
+      const lines = freshLines(a).map((l) => {
+        const o = old.get(l.key);
+        return o ? { ...l, ticked: o.ticked, price: o.price ?? l.price, qty: o.ticked ? o.qty : l.qty } : l;
+      });
+      return { ...saved, version, lines: [...lines, ...saved.lines.filter((l) => l.mine)] };
+    }
   } catch {
     // bỏ qua
   }
-  return {
-    note: "",
-    scanned: false,
-    lines: a.items
-      .filter((i) => i.status === "assigned")
-      .map((i) => ({ key: i.consumption_group_key, name: i.name_display, qty: i.qty ?? 1, unit: i.unit ?? "", price: i.unit_price ?? null, ticked: false, fixedName: true, mine: false, category: i.category_key ?? "" })),
-  };
+  return { note: "", scanned: false, version, lines: freshLines(a) };
 }
 function saveRun(id: string, r: Run | null) {
   try {
@@ -158,6 +174,8 @@ function RunList({ a, onDone }: { a: Assignment; onDone: (v: DoneInfo) => void }
           </button>
         </div>
         {confirmDecline && <p className="hint" role="status">{m15.run.declineAsk(owner)}</p>}
+
+        {a.updated_at && <p className="hint" role="status">{m15.run.updatedAt(owner, hhmm(a.updated_at))}</p>}
 
         <section className="box15 run15__sum">
           <span><ReceiptText size={18} aria-hidden /> {m15.plan.count(ask.length)}</span>

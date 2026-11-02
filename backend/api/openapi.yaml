@@ -656,7 +656,11 @@ paths:
   /households/shopping-assignments:
     post:
       tags: [household]
-      summary: "4.1 mục 9.1: gửi các món đang mở của một Plan cho một thành viên cùng nhà (dòng Plan → assigned)"
+      summary: "4.1 mục 9.1: gửi các món của một Plan cho một thành viên cùng nhà (dòng Plan → assigned)"
+      description: |
+        B5: mỗi Plan chỉ có một bản đã gửi. Plan đang gửi cho cùng người thì lần gửi này ghi đè bản đó
+        (keys là cả danh sách muốn gửi; món bị bỏ trả về open, món đã mua giữ nguyên, updated_at đổi).
+        Gửi cho người khác thì bản cũ bị hủy trước. Vòng đã xong thì tạo vòng mới.
       requestBody:
         required: true
         content:
@@ -1166,6 +1170,8 @@ components:
         plan_id: { type: string }
         status: { type: string, enum: [assigned, shopping, completed, closed_partial, cancelled, declined] }
         note: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, description: "B5: lần cuối người nhờ gửi bản cập nhật; không có khi chưa cập nhật" }
         items:
           type: array
           items: { type: object, properties: { consumption_group_key: { type: string }, name_display: { type: string }, qty: { type: number }, unit: { type: string }, status: { type: string, enum: [assigned, done, returned] } } }
