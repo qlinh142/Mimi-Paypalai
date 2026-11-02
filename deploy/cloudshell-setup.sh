@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT="${1:?Cách dùng: bash deploy/cloudshell-setup.sh <project-id>}"
 REGION="asia-southeast1"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.8-flash}" # dòng 2.5 đã bị Google tắt ngày 20/10/2026
-GEMINI_THINKING="${GEMINI_THINKING:-LOW}" # MINIMAL nhanh nhất, LOW cân bằng; đổi: GEMINI_THINKING=MINIMAL bash deploy/cloudshell-setup.sh <project>
+GEMINI_THINKING="${GEMINI_THINKING:-LOW}" # LOW: đã thử đọc bill ổn. MINIMAL thử 02/11 thì AI từ chối mọi bill, đừng dùng
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 say() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }

@@ -13,6 +13,8 @@ Nhánh `feat/quet-2-bill` (dựa trên `fix/quet-hoa-don-that`).
 - Màn chụp có nút "Bill tiếp": bill đang chụp được gửi đọc ngay (chạy ngầm), màn chụp mở lại cho bill 2. Góc khung camera hiện trạng thái bill 1.
 - Bấm "Xong": xem lại và lưu bill 1, rồi "Xem bill tiếp theo" để lưu bill 2. Bill 1 đọc lỗi: chọn "Đọc lại bill 1" (ảnh đã đọc được lấy từ bộ nhớ đệm) hoặc "Bỏ bill 1".
 - Mỗi bill vẫn tính 1 lượt quét như cũ. Không đổi backend.
+- Thử trên iPhone: bị hỏi quyền camera mỗi lần sang bill 2 hoặc gửi lỗi. Camera giờ mở một lần cho cả màn quét (`useCamera`), không tắt khi gửi đọc, tắt khi rời màn.
+- Thử `GEMINI_THINKING=MINIMAL`: mọi bill báo "tạm thời chưa đọc được" (AI từ chối). Script deploy giữ LOW, ghi chú không dùng MINIMAL.
 - Kiểm tra: tsc, build, chạy luồng 2 bill trên bản thử (giả lập iPhone 13, camera giả).
 
 ## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ

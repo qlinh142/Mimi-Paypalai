@@ -38,6 +38,7 @@ export type BgBill = {
 export function Scan() {
   const [session, setSession] = useState(0);
   const [bg, setBg] = useState<BgBill | null>(null);
+  const camera = useCamera();
 
   function readBg(receiptId: string, images: Blob[]) {
     setBg({ receiptId, images, status: "reading" });
@@ -51,6 +52,7 @@ export function Scan() {
   return (
     <ScanSession
       key={session}
+      camera={camera}
       bg={bg}
       canAddBill={!bg && MAX_BILLS > 1}
       onNextBill={(receiptId, images) => {
@@ -68,6 +70,36 @@ export function Scan() {
 }
 
 /**
+ * Mở camera MỘT lần cho cả màn quét, giữ luồng qua mọi bill và mọi lần gửi lỗi, tắt khi rời màn.
+ * iPhone hỏi lại quyền camera mỗi lần gọi getUserMedia, nên không tắt rồi bật lại giữa chừng.
+ */
+function useCamera(): { stream: MediaStream | null; failed: boolean } {
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let s: MediaStream | undefined;
+    let stopped = false;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setFailed(true);
+      return;
+    }
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, audio: false })
+      .then((ms) => {
+        if (stopped) return ms.getTracks().forEach((t) => t.stop());
+        s = ms;
+        setStream(ms);
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      stopped = true;
+      s?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+  return { stream, failed };
+}
+
+/**
  * Màn quét (spec mục 4): nền tối toàn màn hình, nhiều ảnh cho một hóa đơn.
  * Hai nguồn ảnh:
  * - Camera: getUserMedia; máy không cho phép thì mở camera của hệ thống qua <input capture>.
@@ -75,7 +107,8 @@ export function Scan() {
  *   Ô chọn thư viện KHÔNG có thuộc tính capture, vì capture buộc điện thoại mở camera.
  * Mọi ảnh được nén và bỏ EXIF ngay trên máy, chỉ nằm trong bộ nhớ trang tới khi gửi đi.
  */
-function ScanSession({ onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }: {
+function ScanSession({ camera, onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }: {
+  camera: { stream: MediaStream | null; failed: boolean };
   onNext: () => void;
   bg: BgBill | null;
   canAddBill: boolean;
@@ -87,8 +120,7 @@ function ScanSession({ onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }
   const videoRef = useRef<HTMLVideoElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [cameraFailed, setCameraFailed] = useState(false);
+  const { stream, failed: cameraFailed } = camera;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -102,33 +134,14 @@ function ScanSession({ onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }
   const [bgSaved, setBgSaved] = useState(false);
   const urls = useRef<string[]>([]);
 
-  // Bật camera; bật lại sau khi gửi lỗi (lúc gửi camera đã tắt để đỡ tốn pin).
-  const [cameraOn, setCameraOn] = useState(0);
+  // Gắn luồng camera vào thẻ video mỗi khi thẻ được tạo lại (sau màn chờ đọc) hoặc luồng mới có.
   useEffect(() => {
-    let s: MediaStream | undefined;
-    let stopped = false;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraFailed(true);
-      return;
+    const v = videoRef.current;
+    if (v && stream && v.srcObject !== stream) {
+      v.srcObject = stream;
+      v.play().catch(() => {}); // iPhone đôi khi không tự chạy khi gán luồng mới
     }
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, audio: false })
-      .then((ms) => {
-        if (stopped) return ms.getTracks().forEach((t) => t.stop());
-        s = ms;
-        setStream(ms);
-        const v = videoRef.current;
-        if (v) {
-          v.srcObject = ms;
-          v.play().catch(() => {}); // iPhone đôi khi không tự chạy lại video khi gán luồng mới
-        }
-      })
-      .catch(() => setCameraFailed(true));
-    return () => {
-      stopped = true;
-      s?.getTracks().forEach((t) => t.stop());
-    };
-  }, [cameraOn]);
+  });
 
   // Thu hồi mọi URL xem trước khi rời màn.
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
@@ -186,19 +199,10 @@ function ScanSession({ onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }
   function finish() {
     // Spec 1.5 mục 8: quét cần AI nên phải có mạng; mất mạng thì báo ngay, mời nhập thủ công.
     if (!navigator.onLine) return setOffline(true);
-    stream?.getTracks().forEach((t) => t.stop());
     // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện.
     // Gửi lại sau khi chụp lại một ảnh: backend nhớ kết quả các ảnh đã đọc được (theo nội dung
     // ảnh), nên chỉ ảnh mới được đọc lại (1.1).
-    read.mutate(
-      { receiptId, images: photos.map((p) => p.blob), lang: uiLang },
-      {
-        onError: () => {
-          setStream(null);
-          setCameraOn((n) => n + 1); // bật lại camera để chụp lại ngay trong khung
-        },
-      },
-    );
+    read.mutate({ receiptId, images: photos.map((p) => p.blob), lang: uiLang }); // camera vẫn mở để chụp lại ngay
   }
 
   // 1.1: lỗi gắn với một ảnh (unreadable_image, image_too_large, read_failed) chỉ ra đúng ảnh cần chụp lại.
