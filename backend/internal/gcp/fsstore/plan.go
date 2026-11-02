@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
@@ -162,13 +163,14 @@ func (s *Store) SetState(ctx context.Context, uid string, st plan.State) (int64,
 // thành tiền dòng / số lượng. Dòng chưa quy đổi được sang VND hoặc không rõ cửa hàng bị bỏ qua.
 // Giới hạn: chỉ xét dòng đánh dấu "dùng để dự đoán" (habit), vì index chỉ phủ trường hợp đó.
 func (s *Store) Prices(ctx context.Context, uid string, groups []string) ([]domain.LastPrice, error) {
-	var out []domain.LastPrice
-	for _, g := range groups {
+	groups = uniqueGroups(groups)
+	per := make([][]domain.LastPrice, len(groups))
+	err := eachGroup(ctx, groups, func(ctx context.Context, i int, g string) error {
 		docs, err := s.user(uid).Collection("purchases").
 			Where("group_key", "==", g).Where("habit", "==", true).
 			OrderBy("purchased_on", firestore.Desc).Limit(pricesPerGroup).Documents(ctx).GetAll()
 		if err != nil {
-			return nil, fmt.Errorf("plan prices %s: %w", g, err)
+			return fmt.Errorf("plan prices %s: %w", g, err)
 		}
 		seen := map[string]bool{}
 		for _, d := range docs {
@@ -181,12 +183,49 @@ func (s *Store) Prices(ctx context.Context, uid string, groups []string) ([]doma
 			}
 			seen[store] = true // tài liệu đã xếp mới nhất trước: giá đầu tiên gặp là giá mới nhất
 			on, _ := domain.ParseDate(fmt.Sprint(m["purchased_on"]))
-			out = append(out, domain.LastPrice{
+			per[i] = append(per[i], domain.LastPrice{
 				GroupKey: g, Store: store, Unit: domain.VND(math.Round(float64(total) / qty)), On: on,
 			})
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	var out []domain.LastPrice
+	for _, p := range per {
+		out = append(out, p...)
 	}
 	return out, nil
+}
+
+// groupReadConcurrency: số truy vấn giá chạy cùng lúc. Firestore không có truy vấn "N bản
+// mới nhất của mỗi nhóm", nên mỗi nhóm vẫn là một truy vấn; chạy song song thì giỏ 20 món
+// mất khoảng thời gian của 3 lượt thay vì 20 lượt nối nhau (A9).
+const groupReadConcurrency = 8
+
+// eachGroup chạy fn cho từng nhóm, tối đa groupReadConcurrency cùng lúc. Lỗi đầu tiên
+// hủy các lượt còn lại. fn ghi kết quả vào ô riêng theo i, nên không cần khóa.
+func eachGroup(ctx context.Context, groups []string, fn func(ctx context.Context, i int, g string) error) error {
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(groupReadConcurrency)
+	for i, g := range groups {
+		eg.Go(func() error { return fn(ctx, i, g) })
+	}
+	return eg.Wait()
+}
+
+// uniqueGroups bỏ nhóm trùng và rỗng, giữ thứ tự gặp đầu tiên.
+func uniqueGroups(groups []string) []string {
+	seen := make(map[string]bool, len(groups))
+	out := make([]string, 0, len(groups))
+	for _, g := range groups {
+		if g != "" && !seen[g] {
+			seen[g] = true
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // LastUnitPrices: đơn giá lần mua gần nhất của từng nhóm, ở bất kỳ cửa hàng nào (B7).
@@ -343,13 +382,14 @@ var _ pricing.Store = (*Store)(nil)
 // Purchase trước 0.1 chưa có canonical_quantity thì quy từ số lượng và đơn vị in cạnh số lượng.
 // Dòng cần xem lại (needs_review) không dùng để so giá.
 func (s *Store) PriceObservations(ctx context.Context, uid string, groups []string, limit int) (map[string][]pricing.Observation, error) {
-	out := map[string][]pricing.Observation{}
-	for _, g := range groups {
+	groups = uniqueGroups(groups)
+	per := make([][]pricing.Observation, len(groups))
+	err := eachGroup(ctx, groups, func(ctx context.Context, i int, g string) error {
 		docs, err := s.user(uid).Collection("purchases").
 			Where("group_key", "==", g).Where("habit", "==", true).
 			OrderBy("purchased_on", firestore.Desc).Limit(limit).Documents(ctx).GetAll()
 		if err != nil {
-			return nil, fmt.Errorf("price history %s: %w", g, err)
+			return fmt.Errorf("price history %s: %w", g, err)
 		}
 		for _, d := range docs {
 			m := d.Data()
@@ -366,7 +406,17 @@ func (s *Store) PriceObservations(ctx context.Context, uid string, groups []stri
 			o.Store, _ = m["store"].(string)
 			o.StoreKey, _ = m["store_key"].(string)
 			o.DetailName, _ = m["detail_name"].(string)
-			out[g] = append(out[g], o)
+			per[i] = append(per[i], o)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]pricing.Observation{}
+	for i, g := range groups {
+		if len(per[i]) > 0 {
+			out[g] = per[i]
 		}
 	}
 	return out, nil

@@ -5,6 +5,17 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Đọc giá nhiều món cùng lúc (A9)
+
+- Trước đây máy chủ đọc giá gần nhất và lịch sử giá lần lượt từng món: giỏ 20 món là 20 lượt đọc Firestore nối nhau, màn so sánh giá và giá ước tính chậm theo số món.
+- Giờ các lượt đọc chạy song song, tối đa 8 lượt cùng lúc; giỏ 20 món chỉ mất khoảng thời gian của 3 lượt. Món trùng trong danh sách chỉ đọc một lần.
+- Áp dụng cho giá theo nơi mua (Giỏ, Giá tốt, ô Trang chủ, giá ước tính khi đi mua) và lịch sử giá 90 ngày. Kết quả giữ nguyên thứ tự như trước.
+
+### Cách kiểm tra
+- `go vet`, `go test -race ./...` qua; test mới `TestEachGroupParallel`.
+
+---
+
 ## 2026-11-02 · Giới hạn số lần ghi dùng chung giữa các máy chủ (A5)
 
 - Trước đây mỗi máy chủ (instance Cloud Run) tự đếm 60 thao tác ghi mỗi phút cho mỗi người. Chạy 3 instance thì một người ghi được tới 180 lần.
