@@ -4,7 +4,15 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
+
+// NFC đưa chuỗi về dạng dựng sẵn. Cùng chữ "ầ" có thể đến dưới hai dạng: một ký tự
+// (bàn phím điện thoại, Windows) hoặc "a" + dấu mũ + dấu huyền rời (dán từ macOS, một số
+// trình duyệt, chữ AI đọc từ ảnh). Hai dạng nhìn giống hệt nhưng so sánh byte thì khác,
+// nên mọi chữ người dùng gửi lên đều qua đây trước khi lưu hay so sánh.
+func NFC(s string) string { return norm.NFC.String(s) }
 
 // viFold ánh xạ mọi chữ có dấu của tiếng Việt về chữ không dấu. Dùng bảng tĩnh thay vì
 // golang.org/x/text: đủ cho tiếng Việt, không thêm phụ thuộc. "đ" phải map riêng vì
@@ -29,13 +37,13 @@ var viFold = func() map[rune]rune {
 	return m
 }()
 
-// NormalizeVi chuẩn hóa để tìm không dấu: "Dầu gội" và "dau goi" khớp nhau.
-// Đầu vào giả định đã ở dạng dựng sẵn (NFC), là dạng bàn phím điện thoại gửi lên;
-// dấu kết hợp rời (combining marks) vẫn được bỏ qua để an toàn.
+// NormalizeVi chuẩn hóa để tìm không dấu: "Dầu gội" và "dau goi" khớp nhau, dù chữ gõ
+// ở dạng dựng sẵn hay dấu rời. Chữ được tách hẳn (NFD) rồi bỏ mọi dấu, nên kết quả
+// giống nhau với mọi cách gõ.
 func NormalizeVi(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
-	for _, r := range s {
+	for _, r := range norm.NFD.String(s) {
 		if unicode.Is(unicode.Mn, r) {
 			continue
 		}
@@ -60,7 +68,7 @@ func CleanItemName(s string) string {
 		}
 		return r
 	}, s)
-	s = strings.Join(strings.Fields(s), " ")
+	s = NFC(strings.Join(strings.Fields(s), " "))
 	if utf8.RuneCountInString(s) > MaxItemNameRunes {
 		s = string([]rune(s)[:MaxItemNameRunes])
 	}

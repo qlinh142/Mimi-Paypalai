@@ -203,3 +203,21 @@ func TestQuantity(t *testing.T) {
 		t.Fatal("delta")
 	}
 }
+
+// A2: cùng một chữ gõ dựng sẵn hay dấu rời phải ra cùng kết quả.
+func TestNFCAndFoldDecomposed(t *testing.T) {
+	composed := "Dầu gội Ưu đãi"
+	decomposed := "Dầu gội Ưu đãi"
+	if composed == decomposed {
+		t.Fatal("test input phải khác byte")
+	}
+	if NFC(decomposed) != composed {
+		t.Fatalf("NFC: %q", NFC(decomposed))
+	}
+	if NormalizeVi(decomposed) != "dau goi uu dai" || NormalizeVi(composed) != "dau goi uu dai" {
+		t.Fatalf("fold: %q / %q", NormalizeVi(decomposed), NormalizeVi(composed))
+	}
+	if CleanItemName("  Sữà  ") == "" || CleanItemName("Sữa") != "Sữa" {
+		t.Fatalf("clean: %q", CleanItemName("Sữa"))
+	}
+}
