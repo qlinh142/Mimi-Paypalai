@@ -5,6 +5,15 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Thêm kế hoạch vào lịch (một lần)
+
+Nhánh `feat/them-vao-lich`. ADR-004 mục Lịch, mẹ chốt: chỉ tạo lịch một lần, không nối tài khoản Google Calendar, không tự sửa lịch về sau.
+
+- `lib/calendar.ts`: link Google Calendar điền sẵn (tên, giờ, nơi mua, danh sách món, múi giờ Việt Nam, dài 1 giờ; không đặt giờ thì cả ngày) và file `.ics` cho Lịch trên iPhone.
+- Chi tiết kế hoạch: khi đã có ngày đi chợ, hiện hai nút "Thêm vào Google Calendar" và "Lịch trên iPhone", kèm nhắc đổi giờ thì thêm lại.
+- Kiểm tra: tsc, build; trên bản thử link mở đúng ngày giờ 04/11 09:30 đến 10:30, file .ics đúng định dạng.
+- Chưa có: nút này ở màn người được nhờ mua.
+
 ## 2026-11-02 · Bật App Check (reCAPTCHA Enterprise)
 
 Nhánh `deploy/app-check`, xếp chồng lên PR #36.
