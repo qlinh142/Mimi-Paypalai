@@ -6,3 +6,5 @@ dist/
 .firebase/
 *.tsbuildinfo
 dist-proto/
+test-results/
+playwright-report/
