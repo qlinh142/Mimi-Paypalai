@@ -5,6 +5,13 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · README: các bước quay lại bản cũ (A6)
+
+- `backend/README.md` thêm mục "Quay lại bản cũ": khi nào quay lại, lệnh cho Cloud Run (api, worker, job), Firebase Hosting, Firestore rules, và luật thay đổi dữ liệu để quay lại không hỏng dữ liệu.
+- Thêm lệnh chuyển traffic sang bản `canary` sau khi thử.
+
+---
+
 ## 2026-11-02 · Người được nhờ báo mua xong hoặc từ chối (B2)
 
 - `POST /households/shopping-assignments/{id}/complete`: ghi các món đã tick thành một hóa đơn của người mua, đi qua cùng đường lưu hóa đơn có `assignment_id`. Kết quả:
