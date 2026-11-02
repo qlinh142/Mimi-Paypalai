@@ -5,6 +5,22 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Hợp đồng API: sinh kiểu từ OpenAPI, CI báo khi lệch (A3)
+
+- `frontend/src/api/schema.d.ts` sinh từ `backend/api/openapi.yaml` (`npm run gen:api`) và được commit. CI chạy lại lệnh này; file sinh ra khác bản đã commit thì CI đỏ.
+- `frontend/src/api/contract.ts`: lúc build, so tên trường của 22 kiểu viết tay trong `types.ts` với OpenAPI. Thiếu hay thừa một trường thì `tsc` báo đúng kiểu và tên trường.
+- Backend có test `TestOpenAPIMatchesRoutes`: mọi route trên máy chủ phải có trong OpenAPI và ngược lại.
+- Ba thứ tìm ra khi bật kiểm tra:
+  - `openapi.yaml` bị hỏng từ đợt trước (mất dòng tên `Item`, khóa trùng), nên `gen:api` không chạy được. Đã sửa.
+  - OpenAPI thiếu trường máy chủ vẫn gửi: `Cart.plan_id`, `Cart.phase`, `Assignment.trip`, `BasketPrices.window_days`, `Stock.parts`. Đã thêm.
+  - App thiếu kiểu cho `HomeSummary.receipt_count`, `Item.interval_days`, `PlanPrices.sale_offers`; OpenAPI ghi `GET /ready` mà máy chủ chưa phục vụ. Đã thêm.
+- Chưa làm: xếp lại thư mục frontend theo tính năng, và thay hẳn `types.ts` bằng kiểu sinh ra. Cần OpenAPI ghi đủ `required` trước, làm sau.
+
+### Cách kiểm tra
+- `go vet`, `go test ./...` qua; `npm run gen:api` chạy hai lần ra cùng file; `npm run build` qua. Thử đổi tên một trường trong `types.ts` thì `tsc` báo lỗi tại `contract.ts`.
+
+---
+
 ## 2026-11-02 · Tìm tên món không phân biệt cách gõ dấu (A2)
 
 - Cùng chữ "ầ" có thể đến ở hai dạng: một ký tự (bàn phím điện thoại) hoặc "a" kèm dấu rời (dán từ máy Mac, chữ AI đọc từ ảnh). Trước đây hai dạng nhìn giống nhau nhưng máy chủ coi là khác nhau.

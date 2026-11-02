@@ -230,6 +230,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       needs_count: items.filter((i) => isSoon(i, 7)).length,
       plan: (({ item_count, estimate, missing_price }) => ({ item_count, estimate, missing_price }))(mockCart()),
       unread_notifications: 2,
+      receipt_count: 12 + savedReceipts.size,
     };
     return json(summary);
   }

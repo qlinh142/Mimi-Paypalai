@@ -10,6 +10,7 @@ require (
 	google.golang.org/api v0.287.1
 	google.golang.org/genai v1.75.0
 	google.golang.org/grpc v1.84.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

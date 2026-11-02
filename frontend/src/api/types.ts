@@ -25,6 +25,7 @@ export type HomeSummary = {
   needs_count: number;               // đếm theo đúng quy tắc Cần mua
   plan: { item_count: number; estimate: number | null; missing_price: number };
   unread_notifications: number;
+  receipt_count: number;             // số hóa đơn đã lưu, mọi thời gian
 };
 
 /** Nhãn trạng thái dùng chung mọi màn (spec 6.2), theo thứ tự ưu tiên. */
@@ -38,6 +39,7 @@ export type Item = {
   category_label: string;
   status: StockStatus;
   days_left: number | null;    // null: chưa đủ dữ liệu
+  interval_days?: number;      // chu kỳ mua trung bình (ngày), khi đã đủ lịch sử
   purchase_count: number;
   // API bỏ qua hai trường dưới khi chưa có giá trị, nên có thể là undefined.
   confidence?: "low" | "mid" | "high" | "" | null;
@@ -230,6 +232,7 @@ export type PlanPrices = {
   recommend: "single" | "split";
   missing_price: string[];
   single_source: string[];
+  sale_offers?: unknown[];     // chưa tìm giá sale bên ngoài: luôn rỗng
 };
 
 /** GET /spending?month=YYYY-MM (chỉ chủ giỏ). */

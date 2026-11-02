@@ -241,6 +241,7 @@ func (s *Server) Handler() http.Handler {
 	public("GET /healthz", s.healthz)
 	public("GET /health", s.healthz)
 	public("GET /readyz", s.readyz)
+	public("GET /ready", s.readyz) // như /health: Cloud Run chặn đường dẫn kết thúc bằng z ở URL công khai
 
 	private("GET /me", s.defaultTimeout, s.getMe)
 	private("PUT /settings", s.defaultTimeout, s.putSettings)
