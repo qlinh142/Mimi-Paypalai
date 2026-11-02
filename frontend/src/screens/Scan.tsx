@@ -308,6 +308,7 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
   const edited = lines !== draft.lines;
   const kept = lines.filter((l) => !l.removed);
   const review = kept.filter((l) => l.needs_review && !l.discount).length;
+  const noPrice = kept.filter((l) => !l.discount && l.amount.trim() === "").length;
   const sum = edited ? kept.reduce((a, l) => a + (l.amount_vnd ?? 0), 0) : draft.sum_vnd;
   const printed = draft.total_printed ? parseAmount(draft.total_printed, draft.currency) : null;
   // Tổng lệch chỉ là cảnh báo, không chặn lưu (BUG-06 mục 5.1).
@@ -437,6 +438,7 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
               : t.confirm.mismatch(formatVnd(sum), draft.total_printed)}
         </p>
         {review > 0 && <p className="check warn">{m1.scan.reviewHint(review)}</p>}
+        {noPrice > 0 && <p className="check">{t.confirm.noPriceCount(noPrice)}</p>}
         {toMe.length > 0 && (
           <label className="field">
             {m1.scan.forAssignment}

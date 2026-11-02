@@ -187,7 +187,7 @@ export function ReceiptDetailScreen() {
                         </span>
                         <span className="line15__sub">{l.qty} × {vndOrNone(l.unit_price)}</span>
                       </span>
-                      <span className="num run15__total">{vndOrNone(l.amount)}</span>
+                      <span className="num run15__total" style={l.amount == null ? { opacity: 0.55 } : undefined}>{vndOrNone(l.amount)}</span>
                     </div>
                   </li>
                 ))}
@@ -197,6 +197,7 @@ export function ReceiptDetailScreen() {
               <p><span>{m15.history.subtotal}</span><span className="num">{formatVnd(r.subtotal)}</span></p>
               {r.discount > 0 && <p className="ph15__disc"><span>{m15.history.discount}</span><span className="num">−{formatVnd(r.discount)}</span></p>}
               <p className="ph15__total"><span>{m15.history.total}</span><span className="num">{formatVnd(r.total_vnd)}</span></p>
+              {(r.missing_price ?? 0) > 0 && <p className="hint">{t.confirm.noPriceCount(r.missing_price ?? 0)}</p>}
               {r.split && (
                 <>
                   <p><span>{m15.run.forOwner(r.split.owner_name)}</span><span className="num">{formatVnd(r.split.for_owner)}</span></p>

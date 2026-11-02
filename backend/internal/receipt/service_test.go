@@ -278,6 +278,22 @@ func TestSave(t *testing.T) {
 		}
 	})
 
+	// A7: ô giá trống là chưa rõ giá: vẫn lưu món, không tính 0đ, không cộng vào tổng.
+	t.Run("blank amount is saved as unknown price", func(t *testing.T) {
+		st := &fakeStore{saved: map[string]Receipt{}}
+		s := newSvc(t, nil, &fakeQuota{}, st)
+		r := req
+		r.ReceiptID = "r-12"
+		r.Lines = append(append([]SaveLine(nil), req.Lines...), SaveLine{LineID: "l9", Name: "Rau muống", Qty: 1, Amount: "  "})
+		if _, err := s.Save(context.Background(), owner, r); err != nil {
+			t.Fatal(err)
+		}
+		got := st.saved["r-12"]
+		if got.TotalVND != 138000 || len(got.Lines) != 3 || got.Lines[2].VND != nil {
+			t.Fatalf("saved %+v", got)
+		}
+	})
+
 	t.Run("prediction switch off marks every line habit=false", func(t *testing.T) {
 		st := &fakeStore{saved: map[string]Receipt{}}
 		s := newSvc(t, nil, &fakeQuota{}, st)
