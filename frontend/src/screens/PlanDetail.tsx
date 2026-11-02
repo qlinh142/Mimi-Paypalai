@@ -21,7 +21,7 @@ import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
 import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
-import { type CalendarEvent, IOS_NOT_SAFARI, googleCalendarUrl, openIcs } from "../lib/calendar";
+import { type CalendarEvent, googleCalendarUrl } from "../lib/calendar";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -171,7 +171,6 @@ function Detail({ id }: { id: string }) {
           )}
           {!editTrip && date && (
             <AddToCalendar
-              uid={`plan-${id}-${date}-${time}`}
               ev={{
                 title: m15.plan.calTitle(name),
                 date,
@@ -420,18 +419,14 @@ function Forecast({ cart }: { cart: Cart }) {
 }
 
 /* ---------- Thêm vào lịch (ADR-004: tạo một lần, không nối tài khoản lịch) ---------- */
-function AddToCalendar({ ev, uid }: { ev: CalendarEvent; uid: string }) {
+function AddToCalendar({ ev }: { ev: CalendarEvent }) {
   return (
     <div className="cal15">
       <div className="cal15__row">
         <a className="btn btn--quiet" href={googleCalendarUrl(ev)} target="_blank" rel="noopener noreferrer">
           <CalendarPlus size={18} aria-hidden /> {m15.plan.calGoogle}
         </a>
-        <button type="button" className="btn btn--quiet" onClick={() => openIcs(ev, uid)}>
-          {m15.plan.calIcs}
-        </button>
       </div>
-      {IOS_NOT_SAFARI && <p className="hint" role="note">{m15.plan.calSafari(window.location.host)}</p>}
       <p className="hint">{m15.plan.calHint}</p>
     </div>
   );

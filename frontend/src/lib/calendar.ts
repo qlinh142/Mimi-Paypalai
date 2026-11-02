@@ -1,6 +1,7 @@
 /**
- * Thêm lịch đi chợ một lần (ADR-004, mẹ chốt 02/11): mở Google Calendar với sự kiện điền sẵn,
- * hoặc tải file .ics cho Lịch trên iPhone. Không xin quyền vào lịch, không sửa lịch về sau.
+ * Thêm lịch đi chợ một lần (ADR-004, mẹ chốt 02/11): mở Google Calendar với sự kiện điền sẵn.
+ * Không xin quyền vào lịch, không sửa lịch về sau. Nút Lịch iPhone (.ics) đã bỏ: iPhone chỉ tải
+ * file về chứ không mở app Lịch (mẹ thử 02/11), nên chỉ giữ Google Calendar.
  */
 export type CalendarEvent = {
   title: string;
@@ -40,63 +41,4 @@ export function googleCalendarUrl(ev: CalendarEvent): string {
   if (ev.location) q.set("location", ev.location);
   if (ev.details) q.set("details", ev.details);
   return `https://calendar.google.com/calendar/render?${q.toString()}`;
-}
-
-/** Chuỗi trong .ics: thoát \ ; , và xuống dòng (RFC 5545 mục 3.3.11). */
-const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-
-export function icsText(ev: CalendarEvent, uid: string, now = new Date()): string {
-  const r = range(ev);
-  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Mimi//Ke hoach//VI",
-    "BEGIN:VEVENT",
-    `UID:${uid}@mimi`,
-    `DTSTAMP:${stamp}`,
-    ...(r
-      ? [`DTSTART;TZID=${TZ}:${r[0]}`, `DTEND;TZID=${TZ}:${r[1]}`]
-      : [`DTSTART;VALUE=DATE:${compact(ev.date)}`, `DTEND;VALUE=DATE:${compact(addDays(ev.date, 1))}`]),
-    `SUMMARY:${esc(ev.title)}`,
-    ...(ev.location ? [`LOCATION:${esc(ev.location)}`] : []),
-    ...(ev.details ? [`DESCRIPTION:${esc(ev.details)}`] : []),
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ];
-  return lines.join("\r\n") + "\r\n";
-}
-
-export function downloadIcs(ev: CalendarEvent, uid: string) {
-  const url = URL.createObjectURL(new Blob([icsText(ev, uid)], { type: "text/calendar;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "mimi-di-cho.ics";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-/** iPhone, iPad (iPadOS báo là MacIntel có cảm ứng). */
-export const IS_IOS =
-  typeof navigator !== "undefined" &&
-  (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
-
-/**
- * Trình duyệt khác Safari trên iPhone (Chrome, Firefox, Edge, app Google, Facebook, Zalo...):
- * chỉ tải file .ics về, không mở được app Lịch (mẹ thử Chrome 02/11).
- */
-export const IOS_NOT_SAFARI = IS_IOS && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|FBAN|FBAV|Instagram|Line\/|Zalo/i.test(navigator.userAgent);
-
-/**
- * Nút "Lịch trên iPhone". Safari trên iPhone mở thẳng bảng "Thêm vào Lịch" khi đi tới file lịch
- * (không tải về); máy khác tải file .ics để mở bằng app lịch của máy.
- */
-export function openIcs(ev: CalendarEvent, uid: string) {
-  if (IS_IOS && !IOS_NOT_SAFARI) {
-    window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsText(ev, uid))}`;
-    return;
-  }
-  downloadIcs(ev, uid);
 }
