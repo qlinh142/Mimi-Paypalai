@@ -48,47 +48,47 @@ var nextFulfillment = map[State]State{StatePaid: StateOrdered, StateOrdered: Sta
 
 // Line là một dòng giỏ online / đơn hàng. Qty tính theo gói của sản phẩm.
 type Line struct {
-	Key              string   `json:"key"`
-	Name             string   `json:"name"` // tên nhóm trong Kế hoạch
-	ProductName      string   `json:"product_name"`
-	CategoryKey      string   `json:"category_key,omitempty"` // danh mục chi tiêu
-	Category         string   `json:"category"`               // grocery | household (mandate)
-	Qty              float64  `json:"qty"`                    // số gói
-	Unit             string   `json:"unit"`                   // đơn vị của gói
-	PackQty          float64  `json:"pack_qty"`
-	PlanQty          float64  `json:"plan_qty"`
-	PlanUnit         string   `json:"plan_unit,omitempty"`
-	UnitPriceVND     int64    `json:"unit_price_vnd"`     // giá đang bán mỗi gói, quy ra VND theo tỷ giá của đơn
-	SnapshotPriceVND int64    `json:"snapshot_price_vnd"` // giá tốt nhất ở lần quét gần nhất
-	TotalVND         int64    `json:"total_vnd"`
+	Key              string  `json:"key"`
+	Name             string  `json:"name"` // tên nhóm trong Kế hoạch
+	ProductName      string  `json:"product_name"`
+	CategoryKey      string  `json:"category_key,omitempty"` // danh mục chi tiêu
+	Category         string  `json:"category"`               // grocery | household (mandate)
+	Qty              float64 `json:"qty"`                    // số gói
+	Unit             string  `json:"unit"`                   // đơn vị của gói
+	PackQty          float64 `json:"pack_qty"`
+	PlanQty          float64 `json:"plan_qty"`
+	PlanUnit         string  `json:"plan_unit,omitempty"`
+	UnitPriceVND     int64   `json:"unit_price_vnd"`     // giá đang bán mỗi gói, quy ra VND theo tỷ giá của đơn
+	SnapshotPriceVND int64   `json:"snapshot_price_vnd"` // giá tốt nhất ở lần quét gần nhất
+	TotalVND         int64   `json:"total_vnd"`
 	// Giá gốc của merchant (thị trường Mỹ: USD). Tổng tiền PayPal thu là tổng các TotalSource.
 	SourceCurrency  string `json:"source_currency,omitempty"`
 	UnitPriceSource string `json:"unit_price_source,omitempty"` // "4.29"
 	TotalSource     string `json:"total_source,omitempty"`
 	totalCents      int64
-	NeedBy           string   `json:"need_by,omitempty"`
-	ETA              string   `json:"eta"`
-	InPlan           bool     `json:"-"`
-	OverPlan         bool     `json:"-"`
-	VerifiedQty      *float64 `json:"verified_qty,omitempty"` // số gói thực nhận sau Verify
-	Match            string   `json:"match,omitempty"`        // match | partial | missing
+	NeedBy          string   `json:"need_by,omitempty"`
+	ETA             string   `json:"eta"`
+	InPlan          bool     `json:"-"`
+	OverPlan        bool     `json:"-"`
+	VerifiedQty     *float64 `json:"verified_qty,omitempty"` // số gói thực nhận sau Verify
+	Match           string   `json:"match,omitempty"`        // match | partial | missing
 }
 
 // Basket là giỏ online đã resolve product, giá, ETA và đã qua Household Mandate.
 type Basket struct {
-	Merchant   string    `json:"merchant"`
-	Lines      []Line    `json:"lines"`
-	Missing    []string  `json:"missing"` // món trong Kế hoạch merchant không bán
-	TotalVND   int64     `json:"total_vnd"`
-	AmountUSD  string    `json:"amount_usd"`
-	VNDPerUSD  int64     `json:"vnd_per_usd"`
-	RateSource string    `json:"rate_source,omitempty"` // tỷ giá lấy từ đâu
-	RateAsOf   string    `json:"rate_as_of,omitempty"`  // tỷ giá của ngày nào, YYYY-MM-DD
+	Merchant   string   `json:"merchant"`
+	Lines      []Line   `json:"lines"`
+	Missing    []string `json:"missing"` // món trong Kế hoạch merchant không bán
+	TotalVND   int64    `json:"total_vnd"`
+	AmountUSD  string   `json:"amount_usd"`
+	VNDPerUSD  int64    `json:"vnd_per_usd"`
+	RateSource string   `json:"rate_source,omitempty"` // tỷ giá lấy từ đâu
+	RateAsOf   string   `json:"rate_as_of,omitempty"`  // tỷ giá của ngày nào, YYYY-MM-DD
 	// FX: bản chép tỷ giá USD của ngày đặt hàng từ fx_rates (nil: chưa có bảng tỷ giá,
 	// dùng tỷ giá cấu hình PAYPAL_VND_PER_USD).
 	FX         *receipt.FX `json:"fx,omitempty"`
 	SnapshotAt time.Time   `json:"snapshot_at"`
-	Decision   Decision  `json:"decision"`
+	Decision   Decision    `json:"decision"`
 }
 
 // Refund là một lần hoàn tiền; giữ nguyên để audit cùng giao dịch gốc.
@@ -109,17 +109,17 @@ type Event struct {
 
 // Order là đơn Mimi Online, lưu nguyên khối (users/{uid}/orders/{id}).
 type Order struct {
-	ID                 string     `json:"id"`
-	State              State      `json:"state"`
-	Merchant           string     `json:"merchant"`
-	Lines              []Line     `json:"lines"`
-	TotalVND           int64      `json:"total_vnd"`
-	AmountUSD          string     `json:"amount_usd"`
-	VNDPerUSD          int64      `json:"vnd_per_usd"`
-	RateSource         string     `json:"rate_source,omitempty"`
-	RateAsOf           string     `json:"rate_as_of,omitempty"`
-	Decision           Decision   `json:"decision"`
-	ApprovedByUser     bool       `json:"approved_by_user"` // người dùng duyệt đơn ASK
+	ID             string   `json:"id"`
+	State          State    `json:"state"`
+	Merchant       string   `json:"merchant"`
+	Lines          []Line   `json:"lines"`
+	TotalVND       int64    `json:"total_vnd"`
+	AmountUSD      string   `json:"amount_usd"`
+	VNDPerUSD      int64    `json:"vnd_per_usd"`
+	RateSource     string   `json:"rate_source,omitempty"`
+	RateAsOf       string   `json:"rate_as_of,omitempty"`
+	Decision       Decision `json:"decision"`
+	ApprovedByUser bool     `json:"approved_by_user"` // người dùng duyệt đơn ASK
 	// Cổng thanh toán (Mimi 2.0, chốt 03/11: PayPal mặc định, thẻ qua Braintree). Đơn lưu
 	// trước khi có các ô này là PayPal: Upgrade() điền lại từ hai ô PayPal cũ.
 	Provider        string `json:"provider"`                  // paypal | braintree
@@ -128,21 +128,21 @@ type Order struct {
 	// Tiền thật đã thu, theo luật tiền tệ 03/11: PayPal thu bằng USD, tỷ giá ngày đặt hàng
 	// khóa vào đơn (FX). Hoàn tiền dùng đúng tỷ giá này. AmountUSD, VNDPerUSD, RateSource,
 	// RateAsOf giữ lại để đọc đơn cũ và cho app đang chạy.
-	SourceCurrency string      `json:"source_currency"`
-	SourceAmount   string      `json:"source_amount"`
-	FX             *receipt.FX `json:"fx,omitempty"`
-	PayPalOrderID  string      `json:"paypal_order_id"`
-	ApproveURL     string      `json:"approve_url,omitempty"`
-	CaptureID      string      `json:"paypal_capture_id,omitempty"`
-	PaidAt             *time.Time `json:"paid_at,omitempty"`
-	ETA                string     `json:"eta"`
-	Events             []Event    `json:"events"`
-	Refunds            []Refund   `json:"refunds"`
-	RefundedVND        int64      `json:"refunded_vnd"`
-	NetVND             int64      `json:"net_vnd"` // = total - refunded, chỉ có nghĩa sau khi paid
-	SuggestedRefundVND int64      `json:"suggested_refund_vnd"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	SourceCurrency     string      `json:"source_currency"`
+	SourceAmount       string      `json:"source_amount"`
+	FX                 *receipt.FX `json:"fx,omitempty"`
+	PayPalOrderID      string      `json:"paypal_order_id"`
+	ApproveURL         string      `json:"approve_url,omitempty"`
+	CaptureID          string      `json:"paypal_capture_id,omitempty"`
+	PaidAt             *time.Time  `json:"paid_at,omitempty"`
+	ETA                string      `json:"eta"`
+	Events             []Event     `json:"events"`
+	Refunds            []Refund    `json:"refunds"`
+	RefundedVND        int64       `json:"refunded_vnd"`
+	NetVND             int64       `json:"net_vnd"` // = total - refunded, chỉ có nghĩa sau khi paid
+	SuggestedRefundVND int64       `json:"suggested_refund_vnd"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
 }
 
 // Phụ thuộc, khai báo ở phía dùng.
