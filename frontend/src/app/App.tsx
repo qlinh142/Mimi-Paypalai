@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "../lib/auth";
 import { queryClient, queryPersister } from "./queryClient";
 import { Welcome } from "../screens/Welcome";
 import { Home } from "../screens/Home";
+import { LangSync } from "./LangSync";
 import { MoneySync } from "./MoneySync";
 
 // Màn ít vào ngay được tách bundle riêng để lần mở đầu nhẹ.
@@ -75,6 +76,7 @@ function Gate() {
 
   return (
     <Suspense fallback={null}>
+      <LangSync />
       <MoneySync>
       <Routes>
         <Route path="/" element={<Home entering={wasSignedOut.current === true} />} />
