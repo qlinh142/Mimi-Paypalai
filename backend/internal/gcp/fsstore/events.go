@@ -139,6 +139,7 @@ func (n *NotifyStore) Event(ctx context.Context, uid, id string) (notify.Event, 
 	}
 	if us != nil && us.Exists() {
 		if st, ok := us.Data()["settings"].(map[string]any); ok {
+			ev.Lang, _ = st["lang"].(string) // thư theo ngôn ngữ người nhận
 			if on, ok := st["remind_enabled"].(bool); ok && !on {
 				return ev, delivery, "", nil
 			}

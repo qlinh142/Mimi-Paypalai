@@ -5,6 +5,15 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Thư thông báo theo ngôn ngữ của người nhận
+
+Nhánh `feat/thu-theo-ngon-ngu`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2 (mẹ chốt 03/11): lời nhắc, link mua hộ, email theo ngôn ngữ trong Cài đặt của người nhận.
+
+- Thư sự kiện (nhờ mua, cập nhật, hủy, mua xong, không mua được, chuyển món) và bản tin "món sắp hết" có thêm bản tiếng Anh; chọn theo `settings.lang` của người nhận, vắng là tiếng Việt.
+- Thông báo trong app và màn mua hộ vốn đã dựng chữ theo ngôn ngữ của người đang xem, không cần sửa.
+- Kiểm tra: `TestEventMailLang`, `go test ./internal/notify`.
+- Lưu ý: chưa có dịch vụ gửi email thật (để sau demo), hiện thư chỉ ghi log.
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.
