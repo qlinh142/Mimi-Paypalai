@@ -2935,7 +2935,7 @@ export interface components {
             replacement_enabled?: boolean;
             sale_enabled?: boolean;
             /**
-             * @description Ngôn ngữ dịch hóa đơn, không phải ngôn ngữ giao diện
+             * @description Ngôn ngữ của tài khoản: giao diện, tên món dịch, lời nhắc, email. Vắng khi người mới chưa ghi; app ghi theo ngôn ngữ điện thoại
              * @enum {string}
              */
             lang?: "vi" | "en";
