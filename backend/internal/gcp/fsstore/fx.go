@@ -5,20 +5,23 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/smartlife-lab/mimi/backend/internal/fx"
 )
 
 var _ fx.Store = (*Store)(nil)
 
-// SaveRates ghi fx_rates/{currency}_{ngày}. Chạy lại trong ngày thì ghi đè chính nó; Rate
-// (đọc khi lưu hóa đơn) lấy dòng mới nhất không sau ngày mua.
+// SaveRates ghi fx_rates/{currency}_{ngày}. Tỷ giá đã chốt của một ngày không bao giờ bị
+// ghi đè (quy tắc FX1, FX4): chạy lại trong ngày thì giữ dòng cũ. Ngày không có dòng nào thì
+// Rate (đọc khi lưu hóa đơn) lấy tỷ giá gần nhất trước ngày mua.
 func (s *Store) SaveRates(ctx context.Context, rates []fx.Rate) error {
 	bw := s.c.BulkWriter(ctx)
 	jobs := make([]*firestore.BulkWriterJob, 0, len(rates))
 	for _, r := range rates {
 		ref := s.c.Collection("fx_rates").Doc(r.Currency + "_" + r.On.String())
-		j, err := bw.Set(ref, map[string]any{
+		j, err := bw.Create(ref, map[string]any{
 			"currency": r.Currency, "on": r.On.String(), "rate": r.VNDPerOne, "source": r.Source, "fetched_at": r.FetchedAt,
 		})
 		if err != nil {
@@ -29,7 +32,7 @@ func (s *Store) SaveRates(ctx context.Context, rates []fx.Rate) error {
 	}
 	bw.End()
 	for i, j := range jobs {
-		if _, err := j.Results(); err != nil {
+		if _, err := j.Results(); err != nil && status.Code(err) != codes.AlreadyExists {
 			return fmt.Errorf("fx save %s: %w", rates[i].Currency, err)
 		}
 	}
