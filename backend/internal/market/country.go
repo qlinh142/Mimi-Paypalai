@@ -9,9 +9,9 @@ import (
 // Giá luôn lưu kèm số tiền gốc (Local, Currency) và quy ra VND (PriceVND) để so được với giá
 // trên hóa đơn, vốn tính bằng VND.
 type Country struct {
-	Code     string // VN, SG
+	Code     string // VN, US, SG
 	Name     string // tên tiếng Anh, đưa vào câu hỏi AI
-	Currency string // VND, SGD
+	Currency string // VND, USD, SGD
 	// Giá vô lý theo tiền gốc: bỏ.
 	MinLocal, MaxLocal float64
 	// Shops: sổ nguồn ban đầu (tên cửa hàng, web). Web mới vào sổ khi ra giá hợp lệ 2 lần.
@@ -30,22 +30,38 @@ var Countries = map[string]Country{
 		{"WinMart", "winmart.vn"}, {"Co.opmart", "cooponline.vn"}, {"Bách Hóa Xanh", "bachhoaxanh.com"},
 		{"GO!", ""}, {"AEON", "aeoneshop.com"}, {"Lotte Mart", ""}, {"MM Mega Market", ""},
 	}},
+	// Mẹ chốt 03/11: Cài đặt cho chọn Việt Nam và Mỹ (Selectable). Singapore vẫn giữ để người
+	// đã chọn trước đó dùng tiếp và mở lại khi cần; thêm nước mới chỉ cần thêm một dòng ở đây.
+	"US": {Code: "US", Name: "United States", Currency: "USD", MinLocal: 0.1, MaxLocal: 20_000, Shops: []Shop{
+		{"Walmart", "walmart.com"}, {"Target", "target.com"}, {"Costco", "costco.com"},
+		{"Kroger", "kroger.com"}, {"Whole Foods", "wholefoodsmarket.com"},
+	}},
 	"SG": {Code: "SG", Name: "Singapore", Currency: "SGD", MinLocal: 0.1, MaxLocal: 20_000, Shops: []Shop{
 		{"FairPrice", "fairprice.com.sg"}, {"Cold Storage", "coldstorage.com.sg"}, {"Sheng Siong", "shengsiong.com.sg"},
 		{"RedMart", "redmart.lazada.sg"}, {"Giant", "giant.sg"},
 	}},
 }
 
+// Selectable: các nước hiện ra trong Cài đặt, theo thứ tự (mẹ chốt 03/11: Việt Nam, Mỹ).
+var Selectable = []string{"VN", "US"}
+
 // DefaultCountry khi chưa chọn và không đoán được.
 const DefaultCountry = "VN"
+
+// zoneCountry: múi giờ của nước khác Việt Nam, để đoán nước khi chưa chọn trong Cài đặt.
+var zoneCountry = map[string]string{
+	"America/New_York": "US", "America/Chicago": "US", "America/Denver": "US", "America/Phoenix": "US",
+	"America/Los_Angeles": "US", "America/Anchorage": "US", "Pacific/Honolulu": "US",
+	"Asia/Singapore": "SG",
+}
 
 // CountryFor: nước trong Cài đặt nếu hợp lệ; chưa chọn thì đoán theo múi giờ.
 func CountryFor(setting, timezone string) string {
 	if c := strings.ToUpper(strings.TrimSpace(setting)); Countries[c].Code != "" {
 		return c
 	}
-	if timezone == "Asia/Singapore" {
-		return "SG"
+	if c := zoneCountry[timezone]; c != "" {
+		return c
 	}
 	return DefaultCountry
 }

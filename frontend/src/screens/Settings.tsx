@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { ApiError } from "../api/client";
 import { useDeleteAccount, useHousehold, useHouseholdActions, useMandate, useMe, useSaveMandate, useSaveSettings } from "../api/hooks";
-import type { Mandate, MandateCategory, Me } from "../api/types";
+import type { Country, Mandate, MandateCategory, Me } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { m15 } from "../i18n/m15";
 import { m1 } from "../i18n/m1";
@@ -23,6 +23,14 @@ const TIMEZONES = [
   "Asia/Ho_Chi_Minh", "Asia/Bangkok", "Asia/Singapore", "Asia/Tokyo", "Asia/Seoul",
   "Australia/Sydney", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles",
 ];
+// Nước cho chọn trong Cài đặt (mẹ chốt 03/11: Việt Nam, Mỹ), khớp market.Selectable ở máy chủ.
+// Người đã chọn nước khác trước đó (Singapore) vẫn thấy nước của mình trong danh sách.
+const COUNTRIES: Country[] = ["VN", "US"];
+// Chưa chọn nước thì đoán theo múi giờ, khớp market.CountryFor ở máy chủ.
+const ZONE_COUNTRY: Record<string, Country> = {
+  "America/New_York": "US", "America/Chicago": "US", "America/Denver": "US", "America/Phoenix": "US",
+  "America/Los_Angeles": "US", "America/Anchorage": "US", "Pacific/Honolulu": "US", "Asia/Singapore": "SG",
+};
 const LANG_NAME = { vi: "Tiếng Việt", en: "English" } as const;
 const initial = (n: string) => (n.trim()[0] ?? "?").toUpperCase();
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -231,6 +239,7 @@ export function SettingsLanguage() {
   const save = useSaveSettings();
   const tz = me?.settings.timezone || "Asia/Ho_Chi_Minh";
   const zones = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES];
+  const country: Country = me?.settings.country ?? ZONE_COUNTRY[tz] ?? "VN";
   return (
     <Sub title={S.language}>
       <div className="box15 set15__form">
@@ -259,12 +268,13 @@ export function SettingsLanguage() {
           <span>{S.country}</span>
           <select
             className="pick15"
-            value={me?.settings.country ?? (tz === "Asia/Singapore" ? "SG" : "VN")}
+            value={country}
             disabled={!me || save.isPending}
-            onChange={(e) => save.mutate({ country: e.target.value as "VN" | "SG" })}
+            onChange={(e) => save.mutate({ country: e.target.value as Country })}
           >
-            <option value="VN">{S.countryName.VN}</option>
-            <option value="SG">{S.countryName.SG}</option>
+            {(COUNTRIES.includes(country) ? COUNTRIES : [...COUNTRIES, country]).map((c) => (
+              <option key={c} value={c}>{S.countryName[c]}</option>
+            ))}
           </select>
         </label>
         <label className="field15">

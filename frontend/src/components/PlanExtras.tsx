@@ -10,7 +10,7 @@ import type { Assignment, Cart, MarketPrice } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { formatDateTime, formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 
-/** Giá tiền gốc ngoài Việt Nam, ví dụ "4.50 SGD". */
+/** Giá tiền gốc ngoài Việt Nam, ví dụ "4.50 USD". */
 function formatLocal(amount: number, currency: string) {
   return `${amount.toFixed(2)} ${currency}`;
 }

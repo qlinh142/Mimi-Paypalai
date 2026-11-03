@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Nước lấy giá online: Việt Nam và Mỹ
+
+Nhánh `feat/nuoc-vn-us`. Mẹ chốt 03/11: Cài đặt → Quốc gia (giá online) cho chọn Việt Nam và Mỹ; giữ Singapore trong hệ thống vì sau này sẽ thêm nhiều nước.
+
+- `market.Countries` thêm Mỹ (USD; sổ nguồn ban đầu Walmart, Target, Costco, Kroger, Whole Foods), Singapore giữ nguyên. `market.Selectable` là danh sách nước hiện trong Cài đặt; thêm nước mới chỉ cần thêm một dòng.
+- Chưa chọn nước thì đoán theo múi giờ: múi giờ Mỹ là US, Asia/Singapore là SG, còn lại VN.
+- Cài đặt nhận VN, US, SG; màn Cài đặt hiện Việt Nam, Mỹ. Người đã chọn Singapore trước đó vẫn thấy Singapore trong danh sách.
+- Bản thử: chọn Mỹ thì bảng giá online giả giá USD ở Walmart, Target, Costco.
+- Kiểm tra: `go test ./...` (thêm `TestSelectableCountries`, ca US trong CountryFor và Cài đặt), `tsc -b`, bản thử chọn Mỹ ra "Rẻ nhất ở Target · 1.15 USD".
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.
