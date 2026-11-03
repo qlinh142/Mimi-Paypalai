@@ -7,6 +7,7 @@ import { expect, test } from "@playwright/test";
 const ROUTES = [
   "/", "/spending", "/spending/history", "/spending/receipt/h1", "/items", "/plan", "/plan/trip-mau",
   "/plan/run/trip-mau", "/settings", "/settings/members", "/settings/language", "/settings/notify", "/notifications",
+  "/plan/online", "/settings/mandate", "/orders",
 ];
 
 test.use({ viewport: { width: 320, height: 640 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });

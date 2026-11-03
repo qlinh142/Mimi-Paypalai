@@ -137,7 +137,8 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	if err != nil {
 		return err
 	}
-	orders.WithRateInfo(cfg.VNDRateSource, cfg.VNDRateAsOf)
+	// Tỷ giá USD của ngày đặt hàng lấy từ fx_rates (job fx-sync); bảng trống thì dùng tỷ giá cấu hình.
+	orders.WithRateInfo(cfg.VNDRateSource, cfg.VNDRateAsOf).WithRates(store)
 	api, err := httpapi.New(httpapi.Deps{
 		Log: log, Tokens: auth, AppCheck: appCheck, Principals: store, Profiles: store,
 		Receipts: receipts, Items: items, Ready: store,

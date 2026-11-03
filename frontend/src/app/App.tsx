@@ -27,7 +27,7 @@ const RecurringDetail = lazy(() => import("../screens/RecurringDetail").then((m)
 const ShoppingRun = lazy(() => import("../screens/ShoppingRun").then((m) => ({ default: m.ShoppingRun })));
 const Spending = lazy(() => import("../screens/Spending").then((m) => ({ default: m.Spending })));
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
-const lazySet = (k: "SettingsProfile" | "SettingsNotify" | "SettingsLanguage" | "SettingsMembers" | "SettingsMember" | "SettingsPrivacy") =>
+const lazySet = (k: "SettingsProfile" | "SettingsNotify" | "SettingsLanguage" | "SettingsMembers" | "SettingsMember" | "SettingsPrivacy" | "SettingsMandate") =>
   lazy(() => import("../screens/Settings").then((m) => ({ default: m[k] })));
 const SettingsProfile = lazySet("SettingsProfile");
 const SettingsNotify = lazySet("SettingsNotify");
@@ -35,6 +35,7 @@ const SettingsLanguage = lazySet("SettingsLanguage");
 const SettingsMembers = lazySet("SettingsMembers");
 const SettingsMember = lazySet("SettingsMember");
 const SettingsPrivacy = lazySet("SettingsPrivacy");
+const SettingsMandate = lazySet("SettingsMandate");
 const Notifications = lazy(() => import("../screens/Notifications").then((m) => ({ default: m.Notifications })));
 const Account = lazy(() => import("../screens/Stub").then((m) => ({ default: m.Account })));
 const OnlineBuy = lazy(() => import("../screens/Online").then((m) => ({ default: m.OnlineBuy })));
@@ -101,6 +102,7 @@ function Gate() {
         <Route path="/settings/members" element={<SettingsMembers />} />
         <Route path="/settings/members/:uid" element={<SettingsMember />} />
         <Route path="/settings/privacy" element={<SettingsPrivacy />} />
+        <Route path="/settings/mandate" element={<SettingsMandate />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/today" element={<TodayMeal />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -5,6 +5,14 @@
  */
 export const PAYPAL_CLIENT_ID: string = import.meta.env.VITE_PAYPAL_CLIENT_ID ?? "";
 
+/**
+ * Mua online (Mimi 2.0) bật hay chưa. Bản 1.5 trên cloud chạy PAYPAL_MODE=off nên lối vào
+ * vẫn ẩn; bật bằng VITE_ONLINE_BUY=true khi backend đã bật PayPal (fake hoặc sandbox).
+ * Chế độ mock (bản thử) luôn bật.
+ */
+export const ONLINE_BUY: boolean =
+  import.meta.env.VITE_ONLINE_BUY === "true" || import.meta.env.VITE_API_MODE !== "live";
+
 /** Phần SDK mà Mimi dùng: nút PayPal với createOrder và onApprove. */
 export type PayPalButtons = {
   render: (el: HTMLElement) => Promise<void>;

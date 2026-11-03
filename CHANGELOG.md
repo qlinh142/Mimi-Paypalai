@@ -5,6 +5,22 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Sửa nền mua online cho Mimi 2.0 (thị trường Mỹ)
+
+Nhánh `feat/nen-mua-online`. PR 1 trong `notes/ke-hoach-tool-sponsor.md`. Mẹ chốt 03/11: PayPal là cổng mặc định, thẻ qua Braintree là cổng thứ hai, Venmo để trả lại tiền mua hộ; triển khai ở thị trường Mỹ, sản phẩm tên tiếng Anh, giá USD.
+
+- **Lỗi N1:** hạn mức Mandate được kiểm lại ngay trước khi thu tiền (`recheckBudget`). Tạo 2–3 đơn liền rồi trả lần lượt không còn vượt trần mỗi ngày; trần mỗi đơn bị hạ sau lúc đặt cũng chặn. Trần nào người dùng đã duyệt vượt lúc đặt thì không chặn lại. Chưa chống hai lần thu tiền chạy cùng lúc (cần transaction, để sau).
+- **Lỗi N4:** cửa hàng mẫu đổi thành "Mimi Mart Sandbox (US)": 15 sản phẩm Mỹ, tên tiếng Anh, giá USD (cent), khóa đúng mã taxonomy 300 nhóm. Test đối chiếu mọi khóa với taxonomy.
+- **Giá gốc USD:** dòng giỏ và đơn có `source_currency`, `unit_price_source`, `total_source`. PayPal thu đúng tổng giá USD, không quy ngược từ VND. VND chỉ để so Mandate và ghi Sổ chi tiêu.
+- **Khóa tỷ giá ngày đặt hàng:** đơn lấy tỷ giá USD từ `fx_rates` (ngày chưa có thì ngày gần nhất trước đó), lưu bản chép `fx` {rate, source, at, on}. Bảng trống thì về tỷ giá cấu hình như cũ. Hoàn tiền dùng tỷ giá của đơn và không vượt số USD còn lại.
+- **Đơn biết cổng thanh toán:** `provider`, `provider_order_id`, `provider_txn_id`, `source_currency`, `source_amount`. Đơn cũ đọc ra tự điền (`Upgrade`), giữ ô PayPal cũ.
+- **`fx.on` cho hóa đơn:** bản chép tỷ giá của hóa đơn ngoại tệ lưu thêm ngày của tỷ giá đã dùng.
+- **Chữ gửi ra ngoài (luật 4.1):** hàm `domain.ASCII` bỏ dấu, đ thành d, cắt theo giới hạn. Mô tả đơn PayPal thành `Mimi order - 5 items`; ghi chú hoàn tiền cũng qua hàm này.
+- **Frontend:** lối vào Mua online mở lại khi `VITE_ONLINE_BUY=true` (bản thử luôn bật): nút Mimi ở phần Người mua của Kế hoạch chính, dòng Ủy quyền mua online và Đơn mua online trong Cài đặt (màn mới `/settings/mandate`). Màn Mua online hiện giá USD, tỷ giá kèm ngày, và câu "Trang thanh toán của PayPal hiện bằng tiếng Anh". Người chọn tiền USD nhập hạn mức Mandate bằng đô.
+- Bản thử: sửa giỏ online trống khi gửi `keys: []` (backend coi rỗng là cả Kế hoạch).
+- Kiểm tra: `go test ./...` (mới: `TestCaptureRechecksDayBudget`, `TestCaptureRechecksOrderBudget`, `TestSandboxCatalogUsesTaxonomyKeys`, `TestCheckoutLocksDailyRate`, `TestUpgradeOldOrder`, `TestRefundUSDCapped`, `TestDescriptionIsASCII`, `TestASCII`), `tsc -b`, `npm run build`, Playwright 3/3 (kịch bản demo có thêm bước bấm Mimi → Mua online; kiểm tràn ngang thêm 3 màn).
+- Bản 1.5 trên cloud không đổi: chưa đặt `VITE_ONLINE_BUY` thì các lối vào vẫn là "Sắp ra mắt", backend vẫn `PAYPAL_MODE=off`.
+
 ## 2026-11-03 · Nước lấy giá online: Việt Nam và Mỹ
 
 Nhánh `feat/nuoc-vn-us`. Mẹ chốt 03/11: Cài đặt → Quốc gia (giá online) cho chọn Việt Nam và Mỹ; giữ Singapore trong hệ thống vì sau này sẽ thêm nhiều nước.

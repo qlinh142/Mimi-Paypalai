@@ -125,6 +125,9 @@ type FX struct {
 	Rate   string    `json:"rate"`
 	Source string    `json:"source"`
 	At     time.Time `json:"at"`
+	// On: ngày của tỷ giá đã dùng (YYYY-MM-DD). Ngày mua không có tỷ giá thì lấy ngày gần
+	// nhất trước đó, nên On có thể sớm hơn ngày mua. Hóa đơn lưu trước 03/11 không có ô này.
+	On string `json:"on,omitempty"`
 }
 
 // Draft không chứa ảnh. Được lưu tạm (TTL 1 giờ) theo receipt_id để gửi lại không gọi Gemini lần nữa.

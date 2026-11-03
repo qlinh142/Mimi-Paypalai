@@ -22,6 +22,7 @@ import { Sheet } from "../components/Sheet15";
 import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
 import { AddToCalendar } from "../components/AddToCalendar";
+import { ONLINE_BUY } from "../lib/paypal";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -192,6 +193,7 @@ function Detail({ id }: { id: string }) {
             name={buyerName}
             onMe={() => { setBuyer(id, "me"); changed(); }}
             onMember={() => setMemberSheet(true)}
+            onMimi={ONLINE_BUY && meta?.default ? () => nav("/plan/online") : undefined}
           />
         )}
 
@@ -420,7 +422,7 @@ function Forecast({ cart }: { cart: Cart }) {
 }
 
 /* ---------- Người mua ---------- */
-function Buyer({ pick, name, onMe, onMember }: { pick: BuyerPick | null; name: string; onMe: () => void; onMember: () => void }) {
+function Buyer({ pick, name, onMe, onMember, onMimi }: { pick: BuyerPick | null; name: string; onMe: () => void; onMember: () => void; onMimi?: () => void }) {
   const member = !!pick && pick !== "me";
   return (
     <section aria-labelledby="pd-buyer">
@@ -430,9 +432,14 @@ function Buyer({ pick, name, onMe, onMember }: { pick: BuyerPick | null; name: s
         <button type="button" aria-pressed={member} onClick={onMember}>
           {member && name ? name : m15.plan.sendMember}
         </button>
-        <button type="button" disabled aria-disabled="true" className="buyer15__soon">
-          {m15.plan.mimi}<small>{m15.plan.soon}</small>
-        </button>
+        {/* Mimi mua online (Mimi 2.0): chỉ Kế hoạch chính, vì giỏ online dựng từ Kế hoạch chính. */}
+        {onMimi ? (
+          <button type="button" aria-pressed={false} onClick={onMimi}>{m15.plan.mimi}</button>
+        ) : (
+          <button type="button" disabled aria-disabled="true" className="buyer15__soon">
+            {m15.plan.mimi}<small>{m15.plan.soon}</small>
+          </button>
+        )}
       </div>
     </section>
   );

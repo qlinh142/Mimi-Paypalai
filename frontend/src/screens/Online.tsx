@@ -56,19 +56,22 @@ function BasketView({ basket }: { basket: Basket }) {
                   {t.online.packs(l.qty, l.unit, l.pack_qty)} · {t.online.eta(formatDayMonth(l.eta))}
                 </span>
                 <span className="plan-row__sub">
-                  {t.online.priceVsSnapshot(formatVnd(l.unit_price_vnd), formatVnd(l.snapshot_price_vnd))}
+                  {l.unit_price_source
+                    ? t.online.unitPrice(l.unit_price_source)
+                    : t.online.priceVsSnapshot(formatVnd(l.unit_price_vnd), formatVnd(l.snapshot_price_vnd))}
                 </span>
               </span>
-              <span className="num">{formatVnd(l.total_vnd)}</span>
+              <span className="num">{l.total_source ? `US$${l.total_source}` : formatVnd(l.total_vnd)}</span>
             </li>
           ))}
         </ul>
         {basket.missing.length > 0 && <p className="hint">{t.online.missing(basket.missing.join(", "))}</p>}
         <p className="plan-total">
           <span>{t.online.total}</span>
-          <span className="num">{formatVnd(basket.total_vnd)}</span>
+          <span className="num">US${basket.amount_usd}</span>
         </p>
-        <p className="hint">{t.online.usd(basket.amount_usd, basket.vnd_per_usd)}</p>
+        <p className="hint">{t.online.usd(basket.amount_usd, basket.vnd_per_usd, basket.fx?.on ?? basket.rate_as_of)}</p>
+        <p className="hint">{t.online.gatewayEnglish}</p>
       </section>
 
       <section className="plan-sec" aria-live="polite">
@@ -129,7 +132,7 @@ function PayButton({ approve }: { approve: boolean }) {
               setError("");
               const o = await checkout.mutateAsync({ keys: [], approve });
               orderId.current = o.id;
-              return o.paypal_order_id;
+              return o.provider_order_id || o.paypal_order_id;
             },
             onApprove: async () => {
               const o = await capture.mutateAsync(orderId.current);
@@ -288,7 +291,7 @@ function LinesView({ lines }: { lines: OrderLine[] }) {
                 {l.match && ` · ${t.orders.match[l.match]}`}
               </span>
             </span>
-            <span className="num">{formatVnd(l.total_vnd)}</span>
+            <span className="num">{l.total_source ? `US$${l.total_source}` : formatVnd(l.total_vnd)}</span>
           </li>
         ))}
       </ul>

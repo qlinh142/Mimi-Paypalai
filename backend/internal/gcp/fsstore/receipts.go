@@ -95,6 +95,7 @@ func (s *Store) Rate(ctx context.Context, currency string, on domain.Date) (rece
 	}
 	var v struct {
 		Rate      string    `firestore:"rate"`
+		On        string    `firestore:"on"`
 		Source    string    `firestore:"source"`
 		FetchedAt time.Time `firestore:"fetched_at"`
 		Stale     bool      `firestore:"stale"`
@@ -102,7 +103,7 @@ func (s *Store) Rate(ctx context.Context, currency string, on domain.Date) (rece
 	if err := docs[0].DataTo(&v); err != nil {
 		return receipt.FX{}, false, err
 	}
-	return receipt.FX{Rate: v.Rate, Source: v.Source, At: v.FetchedAt}, true, nil
+	return receipt.FX{Rate: v.Rate, Source: v.Source, At: v.FetchedAt, On: v.On}, true, nil
 }
 
 // ---------- Cảnh báo trùng ----------
@@ -189,5 +190,9 @@ func fxDoc(fx *receipt.FX) any {
 	if fx == nil {
 		return nil
 	}
-	return map[string]any{"rate": fx.Rate, "source": fx.Source, "at": fx.At}
+	d := map[string]any{"rate": fx.Rate, "source": fx.Source, "at": fx.At}
+	if fx.On != "" {
+		d["on"] = fx.On
+	}
+	return d
 }
