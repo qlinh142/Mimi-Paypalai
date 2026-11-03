@@ -5,6 +5,30 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Giá online: bảng giá chung và job price-sync
+
+Nhánh `feat/gia-online`. Theo ADR-004 (mẹ duyệt 02/11): bảng giá chung chỉ từ nguồn công khai; giá trên hóa đơn của nhà nào chỉ dùng cho nhà đó.
+
+- `internal/market`: bảng giá chung, `Sync` gom món đang nằm trong Kế hoạch của mọi nhà (chỉ tên món), gộp trùng, bỏ món đã có giá trong 3 ngày, món nhiều nhà cần tra trước, tối đa `PRICE_SYNC_LIMIT` (mặc định 200) món mỗi đêm, dừng sớm khi nguồn lỗi 5 lần liền. Nguồn cắm thêm theo thứ tự ưu tiên; đối tác thêm vào trước Gemini khi có.
+- `gemini.PriceSearch`: Gemini + Google Search, chỉ nhận giá thấy trong kết quả tìm kiếm; `market.Clean` bỏ giá vô lý, link lạ, gộp trùng nơi bán.
+- Firestore `market_prices/{key}` (+ `price_history/{ngày}`), không trường nào trỏ tới người dùng. Lịch sử giữ 30 ngày (mẹ chốt), TTL `expire_at` của Firestore tự xóa.
+- `GET /plan/market-prices` và khối "Giá đang bán" ở Kế hoạch (cạnh "Ước tính theo lịch sử giá").
+- Deploy: job `mimi-job-price-sync` (60 phút), lịch 2 giờ sáng, `sa-jobs` thêm quyền Vertex AI.
+- Kiểm tra: test `market`, `gemini.parsePrices`, handler, OpenAPI; giao diện chạy trên bản thử.
+- Chưa có: mã món chuẩn (hiện khóa là tên món bỏ dấu).
+## 2026-11-02 · Quét 2 bill trong một lần
+
+Nhánh `feat/quet-2-bill` (dựa trên `fix/quet-hoa-don-that`).
+
+- Người dùng hay để dồn vài ngày mới quét. Mẹ chốt: tối đa 2 bill mỗi lần quét, mỗi bill đọc riêng (không gộp cửa hàng, ngày, tổng tiền).
+- Màn chụp có nút "Bill tiếp": bill đang chụp được gửi đọc ngay (chạy ngầm), màn chụp mở lại cho bill 2. Góc khung camera hiện trạng thái bill 1.
+- Bấm "Xong": xem lại và lưu bill 1, rồi "Xem bill tiếp theo" để lưu bill 2. Bill 1 đọc lỗi: chọn "Đọc lại bill 1" (ảnh đã đọc được lấy từ bộ nhớ đệm) hoặc "Bỏ bill 1".
+- Mỗi bill vẫn tính 1 lượt quét như cũ. Không đổi backend.
+- Thử trên iPhone: bị hỏi quyền camera mỗi lần sang bill 2 hoặc gửi lỗi. Camera giờ mở một lần cho cả màn quét (`useCamera`), không tắt khi gửi đọc, tắt khi rời màn.
+- Thử `GEMINI_THINKING=MINIMAL`: mọi bill báo "tạm thời chưa đọc được" (AI từ chối). Script deploy giữ LOW, ghi chú không dùng MINIMAL.
+- Tạm thời (mẹ chốt): trên iPhone/iPad, nút chụp mở camera có sẵn của máy (`<input capture>`), không gọi camera trong trang nên không bị hỏi quyền. Khung hiện ảnh vừa chụp. Android giữ camera trong trang. Có app cài trên máy thì bỏ nhánh này.
+- Kiểm tra: tsc, build, chạy luồng 2 bill trên bản thử (giả lập iPhone 13, camera giả).
+
 ## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ
 
 Nhánh `fix/quet-hoa-don-that`.

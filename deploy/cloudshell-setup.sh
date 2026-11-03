@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT="${1:?Cách dùng: bash deploy/cloudshell-setup.sh <project-id>}"
 REGION="asia-southeast1"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.8-flash}" # dòng 2.5 đã bị Google tắt ngày 20/10/2026
-GEMINI_THINKING="${GEMINI_THINKING:-LOW}" # MINIMAL nhanh nhất, LOW cân bằng; đổi: GEMINI_THINKING=MINIMAL bash deploy/cloudshell-setup.sh <project>
+GEMINI_THINKING="${GEMINI_THINKING:-LOW}" # LOW: đã thử đọc bill ổn. MINIMAL thử 02/11 thì AI từ chối mọi bill, đừng dùng
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 say() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
@@ -26,7 +26,7 @@ for sa in sa-api sa-jobs sa-scheduler; do
 done
 bind() { gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$1@$PROJECT.iam.gserviceaccount.com" --role "$2" --condition=None >/dev/null; }
 for r in roles/datastore.user roles/aiplatform.user roles/firebaseauth.admin roles/serviceusage.serviceUsageConsumer; do bind sa-api "$r"; done
-for r in roles/datastore.user roles/firebaseauth.viewer roles/serviceusage.serviceUsageConsumer; do bind sa-jobs "$r"; done
+for r in roles/datastore.user roles/firebaseauth.viewer roles/serviceusage.serviceUsageConsumer roles/aiplatform.user; do bind sa-jobs "$r"; done # aiplatform: price-sync tra giá bằng Gemini
 bind sa-scheduler roles/run.invoker
 # Build từ mã nguồn (Cloud Build) chạy bằng tài khoản Compute mặc định.
 gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$NUM-compute@developer.gserviceaccount.com" \
@@ -47,14 +47,15 @@ gcloud run deploy mimi-api --source "$ROOT/backend" --region "$REGION" \
 IMAGE="$(gcloud run services describe mimi-api --region "$REGION" --format='value(spec.template.spec.containers[0].image)')"
 
 say "3/7 Các job (cùng image)"
-job() { # tên, đối số
+job() { # tên, thời gian tối đa (mặc định 10m)
   gcloud run jobs deploy "mimi-job-$1" --image "$IMAGE" --region "$REGION" \
     --service-account "sa-jobs@$PROJECT.iam.gserviceaccount.com" \
-    --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,MIMI_ENV=dev,APP_CHECK_REQUIRED=false" \
-    --args "job,$1" --max-retries 1 --task-timeout 10m --quiet >/dev/null
+    --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,MIMI_ENV=dev,APP_CHECK_REQUIRED=false,GEMINI_MODEL=$GEMINI_MODEL,GEMINI_LOCATION=global" \
+    --args "job,$1" --max-retries 1 --task-timeout "${2:-10m}" --quiet >/dev/null
   echo "  mimi-job-$1"
 }
 for j in fx-sync cleanup migrate seed-demo; do job "$j"; done
+job price-sync 60m # bảng giá chung: tối đa 200 món mỗi đêm, mỗi món vài giây
 
 say "4/7 Lịch chạy job (giờ Việt Nam)"
 sched() { # tên job, cron
@@ -68,6 +69,7 @@ sched() { # tên job, cron
 }
 sched fx-sync "0 6 * * *"
 sched cleanup "0 3 * * *"
+sched price-sync "0 2 * * *"
 echo "  chạy tỷ giá lần đầu"; gcloud run jobs execute mimi-job-fx-sync --region "$REGION" --wait --quiet >/dev/null || echo "  (chưa lấy được tỷ giá, 6h sáng mai lịch sẽ chạy lại)"
 
 say "5/7 Cấu hình web Firebase cho frontend"

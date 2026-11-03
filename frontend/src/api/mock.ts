@@ -873,6 +873,17 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
       other_dimension_count: 0, history: hist, window_days: 90,
     });
   }
+  if (p === "/plan/market-prices" && method === "GET") {
+    // Bản thử: giá "tra trên mạng" giả, lệch nhẹ so với giá hóa đơn mẫu.
+    return inPlan(url.searchParams.get("plan_id"), () => json({
+      items: mockCart().items.filter((i) => MOCK_PRICES[i.key]).map((i) => ({
+        key: i.key, name: i.name, updated_at: new Date().toISOString(),
+        prices: Object.entries(MOCK_PRICES[i.key])
+          .map(([store, v]) => ({ store, price_vnd: Math.round((v * 0.97) / 100) * 100, source: "gemini_search", on: new Date().toISOString().slice(0, 10) }))
+          .sort((a, b) => a.price_vnd - b.price_vnd),
+      })),
+    }));
+  }
   if (p === "/plan/price-history" && method === "GET") {
     return inPlan(url.searchParams.get("plan_id"), () => {
       const keys = [...cart].filter((k) => planLines.get(k)?.line_status !== "assigned");

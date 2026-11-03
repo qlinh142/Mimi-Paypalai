@@ -443,6 +443,10 @@ export type ItemPriceHistory = {
   last_purchase: PriceObservation | null; lowest_historical: PriceObservation | null; average_unit_price: number | null;
   other_dimension_count: number; history: PriceObservation[]; window_days: number;
 };
+/** ADR-004: giá đang bán từ bảng giá chung (chỉ nguồn công khai). */
+export type MarketPrice = { store: string; price_vnd: number; size?: string; source: string; url?: string; on: string };
+export type MarketPrices = { items: { key: string; name: string; prices: MarketPrice[]; updated_at: string }[] };
+
 export type BasketPrices = {
   basket_item_count: number;
   store_options: { store_name: string; store_key: string; covered_items: number; total_items: number; estimated_total: number | null; covered_subtotal: number; missing_keys: string[] }[];
