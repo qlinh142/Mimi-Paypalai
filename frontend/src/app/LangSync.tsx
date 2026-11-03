@@ -11,9 +11,13 @@ export function LangSync() {
   const me = useMe();
   const save = useSaveSettings();
   const done = useRef(false);
+  // Chỉ tin /me vừa tải từ máy chủ sau khi mở app: bản khôi phục từ IndexedDB có thể còn ngôn
+  // ngữ cũ ngay sau khi đổi trong Cài đặt rồi tải lại trang.
+  const openedAt = useRef(Date.now());
+  const fresh = !!me.data && me.dataUpdatedAt >= openedAt.current;
   const account = me.data?.settings.lang;
   useEffect(() => {
-    if (!me.data || done.current) return;
+    if (!fresh || done.current) return;
     done.current = true;
     const fromUrl = new URLSearchParams(location.search).get("ui");
     if (!account || fromUrl) {
@@ -21,6 +25,6 @@ export function LangSync() {
       return;
     }
     if (account !== uiLang) switchUiLang(account);
-  }, [me.data, account, save]);
+  }, [fresh, account, save]);
   return null;
 }
