@@ -34,6 +34,7 @@ type PageLine struct {
 	PackageSize  float64 // dung tích / khối lượng một gói, 0 nếu không in
 	PackageUnit  string
 	SourceLang   string // ngôn ngữ in trên bill: vi | en | ...
+	Translated   string // tên dịch sang ngôn ngữ app của người quét; "" khi bill cùng ngôn ngữ
 	Qty          float64
 	Unit         string // đơn vị in cạnh số lượng ("kg", "hộp", "gói"...), "" nếu không có
 	Amount       string
@@ -103,12 +104,15 @@ type DraftLine struct {
 // Product là phần chuẩn hóa sản phẩm của một dòng (0.1 mục 5.1, 1.1, 7.1). Lưu canonical,
 // không lưu nhãn đã dịch: nhãn nhóm tra từ taxonomy theo ngôn ngữ lúc hiển thị.
 type Product struct {
-	RawName      string  `json:"raw_name,omitempty"`
-	Brand        string  `json:"brand,omitempty"`
-	ProductName  string  `json:"product_name,omitempty"`
-	DetailName   string  `json:"detail_name,omitempty"`
-	ProductKey   string  `json:"product_key,omitempty"`
-	SourceLang   string  `json:"source_language,omitempty"`
+	RawName     string `json:"raw_name,omitempty"`
+	Brand       string `json:"brand,omitempty"`
+	ProductName string `json:"product_name,omitempty"`
+	DetailName  string `json:"detail_name,omitempty"`
+	ProductKey  string `json:"product_key,omitempty"`
+	SourceLang  string `json:"source_language,omitempty"`
+	// OriginalName: tên theo bill (đã chuẩn hóa) khi Name là tên đã dịch sang ngôn ngữ app;
+	// rỗng khi bill cùng ngôn ngữ. App hiện Name to, OriginalName nhỏ bên dưới để đối chiếu.
+	OriginalName string  `json:"original_name,omitempty"`
 	PackageCount float64 `json:"package_count,omitempty"`
 	PackageSize  float64 `json:"package_size,omitempty"`
 	PackageUnit  string  `json:"package_unit,omitempty"`
@@ -162,13 +166,16 @@ type FXRates interface {
 
 // Line là dòng hóa đơn đã lưu.
 type Line struct {
-	ID          string
-	Name        string
-	NameNorm    string
-	Qty         float64
-	Unit        string // khóa đơn vị in cạnh số lượng đã chuẩn hóa, "" nếu hóa đơn không in
-	Orig        string // số gốc in trên hóa đơn
-	VND         *domain.VND
+	ID       string
+	Name     string
+	NameNorm string
+	Qty      float64
+	Unit     string // khóa đơn vị in cạnh số lượng đã chuẩn hóa, "" nếu hóa đơn không in
+	Orig     string // số gốc in trên hóa đơn
+	VND      *domain.VND
+	// DiscountVND: phần giảm giá của cả hóa đơn chia về dòng này theo tỷ lệ tiền (0 khi hóa
+	// đơn không có dòng khuyến mãi). Giá sau giảm của dòng = VND - DiscountVND.
+	DiscountVND domain.VND
 	CategoryKey string
 	GroupKey    string
 	Habit       bool

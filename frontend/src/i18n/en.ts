@@ -59,7 +59,7 @@ export const en = {
     resend: "Resend link",
     openMockLink: "Open link (demo)",
     footer: "The more receipts you scan, the smarter Mimi gets.",
-    langGroup: "Receipt translation language",
+    langGroup: "Language",
   },
 
   home: {
@@ -70,7 +70,7 @@ export const en = {
     tiles: {
       spending: "Spending",
       items: "My Items",
-      plan: "Shopping List",
+      plan: "Plans",
       settings: "Settings",
     },
     spentThisMonth: "Spent this month",

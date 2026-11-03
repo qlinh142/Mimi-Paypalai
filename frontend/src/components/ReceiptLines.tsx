@@ -39,7 +39,8 @@ export function ReceiptLines({
   return (
     <ul className="lines">
       {lines.map((l) => {
-        const title = l.detail_name || l.name;
+        // Tên đã dịch sang ngôn ngữ app thì hiện tên dịch, tên theo bill nhỏ bên dưới.
+        const title = l.original_name ? l.name : l.detail_name || l.name;
         const bad = l.line_id === badLine;
         const group = groupLabel(l.group_key);
         const open = editing === l.line_id || bad;
@@ -48,7 +49,10 @@ export function ReceiptLines({
         return (
           <li key={l.line_id} className={bad ? "lines__bad" : undefined} aria-invalid={bad || undefined}
             style={l.removed ? { opacity: 0.55 } : undefined}>
-            <span style={l.removed ? { textDecoration: "line-through" } : undefined}>{title}</span>
+            <span style={l.removed ? { textDecoration: "line-through" } : undefined}>
+              {title}
+              {l.original_name && <span className="name15__orig">{l.original_name}</span>}
+            </span>
             <span className="num" style={noPrice ? { opacity: 0.55 } : undefined}>
               {noPrice ? t.confirm.noPrice : l.amount_vnd != null ? formatVnd(l.amount_vnd) : `${l.amount} ${currency}`}
             </span>

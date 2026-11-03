@@ -69,14 +69,15 @@ type userDoc struct {
 }
 
 // LoadPrincipal đọc users/{uid}; lần đăng nhập đầu tiên thì tạo tài liệu mặc định
-// (người dùng một mình là chủ của nhà một người).
+// (người dùng một mình là chủ của nhà một người). Chưa ghi ngôn ngữ: app ghi ngôn ngữ
+// đang dùng trên máy ngay sau khi đăng nhập (mẹ chốt 03/11).
 func (s *Store) LoadPrincipal(ctx context.Context, uid string) (authz.Principal, error) {
 	ref := s.user(uid)
 	snap, err := ref.Get(ctx)
 	if isNotFound(err) {
 		doc := map[string]any{
 			"role": "owner", "receipt_count": 0, "created_at": firestore.ServerTimestamp, "schema_version": int64(SchemaVersion),
-			"settings": map[string]any{"lead_days": 7, "timezone": "Asia/Ho_Chi_Minh", "lang": "vi", "remind_enabled": true},
+			"settings": map[string]any{"lead_days": 7, "timezone": "Asia/Ho_Chi_Minh", "remind_enabled": true},
 			// Có next_notify_at thì job digest mới tìm thấy người dùng này (truy vấn theo index).
 			"next_notify_at": domain.NextDigestAt(time.Now(), domain.Location("Asia/Ho_Chi_Minh"),
 				domain.DefaultDigestHour, domain.DefaultDigestMinute),

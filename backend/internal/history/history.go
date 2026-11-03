@@ -28,13 +28,14 @@ const (
 
 // Line là một dòng đã lưu, của hóa đơn hoặc của purchases.
 type Line struct {
-	ReceiptID   string
-	Name        string
-	Structure   string
-	Qty         float64
-	VND         *int64 // nil: chưa rõ giá (A7), không tính vào tổng
-	CategoryKey string
-	Owner       string // uid nhận hàng; "" là người lưu
+	ReceiptID    string
+	Name         string
+	OriginalName string // tên theo bill khi Name là tên đã dịch
+	Structure    string
+	Qty          float64
+	VND          *int64 // nil: chưa rõ giá (A7), không tính vào tổng
+	CategoryKey  string
+	Owner        string // uid nhận hàng; "" là người lưu
 	// Chỉ có ở purchases (dòng mua hộ):
 	PayerUID     string
 	Store        string
@@ -92,13 +93,14 @@ type Entry struct {
 }
 
 type DetailLine struct {
-	Name        string  `json:"name"`
-	Spec        string  `json:"spec,omitempty"`
-	Qty         float64 `json:"qty"`
-	UnitPrice   *int64  `json:"unit_price"` // null: chưa rõ giá
-	Amount      *int64  `json:"amount"`
-	CategoryKey string  `json:"category_key,omitempty"`
-	Tag         string  `json:"tag,omitempty"` // for_owner | mine, khi hóa đơn có món mua hộ
+	Name         string  `json:"name"`
+	OriginalName string  `json:"original_name,omitempty"` // tên theo bill, chữ nhỏ dưới tên dịch
+	Spec         string  `json:"spec,omitempty"`
+	Qty          float64 `json:"qty"`
+	UnitPrice    *int64  `json:"unit_price"` // null: chưa rõ giá
+	Amount       *int64  `json:"amount"`
+	CategoryKey  string  `json:"category_key,omitempty"`
+	Tag          string  `json:"tag,omitempty"` // for_owner | mine, khi hóa đơn có món mua hộ
 	// PriceSource (B7): estimate thì app ghi "Ước tính"; missing là chưa có giá.
 	PriceSource string `json:"price_source,omitempty"`
 }
@@ -249,7 +251,7 @@ func keys(m map[string]bool) []string {
 }
 
 func detailLine(l Line) DetailLine {
-	d := DetailLine{Name: l.Name, Spec: l.Structure, Qty: l.Qty, Amount: l.VND, CategoryKey: l.CategoryKey, PriceSource: l.PriceSource}
+	d := DetailLine{Name: l.Name, OriginalName: l.OriginalName, Spec: l.Structure, Qty: l.Qty, Amount: l.VND, CategoryKey: l.CategoryKey, PriceSource: l.PriceSource}
 	if l.VND == nil {
 		d.PriceSource = "missing"
 	}

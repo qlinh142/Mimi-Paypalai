@@ -55,15 +55,15 @@ export function PriceHistorySection({ itemKey }: { itemKey: string }) {
           <dl className="facts">
             <dt>{m1.priceHistory.last}</dt>
             <dd>
-              {d.last_purchase.store_name} · {formatVnd(d.last_purchase.paid_price)} · {formatDayMonth(d.last_purchase.purchased_at)}
+              {d.last_purchase.store_name} · {formatVnd(d.last_purchase.paid_price, d.last_purchase.purchased_at)} · {formatDayMonth(d.last_purchase.purchased_at)}
               <br />
-              <span className="hint">{formatUnitPrice(d.last_purchase.unit_price, unit, pc)}</span>
+              <span className="hint">{formatUnitPrice(d.last_purchase.unit_price, unit, pc, d.last_purchase.purchased_at)}</span>
             </dd>
             {d.lowest_historical && (
               <>
                 <dt>{m1.priceHistory.lowest}</dt>
                 <dd>
-                  {d.lowest_historical.store_name} · {formatUnitPrice(d.lowest_historical.unit_price, unit, pc)}
+                  {d.lowest_historical.store_name} · {formatUnitPrice(d.lowest_historical.unit_price, unit, pc, d.lowest_historical.purchased_at)}
                 </dd>
               </>
             )}
@@ -79,7 +79,7 @@ export function PriceHistorySection({ itemKey }: { itemKey: string }) {
               <li key={i} className="plan-row">
                 <span className="plan-row__text">
                   <span className="plan-row__sub">
-                    {formatDayMonth(o.purchased_at)} · {o.store_name || "–"} · {formatVnd(o.paid_price)} ({formatUnitPrice(o.unit_price, unit, pc)})
+                    {formatDayMonth(o.purchased_at)} · {o.store_name || "–"} · {formatVnd(o.paid_price, o.purchased_at)} ({formatUnitPrice(o.unit_price, unit, pc, o.purchased_at)})
                   </span>
                 </span>
               </li>
