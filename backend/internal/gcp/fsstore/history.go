@@ -19,6 +19,7 @@ func histLine(m map[string]any) history.Line {
 	l := history.Line{}
 	l.ReceiptID, _ = m["receipt_id"].(string)
 	l.Name, _ = m["name"].(string)
+	l.OriginalName, _ = m["original_name"].(string)
 	l.Structure, _ = m["structure"].(string)
 	l.Qty = asFloat(m["qty"])
 	if v, ok := m["line_total_vnd"].(int64); ok {

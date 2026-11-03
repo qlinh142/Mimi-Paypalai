@@ -1945,6 +1945,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fx/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tỷ giá từng ngày (số đồng cho 1 đơn vị ngoại tệ) để app quy đổi sang tiền tệ hiển thị theo ngày mua
+         * @description Trả các ngày có tỷ giá trong [from, to], cũ trước, kèm một ngày gần nhất trước from (ngày chưa có
+         *     tỷ giá dùng tỷ giá gần nhất trước đó). Vắng to: hôm nay; vắng from: to lùi 800 ngày.
+         */
+        get: {
+            parameters: {
+                query: {
+                    currency: string;
+                    from?: string;
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            currency: string;
+                            rates: {
+                                /** Format: date */
+                                on: string;
+                                /** @description Số đồng cho 1 đơn vị, thập phân */
+                                rate: string;
+                            }[];
+                        };
+                    };
+                };
+                422: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mandate": {
         parameters: {
             query?: never;
@@ -2935,7 +2988,7 @@ export interface components {
             replacement_enabled?: boolean;
             sale_enabled?: boolean;
             /**
-             * @description Ngôn ngữ dịch hóa đơn, không phải ngôn ngữ giao diện
+             * @description Ngôn ngữ của tài khoản: giao diện, tên món dịch, lời nhắc, email. Vắng khi người mới chưa ghi; app ghi theo ngôn ngữ điện thoại
              * @enum {string}
              */
             lang?: "vi" | "en";
@@ -2944,6 +2997,11 @@ export interface components {
              * @enum {string}
              */
             country?: "VN" | "SG";
+            /**
+             * @description Tiền tệ hiển thị của người này. Vắng: VND. Số tiền vẫn lưu bằng VND, chỉ quy đổi lúc hiển thị
+             * @enum {string}
+             */
+            currency?: "VND" | "USD";
             /** @description Tên gọi người nhà theo uid, riêng từng tài khoản. PUT chỉ gửi phần đổi; "" là xóa */
             relations?: {
                 [key: string]: "anh" | "chi" | "em" | "bo" | "me" | "con" | "ong" | "ba" | "khac" | "";
@@ -3035,6 +3093,8 @@ export interface components {
                 brand?: string;
                 product_name?: string;
                 source_language?: string;
+                /** @description Tên theo bill khi name là tên đã dịch sang ngôn ngữ app; gửi lại nguyên vẹn */
+                original_name?: string;
                 package_count?: number;
                 package_size?: number;
                 package_unit?: string;

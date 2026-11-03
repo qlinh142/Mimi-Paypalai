@@ -1,4 +1,5 @@
 import { uiLang } from "../i18n";
+import { toDisplay } from "./money";
 
 /**
  * Chuẩn hóa để tìm không dấu: "Dầu gội" và "dau goi" khớp nhau.
@@ -15,12 +16,19 @@ export function normalizeVi(s: string): string {
     .trim();
 }
 
-// Tiền đã được backend tính bằng số nguyên đồng; client chỉ định dạng, không tính.
+// Tiền đã được backend tính bằng số nguyên đồng; client chỉ định dạng, và quy đổi sang tiền
+// tệ hiển thị của người dùng nếu khác VND (lib/money.ts).
 const vndEn = new Intl.NumberFormat("en-US", { style: "currency", currency: "VND", maximumFractionDigits: 0 });
 const vndVi = new Intl.NumberFormat("vi-VN");
+const usdFmt = new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { style: "currency", currency: "USD" });
 
-/** en: "₫1,284,000" · vi: "1.284.000đ" */
-export function formatVnd(amount: number): string {
+/**
+ * en: "₫1,284,000" · vi: "1.284.000đ". Người chọn xem USD: "$51.36" · "51,36 US$", quy đổi theo
+ * tỷ giá của ngày `on` (ngày mua; vắng là hôm nay).
+ */
+export function formatVnd(amount: number, on?: string | null): string {
+  const usd = toDisplay(amount, on);
+  if (usd !== undefined) return usdFmt.format(usd);
   return uiLang === "en" ? vndEn.format(amount) : `${vndVi.format(amount)}đ`;
 }
 
@@ -77,7 +85,11 @@ export function formatQty(qty: number, unit: "g" | "ml" | "m" | "item" | "pc", p
 }
 
 /** Đơn giá chuẩn hóa (8.1): 35 đ/ml, 120 đ/g, 3.400 đ/cái. */
-export function formatUnitPrice(price: number, unit: string, pcLabel: string): string {
+export function formatUnitPrice(price: number, unit: string, pcLabel: string, on?: string | null): string {
   const u = unit === "item" || unit === "pc" ? pcLabel : unit;
+  const usd = toDisplay(price, on);
+  if (usd !== undefined) {
+    return `${new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { style: "currency", currency: "USD", maximumSignificantDigits: 3 }).format(usd)}/${u}`;
+  }
   return `${new Intl.NumberFormat(uiLang === "en" ? "en-US" : "vi-VN", { maximumFractionDigits: 2 }).format(price)} ${uiLang === "en" ? "VND" : "đ"}/${u}`;
 }
