@@ -4,7 +4,7 @@ import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
 import { ApiError } from "../api/client";
 import {
-  useAssignments, useBasketPrices, useDelegated, useHousehold, useMe, usePlanItem, usePlanMeta, usePlans, useTaxonomySearch,
+  useAssignments, useBasketPrices, useDelegated, useHousehold, useMarketPrices, useMe, usePlanItem, usePlanMeta, usePlans, useTaxonomySearch,
 } from "../api/hooks";
 import type { Assignment, Cart } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
@@ -292,6 +292,37 @@ export function BasketPricesPanel({ cart }: { cart: Cart }) {
       )}
       {d.no_history.length > 0 && <p className="hint">{m1.basketPrices.noHistory(label(d.no_history))}</p>}
       <p className="hint">{m1.basketPrices.disclaimer}</p>
+    </section>
+  );
+}
+
+/** ADR-004: giá đang bán (tra trên mạng mỗi đêm), cạnh giá nhà mình đã trả. */
+export function MarketPricesPanel({ cart }: { cart: Cart }) {
+  const mp = useMarketPrices(cart.item_count > 0);
+  if (!mp.data || cart.item_count === 0) return null;
+  const rows = mp.data.items.filter((i) => i.prices.length > 0);
+  return (
+    <section className="plan-sec" aria-labelledby="plan-market">
+      <h2 id="plan-market">{m1.marketPrices.title}</h2>
+      {rows.map((r) => {
+        const best = r.prices[0];
+        return (
+          <div key={r.key} className="plan-stop">
+            <div className="plan-stop__head">
+              <span>{r.name}</span>
+              <span className="num">{formatVnd(best.price_vnd)}</span>
+            </div>
+            <div className="plan-stop__items">
+              {m1.marketPrices.cheapest(best.store)}
+              {best.size && ` · ${best.size}`}
+              {` · ${formatDayMonth(best.on)}`}
+              {r.prices.length > 1 && ` · ${m1.marketPrices.more(r.prices.length - 1)}`}
+            </div>
+          </div>
+        );
+      })}
+      {rows.length < cart.item_count && <p className="hint">{m1.marketPrices.noneYet}</p>}
+      <p className="hint">{m1.marketPrices.disclaimer}</p>
     </section>
   );
 }

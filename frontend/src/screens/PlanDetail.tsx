@@ -12,7 +12,7 @@ import {
 import type { Assignment, Cart, CartItem, Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
-import { AddAnything, BasketPricesPanel } from "../components/PlanExtras";
+import { AddAnything, BasketPricesPanel, MarketPricesPanel } from "../components/PlanExtras";
 import { goodsTier, savedUnit, unitLabel } from "../lib/displayUnit";
 import { setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { PLAN_ICONS, iconOf, planIcon } from "../lib/planIcon";
@@ -413,6 +413,7 @@ function Forecast({ cart }: { cart: Cart }) {
           {compare ? m15.plan.hideCompare : m15.plan.compare} <ChevronRight size={16} aria-hidden />
         </button>
       )}
+      {compare && <MarketPricesPanel cart={cart} />}
       {compare && <BasketPricesPanel cart={cart} />}
     </section>
   );
