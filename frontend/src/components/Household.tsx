@@ -4,7 +4,6 @@ import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
 import { ApiError } from "../api/client";
 import { useHousehold, useHouseholdActions, useMe } from "../api/hooks";
-import { formatDayMonth } from "../lib/text";
 
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : t.common.genericError;
@@ -57,7 +56,6 @@ export function HouseholdPanel() {
           {invite && (
             <p className="plan-total">
               <span>{m1.household.inviteCode(invite.code)}</span>
-              <span className="hint">{m1.household.inviteExpires(formatDayMonth(invite.expires_at.slice(0, 10)))}</span>
             </p>
           )}
           <button type="button" className="btn btn--quiet btn--block" aria-disabled={act.invite.isPending || undefined} onClick={() => act.invite.mutate()}>

@@ -718,7 +718,7 @@ function recurringView(r: MockRecurring) {
 }
 
 const ME = "mock-uid";
-let household: { id: string; name: string; members: { uid: string; display_name: string; role: "owner" | "member"; joined_at: string }[]; invite?: { code: string; expires_at: string } } = {
+let household: { id: string; name: string; members: { uid: string; display_name: string; role: "owner" | "member"; joined_at: string }[]; invite?: { code: string } } = {
   id: "nha-lan", name: "Nhà Lan", members: [
     { uid: ME, display_name: "Lan", role: "owner", joined_at: iso(today) },
     { uid: "mock-minh", display_name: "Minh", role: "member", joined_at: iso(today) },
@@ -997,7 +997,7 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   }
   if (p === "/households/invites" && method === "POST") {
     household.id ||= `h-${ME}`;
-    household.invite = { code: Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, "X"), expires_at: new Date(Date.now() + 48 * 3_600_000).toISOString() };
+    household.invite = { code: Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, "X") };
     // Bản thử: có mã là có ngay một người nhà mẫu để thử gửi Kế hoạch.
     if (household.members.length === 1) household.members.push({ uid: "mock-minh", display_name: "Minh", role: "member", joined_at: iso(today) });
     return json(household.invite, 201);
