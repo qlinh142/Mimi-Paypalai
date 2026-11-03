@@ -48,6 +48,7 @@ func (n *NotifyStore) DueUsers(ctx context.Context, now time.Time, limit int) ([
 				u.Timezone = tz
 			}
 			u.DigestTime, _ = st["digest_time"].(string)
+			u.Lang, _ = st["lang"].(string)
 		}
 		u.Name, _ = d.Data()["display_name"].(string)
 		if email, err := n.emails.Email(ctx, u.UID); err == nil {
@@ -74,7 +75,7 @@ func (n *NotifyStore) BuildDigest(ctx context.Context, uid string, today domain.
 	if len(lines) == 0 {
 		return notify.Content{}, false, nil
 	}
-	return notify.Content{Subject: fmt.Sprintf("Mimi: %d món sắp hết", len(lines)), Lines: lines}, true, nil
+	return notify.Content{Subject: notify.DigestSubject(len(lines), "vi"), Lines: lines}, true, nil
 }
 
 // sendingStale: bản tin kẹt ở "sending" lâu hơn chừng này (job chết giữa chừng) thì được gửi lại.
