@@ -166,13 +166,16 @@ type FXRates interface {
 
 // Line là dòng hóa đơn đã lưu.
 type Line struct {
-	ID          string
-	Name        string
-	NameNorm    string
-	Qty         float64
-	Unit        string // khóa đơn vị in cạnh số lượng đã chuẩn hóa, "" nếu hóa đơn không in
-	Orig        string // số gốc in trên hóa đơn
-	VND         *domain.VND
+	ID       string
+	Name     string
+	NameNorm string
+	Qty      float64
+	Unit     string // khóa đơn vị in cạnh số lượng đã chuẩn hóa, "" nếu hóa đơn không in
+	Orig     string // số gốc in trên hóa đơn
+	VND      *domain.VND
+	// DiscountVND: phần giảm giá của cả hóa đơn chia về dòng này theo tỷ lệ tiền (0 khi hóa
+	// đơn không có dòng khuyến mãi). Giá sau giảm của dòng = VND - DiscountVND.
+	DiscountVND domain.VND
 	CategoryKey string
 	GroupKey    string
 	Habit       bool
