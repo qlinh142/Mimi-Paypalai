@@ -14,6 +14,90 @@ Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố đị
 - Cài đặt → Thành viên: chưa có mã thì nút "Mời thành viên" tạo mã; có mã rồi thì hiện "Mã cố định, dùng như ID của nhà", nút "Sao chép mã" và nút "Đổi mã" (bấm 2 lần để xác nhận).
 - Kiểm tra: `go test ./...`, test emulator cleanup sửa lại (mã cũ không bị gỡ), `tsc`, build, bản thử đổi mã trên iPhone 13.
 
+## 2026-11-02 · Thêm kế hoạch vào lịch (một lần)
+
+Nhánh `feat/them-vao-lich`. ADR-004 mục Lịch, mẹ chốt: chỉ tạo lịch một lần, không nối tài khoản Google Calendar, không tự sửa lịch về sau.
+
+- `lib/calendar.ts`: link Google Calendar điền sẵn (tên, giờ, nơi mua, danh sách món, múi giờ Việt Nam, dài 1 giờ; không đặt giờ thì cả ngày).
+- Chi tiết kế hoạch: khi đã có ngày đi chợ, hiện nút "Thêm vào Google Calendar", kèm nhắc đổi giờ thì thêm lại.
+- Kiểm tra: tsc, build; trên bản thử link mở đúng ngày giờ 04/11 09:30 đến 10:30.
+- Đã bỏ nút "Lịch trên iPhone" (file .ics): trên iPhone file chỉ bị tải về, không mở app Lịch, kể cả trong Safari (mẹ thử 02/11). Người dùng iPhone dùng nút Google Calendar.
+- Màn đi mua hộ: người được nhờ cũng có nút "Thêm vào Google Calendar" ngay dưới ô tóm tắt, khi kế hoạch đã có ngày (tên, giờ, nơi mua, danh sách món lấy từ kế hoạch gốc). Nút tách ra `components/AddToCalendar.tsx` dùng chung.
+
+## 2026-11-02 · Quét giá theo nước và sổ nguồn
+
+Nhánh `feat/gia-theo-nuoc` (trên `feat/gia-nha-minh`). Mẹ chốt 02/11. Luật đầy đủ: `docs/mimi15/luat-gia.md`.
+
+- Cài đặt có ô "Quốc gia (giá online)": Việt Nam, Singapore. Chưa chọn thì đoán theo múi giờ (Asia/Singapore là Singapore).
+- Bảng giá chung tách theo nước: khóa `market_prices/{nước}_{món}` (ví dụ `vn_sua-tuoi`). Giá ngoài Việt Nam lưu số tiền gốc (`local`, `currency`) và quy ra VND theo tỷ giá job fx-sync; chưa có tỷ giá thì bỏ, không đoán. Giá vô lý kiểm theo tiền gốc từng nước.
+- Hỏi AI gộp tối đa 5 món cùng nước, cùng ngành hàng một lần (job đêm và nút Cập nhật giá).
+- Sổ nguồn `price_sources/{nước}_{web}`: lưu link ngành hàng và mẫu link tìm kiếm, không lưu link từng sản phẩm. Lần sau đưa link cho AI đọc trước (URL context), thiếu mới tìm Google. Web mới vào sổ khi ra giá 2 lần; đọc trang 2 lần liền không ra giá thì đánh dấu, quay về Google, một tháng sau thử lại.
+- Shopee, Lazada chỉ nhận gian hàng chính hãng (Mall, Official).
+- Dòng giá Singapore hiện thêm tiền gốc, ví dụ "1.49 SGD".
+- Lưu ý: các dòng bảng giá cũ (khóa chưa có nước) không dùng nữa, job đêm tra lại. Gemini đọc trang kèm tìm Google chưa thử trên Vertex thật; nếu lỗi thì tự hỏi lại chỉ bằng Google.
+- Kiểm tra: `go test -race ./...` (test mới cho Normalize SGD, batches, sổ nguồn, câu hỏi AI), test emulator `TestPriceSourcesEmulator`, `TestWantedItemsCountryEmulator`; bản thử chọn Singapore thấy giá SGD.
+
+---
+
+## 2026-11-02 · Giá tốt nhất: so giá online với giá nhà mình từng mua
+
+Nhánh `feat/gia-nha-minh` (trên `feat/cap-nhat-gia`). Mẹ chốt 02/11: mỗi tài khoản có lịch sử giá riêng; giá online bằng 0 (chưa có) hoặc cao hơn giá nhà mình từng mua thì lấy giá trong lịch sử mua sắm.
+
+- Khối "Giá đang bán" đổi tên "Giá tốt nhất". Mỗi món lấy giá thấp hơn giữa giá online rẻ nhất và giá nhà mình từng mua (`unit_price`, `best_store` của Kế hoạch, đọc từ hóa đơn của chính nhà).
+- Dòng dùng giá nhà mình ghi rõ "Giá nhà mình từng mua ở … (chỉ nhà mình thấy)", kèm giá online để so hoặc "chưa có giá online".
+- Chỉ đổi giao diện: giá nhà mình không gửi lên, không ghi vào bảng giá chung.
+- Lưu ý: giá online theo quy cách nguồn ghi (ví dụ 4x180ml), giá nhà mình theo đơn vị đã mua, nên so chỉ là tương đối.
+
+---
+
+## 2026-11-02 · Nút "Cập nhật giá" trong Kế hoạch
+
+Nhánh `feat/cap-nhat-gia` (trên `feat/gia-online`). Mẹ hỏi 02/11: không phải chờ job đêm, chỉ tra các món của kế hoạch đang mở.
+
+- `POST /plan/market-prices/refresh`: tra lại giá các món của kế hoạch, cùng nguồn công khai với job. Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, tra song song 6 món để kịp giới hạn 60 giây của Hosting, 3 lần mỗi người mỗi ngày (`quota/price-{ngày}`, tách khỏi lượt đọc hóa đơn). Mẹ chốt 24 giờ và 3 lần (02/11). Không có món nào cần tra thì không tốn lượt.
+- Nút "Cập nhật giá" dưới khối "Giá đang bán", báo "Đã tra N món, có giá M món" hoặc lỗi hết lượt. Dưới nút hiện "Hôm nay còn x/3 lần" và "Lần cập nhật gần nhất" (lưu ở `quota/price-last`, `GET /plan/market-prices` trả kèm `refresh`).
+- Kiểm tra: `go test ./internal/market ./internal/httpapi`, test emulator `TestMarketTouchedAndRefreshQuotaEmulator`, bản thử bấm nút trên iPhone 13.
+
+---
+
+## 2026-11-02 · Giá online: bảng giá chung và job price-sync
+
+Nhánh `feat/gia-online`. Theo ADR-004 (mẹ duyệt 02/11): bảng giá chung chỉ từ nguồn công khai; giá trên hóa đơn của nhà nào chỉ dùng cho nhà đó.
+
+- `internal/market`: bảng giá chung, `Sync` gom món đang nằm trong Kế hoạch của mọi nhà (chỉ tên món), gộp trùng, bỏ món đã có giá trong 3 ngày, món nhiều nhà cần tra trước, tối đa `PRICE_SYNC_LIMIT` (mặc định 200) món mỗi đêm, dừng sớm khi nguồn lỗi 5 lần liền. Nguồn cắm thêm theo thứ tự ưu tiên; đối tác thêm vào trước Gemini khi có.
+- `gemini.PriceSearch`: Gemini + Google Search, chỉ nhận giá thấy trong kết quả tìm kiếm; `market.Clean` bỏ giá vô lý, link lạ, gộp trùng nơi bán.
+- Firestore `market_prices/{key}` (+ `price_history/{ngày}`), không trường nào trỏ tới người dùng. Lịch sử giữ 30 ngày (mẹ chốt), TTL `expire_at` của Firestore tự xóa.
+- `GET /plan/market-prices` và khối "Giá đang bán" ở Kế hoạch (cạnh "Ước tính theo lịch sử giá").
+- Deploy: job `mimi-job-price-sync` (60 phút), lịch 2 giờ sáng, `sa-jobs` thêm quyền Vertex AI.
+- Kiểm tra: test `market`, `gemini.parsePrices`, handler, OpenAPI; giao diện chạy trên bản thử.
+- Chưa có: mã món chuẩn (hiện khóa là tên món bỏ dấu).
+## 2026-11-02 · Quét 2 bill trong một lần
+
+Nhánh `feat/quet-2-bill` (dựa trên `fix/quet-hoa-don-that`).
+
+- Người dùng hay để dồn vài ngày mới quét. Mẹ chốt: tối đa 2 bill mỗi lần quét, mỗi bill đọc riêng (không gộp cửa hàng, ngày, tổng tiền).
+- Màn chụp có nút "Bill tiếp": bill đang chụp được gửi đọc ngay (chạy ngầm), màn chụp mở lại cho bill 2. Góc khung camera hiện trạng thái bill 1.
+- Bấm "Xong": xem lại và lưu bill 1, rồi "Xem bill tiếp theo" để lưu bill 2. Bill 1 đọc lỗi: chọn "Đọc lại bill 1" (ảnh đã đọc được lấy từ bộ nhớ đệm) hoặc "Bỏ bill 1".
+- Mỗi bill vẫn tính 1 lượt quét như cũ. Không đổi backend.
+- Thử trên iPhone: bị hỏi quyền camera mỗi lần sang bill 2 hoặc gửi lỗi. Camera giờ mở một lần cho cả màn quét (`useCamera`), không tắt khi gửi đọc, tắt khi rời màn.
+- Thử `GEMINI_THINKING=MINIMAL`: mọi bill báo "tạm thời chưa đọc được" (AI từ chối). Script deploy giữ LOW, ghi chú không dùng MINIMAL.
+- Tạm thời (mẹ chốt): trên iPhone/iPad, nút chụp mở camera có sẵn của máy (`<input capture>`), không gọi camera trong trang nên không bị hỏi quyền. Khung hiện ảnh vừa chụp. Android giữ camera trong trang. Có app cài trên máy thì bỏ nhánh này.
+- Kiểm tra: tsc, build, chạy luồng 2 bill trên bản thử (giả lập iPhone 13, camera giả).
+
+## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ
+
+Nhánh `fix/quet-hoa-don-that`.
+
+- Thử trên mimi-1-5 với bill GO! rõ nét, app báo "Mimi chưa đọc được hóa đơn này. Chụp lại rõ hơn".
+- Nguyên nhân nghi nhiều nhất: schema gửi Gemini có `category_key` với enum chứa chuỗi rỗng, Vertex AI từ chối (400). Mọi lỗi 4xx của AI lại bị xếp thành "ảnh không đọc được".
+- Sửa: bỏ chuỗi rỗng khỏi enum; lỗi 400/403/404 từ AI thành `ai_unavailable` ("thử lại sau hoặc nhập tay"), không bảo chụp lại, không thử lại; log `receipt read` ghi thêm `cause` (lời Google trả về) để lần sau thấy ngay.
+- Nguyên nhân thật (log mới chỉ ra): Google trả 404 cho `gemini-2.5-flash` vì dòng Gemini 2.5 trên Vertex AI đã bị tắt ngày 20/10/2026. Script deploy đổi mặc định sang `gemini-3.8-flash` (thử trên mimi-1-5: 3.8, 3.7, 3.5 flash trả 200).
+- Sau khi đổi model, quét 1 ảnh được nhưng chậm; chụp 2 đến 3 ảnh thì ảnh sau báo `read_failed`. Thời gian chờ mỗi ảnh tăng từ 20 lên 40 giây (request vẫn trong 55 giây).
+- Màn chụp trên iPhone: khung camera co thành dải mỏng khi có ảnh. Video giờ phủ kín khung (vị trí tuyệt đối), khung giữ tối thiểu 40% chiều cao màn hình, màn cuộn được nếu chật.
+- Thử lại trên iPhone: khung vẫn chỉ hiện video ở một dải dưới đáy sau ảnh 1. Khung camera giờ cao cố định (44% màn hình), không đổi cỡ khi thêm ảnh hay hiện thông báo; ảnh thu nhỏ và nút không bị ép bẹp; lời dặn ẩn sau ảnh đầu để nút "Xong" vẫn trong màn hình. Gửi lỗi thì camera tự bật lại thay vì để khung đen.
+- Gemini 3.x mặc định "suy nghĩ" trước khi trả lời, làm đọc bill chậm. Thêm `GEMINI_THINKING` (mặc định `LOW`; đặt rỗng để model tự chọn).
+- Kiểm tra: `TestSchemaEnumsHaveNoEmptyValue`, `TestClassify`, test service mới; chạy lại trên mimi-1-5 với bill thật.
+
 ## 2026-11-02 · Bật App Check (reCAPTCHA Enterprise)
 
 Nhánh `deploy/app-check`, xếp chồng lên PR #36.

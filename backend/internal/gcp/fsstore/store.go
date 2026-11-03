@@ -24,6 +24,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/user"
 )
@@ -110,6 +111,8 @@ func (s *Store) LoadPrincipal(ctx context.Context, uid string) (authz.Principal,
 	if ld, ok := ud.Settings["lead_days"].(int64); ok {
 		p.LeadDays = int(ld)
 	}
+	c, _ := ud.Settings["country"].(string)
+	p.Country = market.CountryFor(c, p.Timezone)
 	return p, nil
 }
 
@@ -132,7 +135,51 @@ func (s *Store) Profile(ctx context.Context, p authz.Principal) (user.Profile, e
 
 // Reserve tăng quota/{day} trong transaction: nhiều instance cùng chạy vẫn đếm đúng.
 func (s *Store) Reserve(ctx context.Context, uid, day string, limit int) error {
-	ref := s.user(uid).Collection("quota").Doc(day)
+	return s.reserve(ctx, uid, day, limit, func() error {
+		return apperr.New(apperr.CodeQuotaExceeded, fmt.Sprintf("Hôm nay bạn đã đọc %d hóa đơn, mai đọc tiếp nhé.", limit)).
+			With("limit", limit)
+	})
+}
+
+// ReservePriceRefresh đếm số lần bấm "Cập nhật giá" trong ngày, tách khỏi lượt đọc hóa đơn.
+// Lần bấm gần nhất ghi ở quota/price-last (không có TTL) để app hiện "Lần cập nhật gần nhất".
+func (s *Store) ReservePriceRefresh(ctx context.Context, uid, day string, limit int, at time.Time) error {
+	err := s.reserve(ctx, uid, "price-"+day, limit, func() error {
+		return apperr.New(apperr.CodeQuotaExceeded, fmt.Sprintf("Hôm nay bạn đã cập nhật giá %d lần, mai cập nhật tiếp nhé. Mimi vẫn tự tra giá mỗi đêm.", limit)).
+			With("limit", limit)
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := s.user(uid).Collection("quota").Doc("price-last").Set(ctx, map[string]any{"at": at}); err != nil {
+		return fmt.Errorf("price refresh last: %w", err)
+	}
+	return nil
+}
+
+// PriceRefreshStatus trả số lần đã bấm trong ngày và lần bấm gần nhất (zero: chưa bấm lần nào).
+func (s *Store) PriceRefreshStatus(ctx context.Context, uid, day string) (int, time.Time, error) {
+	q := s.user(uid).Collection("quota")
+	snaps, err := s.c.GetAll(ctx, []*firestore.DocumentRef{q.Doc("price-" + day), q.Doc("price-last")})
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("price refresh status: %w", err)
+	}
+	used, last := 0, time.Time{}
+	if snaps[0].Exists() {
+		if v, ok := snaps[0].Data()["used"].(int64); ok {
+			used = int(v)
+		}
+	}
+	if snaps[1].Exists() {
+		if t, ok := snaps[1].Data()["at"].(time.Time); ok {
+			last = t
+		}
+	}
+	return used, last, nil
+}
+
+func (s *Store) reserve(ctx context.Context, uid, doc string, limit int, full func() error) error {
+	ref := s.user(uid).Collection("quota").Doc(doc)
 	return s.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		used := int64(0)
 		snap, err := tx.Get(ref)
@@ -145,8 +192,7 @@ func (s *Store) Reserve(ctx context.Context, uid, day string, limit int) error {
 			return err
 		}
 		if used >= int64(limit) {
-			return apperr.New(apperr.CodeQuotaExceeded, fmt.Sprintf("Hôm nay bạn đã đọc %d hóa đơn, mai đọc tiếp nhé.", limit)).
-				With("limit", limit)
+			return full()
 		}
 		return tx.Set(ref, map[string]any{
 			"used":      used + 1,

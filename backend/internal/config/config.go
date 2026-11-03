@@ -19,9 +19,11 @@ type Config struct {
 	FirestoreDB      string
 	GeminiModel      string
 	GeminiLocation   string
+	GeminiThinking   string // MINIMAL | LOW | MEDIUM | HIGH; rỗng: để model tự chọn
 	AppCheckRequired bool
 
 	ReceiptDailyLimit int
+	PriceSyncLimit    int           // số món tối đa job price-sync tra mỗi đêm (ADR-004), PRICE_SYNC_LIMIT
 	ReadTimeout       time.Duration // ngân sách cho POST /receipts/read, dưới giới hạn 60 s của Hosting rewrite
 	DefaultTimeout    time.Duration
 
@@ -52,6 +54,7 @@ func Load() (Config, error) {
 		Env:               get("MIMI_ENV", "dev"),
 		FirestoreDB:       get("FIRESTORE_DATABASE", "(default)"),
 		GeminiModel:       os.Getenv("GEMINI_MODEL"),
+		GeminiThinking:    get("GEMINI_THINKING", "LOW"),    // chép chữ trên bill không cần nghĩ lâu; nghĩ ít thì trả lời nhanh hơn
 		GeminiLocation:    get("GEMINI_LOCATION", "global"), // checklist 48h Gate 1: Vertex AI gọi endpoint global
 		AppCheckRequired:  get("APP_CHECK_REQUIRED", "true") == "true",
 		TasksQueue:        os.Getenv("TASKS_QUEUE"),
@@ -62,6 +65,7 @@ func Load() (Config, error) {
 		ReadTimeout:       55 * time.Second,
 		DefaultTimeout:    10 * time.Second,
 		ReceiptDailyLimit: 20,
+		PriceSyncLimit:    200,
 		PayPalMode:        get("PAYPAL_MODE", "fake"),
 		PayPalClientID:    os.Getenv("PAYPAL_CLIENT_ID"),
 		PayPalSecret:      os.Getenv("PAYPAL_CLIENT_SECRET"),
@@ -79,6 +83,13 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("RECEIPT_DAILY_LIMIT invalid: %q", v))
 		}
 		c.ReceiptDailyLimit = n
+	}
+	if v := os.Getenv("PRICE_SYNC_LIMIT"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 2000 {
+			errs = append(errs, fmt.Errorf("PRICE_SYNC_LIMIT invalid: %q", v))
+		}
+		c.PriceSyncLimit = n
 	}
 	if v := os.Getenv("PAYPAL_VND_PER_USD"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)

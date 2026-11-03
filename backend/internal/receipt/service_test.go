@@ -197,6 +197,19 @@ func TestRead(t *testing.T) {
 		}
 	})
 
+	t.Run("AI rejecting the request is not blamed on the photo", func(t *testing.T) {
+		q := &fakeQuota{}
+		calls := 0
+		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) {
+			calls++
+			return Page{}, fmt.Errorf("gemini: 400 bad schema: %w", ErrAIRejected)
+		}}, q, &fakeStore{})
+		_, err := s.Read(context.Background(), owner, "r-5b", "vi", []Image{{jpeg, "image/jpeg"}})
+		if code(err) != apperr.CodeAIUnavailable || q.used != 0 || calls != 1 {
+			t.Fatalf("err=%v used=%d calls=%d", err, q.used, calls)
+		}
+	})
+
 	t.Run("content type not trusted", func(t *testing.T) {
 		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return page, nil }}, &fakeQuota{}, &fakeStore{})
 		_, err := s.Read(context.Background(), owner, "r-6", "vi", []Image{{[]byte("<svg>"), "image/jpeg"}})

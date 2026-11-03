@@ -14,6 +14,7 @@ export type Me = {
     lead_days: number;
     lang: "vi" | "en";
     timezone: string;
+    country?: "VN" | "SG";     // nước lấy giá online; vắng thì máy chủ đoán theo múi giờ
     remind_enabled?: boolean;
     digest_time?: string;      // HH:MM
     relations?: Record<string, string>; // tên gọi người nhà theo uid, lưu trên máy chủ
@@ -296,6 +297,7 @@ export type SettingsPatch = Partial<{
   digest_time: string;
   timezone: string;
   lang: "vi" | "en";
+  country: "VN" | "SG";
   /** Chỉ gửi phần đổi; "" là xóa tên gọi của uid đó. */
   relations: Record<string, string>;
 }>;
@@ -443,6 +445,15 @@ export type ItemPriceHistory = {
   last_purchase: PriceObservation | null; lowest_historical: PriceObservation | null; average_unit_price: number | null;
   other_dimension_count: number; history: PriceObservation[]; window_days: number;
 };
+/** ADR-004: giá đang bán từ bảng giá chung (chỉ nguồn công khai). */
+/** local, currency: số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5 SGD). */
+export type MarketPrice = { store: string; price_vnd: number; local?: number; currency?: string; size?: string; source: string; url?: string; on: string };
+/** Nút "Cập nhật giá": còn mấy lần hôm nay, lần bấm gần nhất. */
+export type MarketRefreshStatus = { daily: number; left: number; last_at?: string };
+export type MarketPrices = { items: { key: string; name: string; prices: MarketPrice[]; updated_at: string }[]; refresh?: MarketRefreshStatus };
+/** Nút "Cập nhật giá": bảng giá mới kèm số món vừa tra. */
+export type MarketRefresh = MarketPrices & { looked: number; found: number; fresh: number };
+
 export type BasketPrices = {
   basket_item_count: number;
   store_options: { store_name: string; store_key: string; covered_items: number; total_items: number; estimated_total: number | null; covered_subtotal: number; missing_keys: string[] }[];

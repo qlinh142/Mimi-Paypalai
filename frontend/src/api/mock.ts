@@ -228,7 +228,8 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       role: "owner",
       receipt_count: receiptCount,
       settings: { lead_days: mockSettings.lead_days, lang: mockSettings.lang, timezone: mockSettings.timezone,
-        remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {} },
+        remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {},
+        ...(mockSettings.country ? { country: mockSettings.country } : {}) },
     };
     return json(me);
   }
@@ -799,6 +800,29 @@ function histDetail(id: string): ReceiptDetail | null {
   return { receipt_id: rid, store, purchased_at: histDate(ago, hour), total_vnd: subtotal - disc, item_names: [], kind: "own", plans, lines, subtotal, discount: disc };
 }
 
+/** Bản thử: nút Cập nhật giá 3 lần mỗi ngày như máy chủ. */
+let mockRefresh: { daily: number; left: number; last_at?: string } = { daily: 3, left: 3 };
+
+function mockMarketItems() {
+  // Bản thử: nước Singapore thì giả giá SGD ở cửa hàng Sing, quy ra VND theo tỷ giá 19.500.
+  const sg = mockSettings.country === "SG";
+  const sgStore: Record<string, string> = { "Co.opmart": "FairPrice", "Bách Hóa Xanh": "Sheng Siong" };
+  const on = new Date().toISOString().slice(0, 10);
+  // Trứng gà: giả như chưa tra ra giá online; nước rửa chén: online đắt hơn giá nhà mình từng
+  // mua. Cả hai để bản thử hiện dòng "giá nhà mình từng mua".
+  return mockCart().items.filter((i) => MOCK_PRICES[i.key] && i.key !== "trung-ga").map((i) => ({
+    key: i.key, name: i.name, updated_at: new Date().toISOString(),
+    prices: Object.entries(MOCK_PRICES[i.key])
+      .map(([store, v]) => {
+        const vnd = Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100;
+        if (!sg) return { store, price_vnd: vnd, currency: "VND", source: "gemini_search", on };
+        const local = Math.round((vnd / 19_500) * 100) / 100;
+        return { store: sgStore[store] ?? store, price_vnd: Math.round(local * 19_500), local, currency: "SGD", source: "gemini_search", on };
+      })
+      .sort((a, b) => a.price_vnd - b.price_vnd),
+  }));
+}
+
 function mockM1(method: string, url: URL, init: RequestInit): Response | null {
   const p = url.pathname;
   const body = () => (init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {});
@@ -871,6 +895,21 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
       last_purchase: hist[0] ?? null, lowest_historical: hist.length > 1 ? sorted[0] : null,
       average_unit_price: hist.length > 1 ? Math.round((hist.reduce((a, o) => a + o.unit_price, 0) / hist.length) * 100) / 100 : null,
       other_dimension_count: 0, history: hist, window_days: 90,
+    });
+  }
+  if (p === "/plan/market-prices" && method === "GET") {
+    // Bản thử: giá "tra trên mạng" giả, lệch nhẹ so với giá hóa đơn mẫu.
+    return inPlan(url.searchParams.get("plan_id"), () => json({ items: mockMarketItems(), refresh: mockRefresh }));
+  }
+  if (p === "/plan/market-prices/refresh" && method === "POST") {
+    // Bản thử: không tra thật, trả lại bảng giá giả như vừa tra xong.
+    return inPlan(url.searchParams.get("plan_id"), () => {
+      const items = mockMarketItems();
+      if (mockRefresh.left <= 0) {
+        return json({ code: "quota_exceeded", message: `Hôm nay bạn đã cập nhật giá ${mockRefresh.daily} lần, mai cập nhật tiếp nhé. Mimi vẫn tự tra giá mỗi đêm.` }, 429);
+      }
+      mockRefresh = { ...mockRefresh, left: mockRefresh.left - 1, last_at: new Date().toISOString() };
+      return json({ items, looked: mockCart().items.length, found: items.length, fresh: 0, refresh: mockRefresh });
     });
   }
   if (p === "/plan/price-history" && method === "GET") {

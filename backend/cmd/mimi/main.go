@@ -36,6 +36,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/httpapi"
 	"github.com/smartlife-lab/mimi/backend/internal/inbox"
 	"github.com/smartlife-lab/mimi/backend/internal/item"
+	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/order"
 	"github.com/smartlife-lab/mimi/backend/internal/paypal"
@@ -101,6 +102,9 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 	}
 	taxonomy := groupTaxonomy.SpendingKeys()
 	reader, err := gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, taxonomy, groupTaxonomy.Keys())
+	if err == nil {
+		reader.SetThinking(cfg.GeminiThinking)
+	}
 	if err != nil {
 		return err
 	}
@@ -147,9 +151,12 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Recurring:  recurring.NewService(store, store, store, nil),
 		Households: household.New(store, store, nil).WithReceipts(receipts),
 		Pricing:    pricing.New(store, store, nil),
-		History:    history.New(store),
-		Accounts:   account.New(store, store, auth),
-		SignIn:     auth,
+		Market:     store, // bảng giá chung, job price-sync ghi mỗi đêm
+		// Nút "Cập nhật giá": tra lại giá món trong một kế hoạch, cùng nguồn công khai với job.
+		PriceRefresh: market.NewRefresher(store, []market.Source{reader.NewPriceSearch(store, log)}, store, market.RefreshOptions{Log: log, FX: store}),
+		History:      history.New(store),
+		Accounts:     account.New(store, store, auth),
+		SignIn:       auth,
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)),
 		httpapi.WithSharedLimiter(fsstore.NewRateLimiter(store)))
 	if err != nil {
@@ -262,7 +269,19 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 			log.InfoContext(ctx, "seed-demo done", "receipts", n)
 		}
 	case "price-sync":
-		err = fmt.Errorf("job %s: not implemented yet", name)
+		// ADR-004: bảng giá chung chỉ từ nguồn công khai. Thứ tự nguồn = thứ tự ưu tiên;
+		// nguồn đối tác cắm thêm vào trước Gemini khi có hợp tác.
+		if cfg.GeminiModel == "" {
+			return errors.New("price-sync: thiếu GEMINI_MODEL")
+		}
+		var r *gemini.Reader
+		if r, err = gemini.New(ctx, cfg.ProjectID, cfg.GeminiLocation, cfg.GeminiModel, nil, nil); err == nil {
+			var res market.Result
+			res, err = market.Sync(ctx, store, store, []market.Source{r.NewPriceSearch(store, log)},
+				market.Options{Limit: cfg.PriceSyncLimit, Now: time.Now(), Log: log, FX: store})
+			log.InfoContext(ctx, "price-sync done", "wanted", res.Wanted, "fresh", res.Fresh, "looked", res.Looked,
+				"found", res.Found, "skipped", res.Skipped, "errors", res.Errors)
+		}
 	default:
 		err = fmt.Errorf("unknown job %q", name)
 	}

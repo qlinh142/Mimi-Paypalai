@@ -12,7 +12,7 @@ import {
 import type { Assignment, Cart, CartItem, Item } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
-import { AddAnything, BasketPricesPanel } from "../components/PlanExtras";
+import { AddAnything, BasketPricesPanel, MarketPricesPanel } from "../components/PlanExtras";
 import { goodsTier, savedUnit, unitLabel } from "../lib/displayUnit";
 import { setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { PLAN_ICONS, iconOf, planIcon } from "../lib/planIcon";
@@ -21,6 +21,7 @@ import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
 import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
+import { AddToCalendar } from "../components/AddToCalendar";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -167,6 +168,17 @@ function Detail({ id }: { id: string }) {
               </span>
               <Pencil size={20} aria-hidden />
             </button>
+          )}
+          {!editTrip && date && (
+            <AddToCalendar
+              ev={{
+                title: m15.plan.calTitle(name),
+                date,
+                time,
+                location: store,
+                details: m15.plan.calDetails((cart?.items ?? []).slice(0, 20).map((i) => i.name)),
+              }}
+            />
           )}
         </section>
 
@@ -401,6 +413,7 @@ function Forecast({ cart }: { cart: Cart }) {
           {compare ? m15.plan.hideCompare : m15.plan.compare} <ChevronRight size={16} aria-hidden />
         </button>
       )}
+      {compare && <MarketPricesPanel cart={cart} />}
       {compare && <BasketPricesPanel cart={cart} />}
     </section>
   );

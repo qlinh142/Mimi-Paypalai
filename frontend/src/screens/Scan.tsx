@@ -2,7 +2,7 @@ import { t, uiLang } from "../i18n";
 import { m15 } from "../i18n/m15";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Camera, ImagePlus, X } from "lucide-react";
+import { Camera, ChevronRight, ImagePlus, X } from "lucide-react";
 import { toSaveRequest, useDelegated, usePlanCarts, usePlans, useReadReceipt, useSaveReceipt } from "../api/hooks";
 import { allocate, planNeeds } from "../lib/allocate";
 import { visiblePlans } from "../components/PlanPicker";
@@ -10,7 +10,7 @@ import { planName } from "./PlanList";
 import { m1 } from "../i18n/m1";
 import { currentPlanId } from "../lib/currentPlan";
 import type { ReceiptDraft } from "../api/types";
-import { ApiError, OfflineError } from "../api/client";
+import { ApiError, OfflineError, apiUploadReceipt } from "../api/client";
 import { compressReceiptImage, grabFrame } from "../lib/image";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { MimiMark } from "../components/MimiMark";
@@ -20,10 +20,92 @@ const MAX_PHOTOS = 10; // BUG-05 mục 6: tối đa 10 ảnh / hóa đơn, khớ
 
 type Photo = { id: string; blob: Blob; url: string; from: "camera" | "library" };
 
-/** Mỗi lần "Quét hóa đơn khác" tạo phiên mới: ảnh, receipt_id và kết quả đọc đều làm lại từ đầu. */
+const MAX_BILLS = 2; // mẹ chốt 02/11: tối đa 2 bill mỗi lần quét, mỗi bill đọc riêng
+
+/** Bill 1 được đọc ngầm trong lúc người dùng chụp bill 2. */
+export type BgBill = {
+  receiptId: string;
+  images: Blob[];
+  status: "reading" | "ok" | "error";
+  draft?: ReceiptDraft;
+  error?: unknown;
+};
+
+/**
+ * Mỗi lần "Quét hóa đơn khác" tạo phiên mới: ảnh, receipt_id và kết quả đọc đều làm lại từ đầu.
+ * Bấm "Chụp bill tiếp theo": bill đang chụp được gửi đọc ngay (chạy ngầm), màn chụp mở lại cho bill sau.
+ */
 export function Scan() {
   const [session, setSession] = useState(0);
-  return <ScanSession key={session} onNext={() => setSession((s) => s + 1)} />;
+  const [bg, setBg] = useState<BgBill | null>(null);
+  const camera = useCamera();
+
+  function readBg(receiptId: string, images: Blob[]) {
+    setBg({ receiptId, images, status: "reading" });
+    const same = (b: BgBill | null) => b?.receiptId === receiptId;
+    apiUploadReceipt<ReceiptDraft>(receiptId, images, uiLang).then(
+      (draft) => setBg((b) => (same(b) ? { ...b!, status: "ok", draft } : b)),
+      (error) => setBg((b) => (same(b) ? { ...b!, status: "error", error } : b)),
+    );
+  }
+
+  return (
+    <ScanSession
+      key={session}
+      camera={camera}
+      bg={bg}
+      canAddBill={!bg && MAX_BILLS > 1}
+      onNextBill={(receiptId, images) => {
+        readBg(receiptId, images);
+        setSession((s) => s + 1);
+      }}
+      onRetryBg={() => bg && readBg(bg.receiptId, bg.images)}
+      onDropBg={() => setBg(null)}
+      onNext={() => {
+        setBg(null);
+        setSession((s) => s + 1);
+      }}
+    />
+  );
+}
+
+/**
+ * Tạm thời (02/11, mẹ chốt): trên iPhone/iPad, trình duyệt hỏi lại quyền camera mỗi lần mở trang.
+ * Ở đó nút chụp mở camera có sẵn của máy (<input capture>), không cần quyền. Khi có app cài
+ * trên máy thì bỏ nhánh này. Android nhớ quyền theo trang nên vẫn dùng camera trong trang.
+ */
+const SYSTEM_CAMERA = typeof navigator !== "undefined" &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+/**
+ * Mở camera MỘT lần cho cả màn quét, giữ luồng qua mọi bill và mọi lần gửi lỗi, tắt khi rời màn.
+ * iPhone hỏi lại quyền camera mỗi lần gọi getUserMedia, nên không tắt rồi bật lại giữa chừng.
+ */
+function useCamera(): { stream: MediaStream | null; failed: boolean } {
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (SYSTEM_CAMERA) return; // iPhone: dùng camera của máy, không xin quyền
+    let s: MediaStream | undefined;
+    let stopped = false;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setFailed(true);
+      return;
+    }
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, audio: false })
+      .then((ms) => {
+        if (stopped) return ms.getTracks().forEach((t) => t.stop());
+        s = ms;
+        setStream(ms);
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      stopped = true;
+      s?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+  return { stream, failed };
 }
 
 /**
@@ -34,13 +116,20 @@ export function Scan() {
  *   Ô chọn thư viện KHÔNG có thuộc tính capture, vì capture buộc điện thoại mở camera.
  * Mọi ảnh được nén và bỏ EXIF ngay trên máy, chỉ nằm trong bộ nhớ trang tới khi gửi đi.
  */
-function ScanSession({ onNext }: { onNext: () => void }) {
+function ScanSession({ camera, onNext, bg, canAddBill, onNextBill, onRetryBg, onDropBg }: {
+  camera: { stream: MediaStream | null; failed: boolean };
+  onNext: () => void;
+  bg: BgBill | null;
+  canAddBill: boolean;
+  onNextBill: (receiptId: string, images: Blob[]) => void;
+  onRetryBg: () => void;
+  onDropBg: () => void;
+}) {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [cameraFailed, setCameraFailed] = useState(false);
+  const { stream, failed: cameraFailed } = camera;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -49,24 +138,19 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   const [replaceAt, setReplaceAt] = useState<number | null>(null);
   const [receiptId] = useState(() => crypto.randomUUID()); // khóa idempotent cho cả lần đọc và lần lưu
   const read = useReadReceipt();
+  // Xem lại: bill 1 (đọc ngầm) trước, rồi tới bill đang chụp. reviewOnly: bill này chưa chụp gì, chỉ xem bill 1.
+  const [reviewOnly, setReviewOnly] = useState(false);
+  const [bgSaved, setBgSaved] = useState(false);
   const urls = useRef<string[]>([]);
 
+  // Gắn luồng camera vào thẻ video mỗi khi thẻ được tạo lại (sau màn chờ đọc) hoặc luồng mới có.
   useEffect(() => {
-    let s: MediaStream | undefined;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraFailed(true);
-      return;
+    const v = videoRef.current;
+    if (v && stream && v.srcObject !== stream) {
+      v.srcObject = stream;
+      v.play().catch(() => {}); // iPhone đôi khi không tự chạy khi gán luồng mới
     }
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, audio: false })
-      .then((ms) => {
-        s = ms;
-        setStream(ms);
-        if (videoRef.current) videoRef.current.srcObject = ms;
-      })
-      .catch(() => setCameraFailed(true));
-    return () => s?.getTracks().forEach((t) => t.stop());
-  }, []);
+  });
 
   // Thu hồi mọi URL xem trước khi rời màn.
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
@@ -124,14 +208,10 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   function finish() {
     // Spec 1.5 mục 8: quét cần AI nên phải có mạng; mất mạng thì báo ngay, mời nhập thủ công.
     if (!navigator.onLine) return setOffline(true);
-    stream?.getTracks().forEach((t) => t.stop());
     // lang là ngôn ngữ dịch hóa đơn (tên món), không phải ngôn ngữ giao diện.
     // Gửi lại sau khi chụp lại một ảnh: backend nhớ kết quả các ảnh đã đọc được (theo nội dung
     // ảnh), nên chỉ ảnh mới được đọc lại (1.1).
-    read.mutate(
-      { receiptId, images: photos.map((p) => p.blob), lang: uiLang },
-      { onError: () => setStream(null) }, // camera đã tắt: chụp lại bằng camera hệ thống
-    );
+    read.mutate({ receiptId, images: photos.map((p) => p.blob), lang: uiLang }); // camera vẫn mở để chụp lại ngay
   }
 
   // 1.1: lỗi gắn với một ảnh (unreadable_image, image_too_large, read_failed) chỉ ra đúng ảnh cần chụp lại.
@@ -140,6 +220,36 @@ function ScanSession({ onNext }: { onNext: () => void }) {
     const f = read.error.fields;
     if (Array.isArray(f.image_indexes)) f.image_indexes.forEach((i) => typeof i === "number" && badImages.add(i));
     else if (typeof f.image_index === "number") badImages.add(f.image_index);
+  }
+
+  const ownReady = reviewOnly || !!read.data;
+  if (ownReady && bg && !bgSaved) {
+    if (bg.status === "reading") return <Waiting text={m15.scan.waitBg} />;
+    if (bg.status === "error") {
+      const msg = bg.error instanceof OfflineError ? t.scan.uploadOffline : bg.error instanceof Error ? bg.error.message : "";
+      return (
+        <main className="scan">
+          <div className="scan__view" style={{ flex: 1, height: "auto" }}>
+            <div className="scan__fallback">
+              <p role="alert">{m15.scan.bgError(msg)}</p>
+              <button type="button" className="btn btn--primary" onClick={onRetryBg}>{m15.scan.retryBg}</button>
+              <button type="button" className="btn btn--quiet" onClick={() => (reviewOnly ? onNext() : onDropBg())}>{m15.scan.skipBg}</button>
+            </div>
+          </div>
+        </main>
+      );
+    }
+    if (bg.draft) {
+      return (
+        <Confirm
+          key={bg.receiptId}
+          draft={bg.draft}
+          onDone={() => nav("/")}
+          onNext={onNext}
+          onContinue={reviewOnly ? undefined : () => setBgSaved(true)}
+        />
+      );
+    }
   }
 
   if (read.isPending) {
@@ -155,7 +265,8 @@ function ScanSession({ onNext }: { onNext: () => void }) {
     );
   }
 
-  if (read.data) return <Confirm draft={read.data} onDone={() => nav("/")} onNext={onNext} />;
+  if (read.data) return <Confirm key={receiptId} draft={read.data} onDone={() => nav("/")} onNext={onNext} />;
+  if (reviewOnly) return <Waiting text={m15.scan.waitBg} />; // bill 1 lưu xong: onNext đã mở phiên mới
 
   const fromLibrary = photos.some((p) => p.from === "library");
 
@@ -169,7 +280,16 @@ function ScanSession({ onNext }: { onNext: () => void }) {
       <p className="scan__privacy" role="note">⚠️ {m15.scan.privacy}</p>
 
       <div className="scan__view">
-        {!cameraFailed ? (
+        {SYSTEM_CAMERA ? (
+          photos.length > 0 ? (
+            <img className="scan__last" src={photos[photos.length - 1].url} alt={t.scan.photoAlt(photos.length, false)} />
+          ) : (
+            <button type="button" className="scan__fallback scan__system" onClick={() => cameraRef.current?.click()}>
+              <Camera size={48} aria-hidden />
+              <span>{m15.scan.systemCamera}</span>
+            </button>
+          )
+        ) : !cameraFailed ? (
           <video ref={videoRef} autoPlay playsInline muted aria-label={t.scan.camera} />
         ) : (
           <div className="scan__fallback">
@@ -182,13 +302,15 @@ function ScanSession({ onNext }: { onNext: () => void }) {
             </button>
           </div>
         )}
+        {bg && (
+          <p className="scan__badge" role="status">
+            {bg.status === "reading" ? m15.scan.bgReading : bg.status === "ok" ? m15.scan.bgDone : m15.scan.bgFailed}
+          </p>
+        )}
       </div>
 
-      <p className="scan__hint">
-        {fromLibrary
-          ? t.scan.hintLibrary
-          : t.scan.hintCamera}
-      </p>
+      {/* Có ảnh rồi thì bỏ lời dặn để nút "Xong" không bị đẩy khỏi màn hình */}
+      {photos.length === 0 && <p className="scan__hint">{fromLibrary ? t.scan.hintLibrary : t.scan.hintCamera}</p>}
 
       {photos.length > 0 && (
         <ul className="scan__thumbs" aria-label={t.scan.photosOfReceipt(photos.length)}>
@@ -234,7 +356,23 @@ function ScanSession({ onNext }: { onNext: () => void }) {
           <ImagePlus size={20} aria-hidden /> {t.scan.library}
         </button>
         <button type="button" className="shutter" aria-label={t.scan.shutter} onClick={shoot} />
-        <span className="scan__count">{photos.length > 0 ? t.scan.count(photos.length, MAX_PHOTOS) : ""}</span>
+        {canAddBill && photos.length > 0 && !read.isError ? (
+          // Chụp xong bill này: gửi đọc ngầm, mở màn chụp cho bill sau
+          <button
+            type="button"
+            className="btn btn--quiet scan__next"
+            aria-disabled={busy || undefined}
+            onClick={() => {
+              if (busy) return;
+              if (!navigator.onLine) return setOffline(true);
+              onNextBill(receiptId, photos.map((p) => p.blob));
+            }}
+          >
+            {m15.scan.nextBill} <ChevronRight size={18} aria-hidden />
+          </button>
+        ) : (
+          <span className="scan__count">{photos.length > 0 ? t.scan.count(photos.length, MAX_PHOTOS) : ""}</span>
+        )}
       </div>
 
       {/* Thư viện: không có capture, chọn nhiều ảnh */}
@@ -268,13 +406,32 @@ function ScanSession({ onNext }: { onNext: () => void }) {
           <button type="button" className="btn btn--outline" onClick={() => nav("/plan")}>{m15.run.manual}</button>
         </div>
       )}
-      {photos.length > 0 && (
+      {(photos.length > 0 || bg) && (
         <div className="scan__done">
-          <button type="button" className="btn btn--primary btn--block btn--lg" onClick={finish} aria-disabled={busy || undefined}>
-            {t.scan.finish(photos.length)}
-          </button>
+          {photos.length > 0 ? (
+            <button type="button" className="btn btn--primary btn--block btn--lg" onClick={finish} aria-disabled={busy || undefined}>
+              {t.scan.finish(photos.length)}
+            </button>
+          ) : (
+            <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => setReviewOnly(true)}>
+              {m15.scan.reviewOnly}
+            </button>
+          )}
         </div>
       )}
+    </main>
+  );
+}
+
+function Waiting({ text }: { text: string }) {
+  return (
+    <main className="scan" aria-busy="true">
+      <div className="scan__view">
+        <div style={{ display: "grid", justifyItems: "center", gap: 16 }}>
+          <MimiMark size={88} animated />
+          <p className="scan__hint" role="status">{text}</p>
+        </div>
+      </div>
     </main>
   );
 }
@@ -289,7 +446,13 @@ function todayLocal(): string {
  * Xác nhận hóa đơn: màn tối giản, đối chiếu tổng tiền thành một dòng chữ.
  * Mọi con số (từng dòng, tổng, khớp hay lệch) do backend tính trong bản nháp; khi lưu backend tính lại.
  */
-function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () => void; onNext: () => void }) {
+function Confirm({ draft, onDone, onNext, onContinue }: {
+  draft: ReceiptDraft;
+  onDone: () => void;
+  onNext: () => void;
+  /** Còn bill sau cần xem: nút chính sau khi lưu chuyển sang bill đó. */
+  onContinue?: () => void;
+}) {
   const [usePrediction, setUsePrediction] = useState(true);
   const [purchasedOn, setPurchasedOn] = useState(draft.purchased_on || todayLocal());
   const save = useSaveReceipt();
@@ -391,9 +554,15 @@ function Confirm({ draft, onDone, onNext }: { draft: ReceiptDraft; onDone: () =>
           </dl>
           {/* Cùng quy cách với nút "Lưu hóa đơn": nút chính rộng hết khung, nút phụ viền nhạt bên dưới */}
           <div className="actions">
-            <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onNext}>
-              {t.confirm.scanAnother}
-            </button>
+            {onContinue ? (
+              <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onContinue}>
+                {m15.scan.seeNext}
+              </button>
+            ) : (
+              <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onNext}>
+                {t.confirm.scanAnother}
+              </button>
+            )}
             <button type="button" className="btn btn--quiet btn--block" onClick={onDone}>
               {t.common.backHome}
             </button>

@@ -1662,6 +1662,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plan/market-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ADR-004: giá đang bán của các món trong Kế hoạch, đọc từ bảng giá chung (chỉ nguồn công khai)
+         * @description Chỉ trả món đã có giá. Món mới thêm có giá sau lượt price-sync 2 giờ sáng. Giá trên hóa đơn của nhà mình không nằm ở đây.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MarketPrices"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plan/market-prices/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nút Cập nhật giá: tra lại giá các món trong Kế hoạch, không chờ job đêm
+         * @description Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, 3 lần mỗi người mỗi ngày (mẹ chốt 02/11). Không có món nào cần tra thì không tốn lượt.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MarketRefresh"];
+                    };
+                };
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plan/delegated": {
         parameters: {
             query?: never;
@@ -2856,6 +2939,11 @@ export interface components {
              * @enum {string}
              */
             lang?: "vi" | "en";
+            /**
+             * @description Nước để lấy giá online. Vắng: đoán theo múi giờ (Asia/Singapore là SG, còn lại VN)
+             * @enum {string}
+             */
+            country?: "VN" | "SG";
             /** @description Tên gọi người nhà theo uid, riêng từng tài khoản. PUT chỉ gửi phần đổi; "" là xóa */
             relations?: {
                 [key: string]: "anh" | "chi" | "em" | "bo" | "me" | "con" | "ong" | "ba" | "khac" | "";
@@ -3224,6 +3312,56 @@ export interface components {
             other_dimension_count?: number;
             history?: components["schemas"]["PriceObservation"][];
             window_days?: number;
+        };
+        MarketPrice: {
+            store: string;
+            /**
+             * Format: int64
+             * @description Quy ra VND để so với giá trên hóa đơn
+             */
+            price_vnd: number;
+            /** @description Số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5) */
+            local?: number;
+            /** @description Tiền gốc: VND, SGD */
+            currency?: string;
+            /** @description Quy cách nguồn ghi (1L */
+            size?: string;
+            /** @description gemini_search hoặc partner_... */
+            source: string;
+            url?: string;
+            /** Format: date */
+            on: string;
+        };
+        MarketRefresh: components["schemas"]["MarketPrices"] & {
+            /** @description Số món vừa tra */
+            looked: number;
+            /** @description Số món tra ra giá */
+            found: number;
+            /** @description Số món vừa có giá trong 24 giờ nên giữ nguyên */
+            fresh: number;
+        };
+        MarketRefreshStatus: {
+            /** @description Số lần bấm Cập nhật giá mỗi ngày */
+            daily: number;
+            /** @description Số lần còn lại hôm nay */
+            left: number;
+            /**
+             * Format: date-time
+             * @description Lần bấm gần nhất; vắng khi chưa bấm lần nào
+             */
+            last_at?: string;
+        };
+        MarketPrices: {
+            refresh?: components["schemas"]["MarketRefreshStatus"];
+            items: {
+                /** @description Khóa dòng Kế hoạch */
+                key: string;
+                name: string;
+                /** @description Rẻ trước */
+                prices: components["schemas"]["MarketPrice"][];
+                /** Format: date-time */
+                updated_at: string;
+            }[];
         };
         BasketPrices: {
             /** @description Số ngày lịch sử giá đã xét (90) */
