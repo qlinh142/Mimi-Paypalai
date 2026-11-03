@@ -5,6 +5,14 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Tỷ giá đã chốt của một ngày không bị ghi đè
+
+Nhánh `feat/ty-gia-khong-ghi-de`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 5 (mẹ chốt 03/11): quét tỷ giá 1 lần/ngày, ngày đã có thì giữ nguyên, ngày chưa có dùng tỷ giá gần nhất trước đó.
+
+- `fsstore.SaveRates` dùng Create thay cho Set: chạy lại fx-sync trong ngày không đổi tỷ giá đã ghi, nên hóa đơn quy đổi theo ngày đó luôn ra cùng một số.
+- Phần "ngày chưa có dùng tỷ giá gần nhất trước đó" đã đúng từ trước (`Store.Rate`); lịch fx-sync vẫn 6h sáng mỗi ngày.
+- Kiểm tra: test emulator mới `TestSaveRatesKeepsFirstOfDayEmulator` (ghi 2 lần cùng ngày, đọc ra lần đầu).
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.
