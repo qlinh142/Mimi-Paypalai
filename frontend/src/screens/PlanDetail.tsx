@@ -21,6 +21,7 @@ import { planName } from "./PlanList";
 import { Sheet } from "../components/Sheet15";
 import { useRelations } from "../lib/relation";
 import { buyerOf, clearDraft, markDraft, setBuyer, usePlanDraftVersion, type BuyerPick } from "../lib/planDraft";
+import { AddToCalendar } from "../components/AddToCalendar";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : t.common.genericError);
@@ -167,6 +168,17 @@ function Detail({ id }: { id: string }) {
               </span>
               <Pencil size={20} aria-hidden />
             </button>
+          )}
+          {!editTrip && date && (
+            <AddToCalendar
+              ev={{
+                title: m15.plan.calTitle(name),
+                date,
+                time,
+                location: store,
+                details: m15.plan.calDetails((cart?.items ?? []).slice(0, 20).map((i) => i.name)),
+              }}
+            />
           )}
         </section>
 
