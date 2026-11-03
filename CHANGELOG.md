@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Dịch tên món theo ngôn ngữ app, giữ tên theo bill để đối chiếu
+
+Nhánh `feat/dich-ten-mon`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2.1 (mẹ chốt 03/11).
+
+- Lúc quét: app gửi ngôn ngữ đang dùng (`lang`, trước đây AI bỏ qua). Bill khác ngôn ngữ đó thì AI trả thêm `name_translated` trong cùng lượt đọc (gọn ~40 ký tự, giữ tên hãng), không gọi thêm.
+- Máy chủ: dòng có tên dịch thì `name` là tên dịch, `original_name` là tên theo bill đã chuẩn hóa; `raw_name` vẫn là chữ in nguyên văn. Lưu `original_name` vào receipts, trả ra ở chi tiết Lịch sử mua hàng. Bản đọc nhớ tạm theo ảnh + ngôn ngữ.
+- App: màn xác nhận hóa đơn và chi tiết Lịch sử mua hàng hiện tên dịch, tên theo bill chữ nhỏ bên dưới. Bill cùng ngôn ngữ thì chỉ một dòng như cũ.
+- Kiểm tra: test mới trong `TestRead` (dòng có/không có tên dịch), `go test ./internal/receipt ./internal/history ./internal/httpapi`, `tsc -b`, Playwright bản tiếng Anh (ảnh `screens/ten-dich-lich-su.png`).
+- Chưa làm: tên món ở Đồ dùng vẫn lấy theo tên trên bill; hóa đơn đã lưu trước đây không có tên dịch.
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.

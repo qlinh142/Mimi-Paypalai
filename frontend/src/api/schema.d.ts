@@ -3035,6 +3035,8 @@ export interface components {
                 brand?: string;
                 product_name?: string;
                 source_language?: string;
+                /** @description Tên theo bill khi name là tên đã dịch sang ngôn ngữ app; gửi lại nguyên vẹn */
+                original_name?: string;
                 package_count?: number;
                 package_size?: number;
                 package_unit?: string;

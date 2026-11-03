@@ -111,6 +111,8 @@ export type ReceiptDraftLine = {
   detail_name?: string;
   product_key?: string;
   source_language?: string;
+  /** Tên theo bill khi name là tên đã dịch sang ngôn ngữ app; hiện chữ nhỏ dưới tên. */
+  original_name?: string;
   package_count?: number;
   package_size?: number;
   package_unit?: string;
@@ -157,6 +159,7 @@ export type SaveReceiptRequest = {
     brand?: string;
     product_name?: string;
     source_language?: string;
+    original_name?: string;
     package_count?: number;
     package_size?: number;
     /** B3: kế hoạch mà dòng này trừ vào, theo thứ tự đã chia. Vắng: theo source_plan_id. [] = không trừ. */
@@ -248,7 +251,7 @@ export type HistoryReceipt = {
   recurring_id?: string;
 };
 /** unit_price, amount null: món chưa rõ giá, không tính vào tổng. */
-export type ReceiptDetailLine = { name: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine";
+export type ReceiptDetailLine = { name: string; /** Tên theo bill khi name là tên đã dịch. */ original_name?: string; spec?: string; qty: number; unit_price: number | null; amount: number | null; category_key?: string; discount?: number; tag?: "for_owner" | "mine";
   /** B7: estimate = không nhập giá, lấy giá mua gần nhất; missing = chưa có giá. "online" để dành cho bước 13. */
   price_source?: "receipt" | "manual" | "estimate" | "missing" | "online" };
 export type ReceiptDetail = HistoryReceipt & { plans: { id: string; name: string }[]; lines: ReceiptDetailLine[]; subtotal: number; discount: number; split?: { for_owner: number; mine: number; owner_name: string } };

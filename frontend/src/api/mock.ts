@@ -381,7 +381,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
     const body = JSON.parse(String(init.body)) as Record<string, unknown> & { receipt_id: string; lines?: Record<string, unknown>[] };
     const top = ["receipt_id", "store", "purchased_on", "currency", "discount_total", "lines", "use_for_prediction", "confirm_duplicate", "source_plan_id", "assignment_id"];
     const lineKeys = ["line_id", "name", "qty", "unit", "amount", "category_key", "group_key", "habit",
-      "raw_name", "brand", "product_name", "source_language", "package_count", "package_size", "package_unit", "plans", "price_source"];
+      "raw_name", "brand", "product_name", "source_language", "original_name", "package_count", "package_size", "package_unit", "plans", "price_source"];
     const unknown =
       Object.keys(body).some((k) => !top.includes(k)) ||
       (body.lines ?? []).some((l) => Object.keys(l).some((k) => !lineKeys.includes(k)));
@@ -764,6 +764,11 @@ function priceObs(key: string) {
 
 
 /* Spec 1.5 mục 4: lịch sử mua hàng nhiều tháng, chi tiết hóa đơn (dữ liệu mẫu). */
+const HIST_EN: Record<string, string> = {
+  "Sữa tươi Vinamilk không đường": "Vinamilk unsweetened fresh milk", "Trứng gà": "Chicken eggs",
+  "Nước rửa chén Sunlight chanh": "Sunlight lemon dish soap", "Bánh mì sandwich": "Sandwich bread",
+  "Sữa chua Vinamilk": "Vinamilk yogurt", "Nước giặt Omo": "Omo laundry liquid",
+};
 type HLine = [string, string, number, number, string, ("for_owner" | "mine")?];
 const HIST_SRC: [string, string, number, number, HLine[], number?][] = [
   // id, cửa hàng, số ngày trước, giờ, các dòng [tên, quy cách, sl, đơn giá, danh mục], giảm giá
@@ -794,7 +799,11 @@ function histDetail(id: string): ReceiptDetail | null {
   const src = HIST_SRC.find((h) => h[0] === id);
   if (!src) return null;
   const [rid, store, ago, hour, ls, disc = 0] = src;
-  const lines = ls.map(([name, spec, qty, unit_price, category_key]) => ({ name, spec, qty, unit_price, amount: qty * unit_price, category_key }));
+  // Bản tiếng Anh: tên đã dịch lúc quét, tên theo bill (tiếng Việt) giữ ở original_name.
+  const lines = ls.map(([name, spec, qty, unit_price, category_key]) => ({
+    name: (L && HIST_EN[name]) || name, ...(L && HIST_EN[name] ? { original_name: name } : {}),
+    spec, qty, unit_price, amount: qty * unit_price, category_key,
+  }));
   const subtotal = lines.reduce((a, l) => a + l.amount, 0);
   const plans = rid === "h1" ? [{ id: "default", name: L ? "Shopping cart" : "Giỏ mua sắm" }] : rid === "h2" ? [{ id: "default", name: L ? "Shopping cart" : "Giỏ mua sắm" }, { id: "p-be", name: L ? "Baby shopping" : "Mua đồ cho bé" }] : [];
   return { receipt_id: rid, store, purchased_at: histDate(ago, hour), total_vnd: subtotal - disc, item_names: [], kind: "own", plans, lines, subtotal, discount: disc };
