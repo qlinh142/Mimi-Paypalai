@@ -152,9 +152,11 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		Households: household.New(store, store, nil).WithReceipts(receipts),
 		Pricing:    pricing.New(store, store, nil),
 		Market:     store, // bảng giá chung, job price-sync ghi mỗi đêm
-		History:    history.New(store),
-		Accounts:   account.New(store, store, auth),
-		SignIn:     auth,
+		// Nút "Cập nhật giá": tra lại giá món trong một kế hoạch, cùng nguồn công khai với job.
+		PriceRefresh: market.NewRefresher(store, []market.Source{reader.NewPriceSearch()}, store, market.RefreshOptions{Log: log}),
+		History:      history.New(store),
+		Accounts:     account.New(store, store, auth),
+		SignIn:       auth,
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)),
 		httpapi.WithSharedLimiter(fsstore.NewRateLimiter(store)))
 	if err != nil {

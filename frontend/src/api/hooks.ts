@@ -1,9 +1,9 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryLabel } from "../i18n";
-import { ApiError, apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
+import { ApiError, UPLOAD_TIMEOUT_MS, apiGet, apiSend, apiSendQueued, apiUploadImages, apiUploadReceipt } from "./client";
 import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
-  Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, MarketPrices, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
+  Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, MarketPrices, MarketRefresh, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
   ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
   QuickStock, ReceiptDraft, ReceiptDraftLine, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
   SpendingReport, TaxonomyGroup,
@@ -436,7 +436,19 @@ export function useMarketPrices(enabled: boolean) {
     queryKey: ["plan", "market-prices", id],
     queryFn: () => apiGet<MarketPrices>(`/plan/market-prices${planQuery(id)}`),
     enabled,
-    staleTime: 30 * 60_000, // bảng chỉ đổi mỗi đêm
+    staleTime: 30 * 60_000, // bảng chỉ đổi mỗi đêm hoặc khi bấm "Cập nhật giá"
+  });
+}
+
+/** Nút "Cập nhật giá": máy chủ tra lại giá các món của kế hoạch đang mở (có thể mất 20 đến 40 giây). */
+export function useRefreshMarketPrices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiSend<MarketRefresh>("POST", `/plan/market-prices/refresh${planQuery(currentPlanId())}`, undefined, crypto.randomUUID(), UPLOAD_TIMEOUT_MS),
+    onSuccess: (d) => qc.setQueryData<MarketPrices>(["plan", "market-prices", currentPlanId()], { items: d.items, refresh: d.refresh }),
+    // Hết lượt hoặc lỗi: tải lại để số lần còn lại đúng với máy chủ.
+    onError: () => qc.invalidateQueries({ queryKey: ["plan", "market-prices"] }),
   });
 }
 

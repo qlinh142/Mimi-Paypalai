@@ -3,6 +3,7 @@ package market
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -106,5 +107,83 @@ func TestCleanDropsBadPricesAndKeepsCheapestPerStore(t *testing.T) {
 	}, "gemini_search", "2026-11-03")
 	if len(got) != 2 || got[0].Store != "Bách Hóa Xanh" || got[1].PriceVND != 31_000 || got[1].URL != "" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+type fakeRefreshStore struct {
+	fakeStore
+	mu      sync.Mutex
+	touched map[string]time.Time
+}
+
+func (f *fakeRefreshStore) Touched(context.Context, []string) (map[string]time.Time, error) {
+	return f.touched, nil
+}
+func (f *fakeRefreshStore) SaveEntry(ctx context.Context, e Entry) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.fakeStore.SaveEntry(ctx, e)
+}
+
+type fakeQuota struct {
+	used int
+	last time.Time
+}
+
+func (q *fakeQuota) ReservePriceRefresh(_ context.Context, _, _ string, limit int, at time.Time) error {
+	if q.used >= limit {
+		return errors.New("quota")
+	}
+	q.used++
+	q.last = at
+	return nil
+}
+func (q *fakeQuota) PriceRefreshStatus(context.Context, string, string) (int, time.Time, error) {
+	return q.used, q.last, nil
+}
+
+type safeSource struct {
+	mu     sync.Mutex
+	prices map[string][]Price
+	calls  []string
+}
+
+func (s *safeSource) Name() string { return "gemini_search" }
+func (s *safeSource) Lookup(_ context.Context, w Wanted) ([]Price, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, w.Key)
+	return s.prices[w.Key], nil
+}
+
+func TestRefreshSkipsRecentAndCountsQuota(t *testing.T) {
+	st := &fakeRefreshStore{touched: map[string]time.Time{
+		"sua-hat": now.Add(-20 * time.Hour), // trong 24 giờ: giữ
+		"trung":   now.Add(-30 * time.Hour), // quá 24 giờ: tra lại
+	}}
+	src := &safeSource{prices: map[string][]Price{"trung": {{Store: "WinMart", PriceVND: 29_000}}}}
+	q := &fakeQuota{}
+	r := NewRefresher(st, []Source{src}, q, RefreshOptions{Daily: 1, Now: func() time.Time { return now }})
+	items := []Wanted{{Key: "sua-hat", Name: "Sữa hạt"}, {Key: "trung", Name: "Trứng"}, {Key: "gao", Name: "Gạo"}, {Key: "trung", Name: "Trứng"}}
+	res, err := r.Refresh(context.Background(), "u1", "2026-11-03", items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Wanted != 3 || res.Fresh != 1 || res.Looked != 2 || res.Found != 1 || q.used != 1 || len(st.saved) != 2 {
+		t.Fatalf("%+v used=%d saved=%d", res, q.used, len(st.saved))
+	}
+	// Hết lượt trong ngày thì báo lỗi, không gọi nguồn.
+	st.touched = nil
+	src.calls = nil
+	if _, err := r.Refresh(context.Background(), "u1", "2026-11-03", items); err == nil || len(src.calls) != 0 {
+		t.Fatalf("want quota error, calls=%v", src.calls)
+	}
+	// Mọi món đều vừa tra: không tốn lượt.
+	st.touched = map[string]time.Time{"sua-hat": now, "trung": now, "gao": now}
+	if res, err := r.Refresh(context.Background(), "u1", "2026-11-03", items); err != nil || res.Fresh != 3 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if st, err := r.Status(context.Background(), "u1", "2026-11-03"); err != nil || st.Left != 0 || st.Daily != 1 || st.LastAt == nil || !st.LastAt.Equal(now) {
+		t.Fatalf("%+v %v", st, err)
 	}
 }

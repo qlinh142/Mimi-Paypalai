@@ -501,6 +501,15 @@ paths:
       description: Chỉ trả món đã có giá. Món mới thêm có giá sau lượt price-sync 2 giờ sáng. Giá trên hóa đơn của nhà mình không nằm ở đây.
       parameters: [{ $ref: "#/components/parameters/PlanId" }]
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MarketPrices" } } } } }
+  /plan/market-prices/refresh:
+    post:
+      tags: [plan]
+      summary: "Nút Cập nhật giá: tra lại giá các món trong Kế hoạch, không chờ job đêm"
+      description: Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, 3 lần mỗi người mỗi ngày (mẹ chốt 02/11). Không có món nào cần tra thì không tốn lượt.
+      parameters: [{ $ref: "#/components/parameters/PlanId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MarketRefresh" } } } }
+        "429": { $ref: "#/components/responses/Error" }
   /plan/delegated:
     get:
       tags: [plan, household]
@@ -1202,10 +1211,27 @@ components:
         source: { type: string, description: "gemini_search hoặc partner_..." }
         url: { type: string }
         on: { type: string, format: date }
+    MarketRefresh:
+      allOf:
+        - $ref: "#/components/schemas/MarketPrices"
+        - type: object
+          required: [looked, found, fresh]
+          properties:
+            looked: { type: integer, description: Số món vừa tra }
+            found: { type: integer, description: Số món tra ra giá }
+            fresh: { type: integer, description: Số món vừa có giá trong 24 giờ nên giữ nguyên }
+    MarketRefreshStatus:
+      type: object
+      required: [daily, left]
+      properties:
+        daily: { type: integer, description: Số lần bấm Cập nhật giá mỗi ngày }
+        left: { type: integer, description: Số lần còn lại hôm nay }
+        last_at: { type: string, format: date-time, description: Lần bấm gần nhất; vắng khi chưa bấm lần nào }
     MarketPrices:
       type: object
       required: [items]
       properties:
+        refresh: { $ref: "#/components/schemas/MarketRefreshStatus" }
         items:
           type: array
           items:

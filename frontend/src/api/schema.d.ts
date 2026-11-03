@@ -1703,6 +1703,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plan/market-prices/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nút Cập nhật giá: tra lại giá các món trong Kế hoạch, không chờ job đêm
+         * @description Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, 3 lần mỗi người mỗi ngày (mẹ chốt 02/11). Không có món nào cần tra thì không tốn lượt.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MarketRefresh"];
+                    };
+                };
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plan/delegated": {
         parameters: {
             query?: never;
@@ -3280,7 +3322,27 @@ export interface components {
             /** Format: date */
             on: string;
         };
+        MarketRefresh: components["schemas"]["MarketPrices"] & {
+            /** @description Số món vừa tra */
+            looked: number;
+            /** @description Số món tra ra giá */
+            found: number;
+            /** @description Số món vừa có giá trong 24 giờ nên giữ nguyên */
+            fresh: number;
+        };
+        MarketRefreshStatus: {
+            /** @description Số lần bấm Cập nhật giá mỗi ngày */
+            daily: number;
+            /** @description Số lần còn lại hôm nay */
+            left: number;
+            /**
+             * Format: date-time
+             * @description Lần bấm gần nhất; vắng khi chưa bấm lần nào
+             */
+            last_at?: string;
+        };
         MarketPrices: {
+            refresh?: components["schemas"]["MarketRefreshStatus"];
             items: {
                 /** @description Khóa dòng Kế hoạch */
                 key: string;

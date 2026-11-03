@@ -29,3 +29,32 @@ func TestMarketSaveEntriesEmulator(t *testing.T) {
 		t.Fatalf("%+v %v", e, ok)
 	}
 }
+
+func TestMarketTouchedAndRefreshQuotaEmulator(t *testing.T) {
+	s, _, uid := emulator(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	key := "rong-" + uid
+	if err := s.SaveEntry(ctx, market.Entry{Key: key, Name: "Không ra giá", UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Touched(ctx, []string{key, "khong-co-" + uid})
+	if err != nil || len(got) != 1 || !got[key].Equal(now) {
+		t.Fatalf("%v %v", got, err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2, now); err == nil {
+		t.Fatal("want quota error")
+	}
+	if used, last, err := s.PriceRefreshStatus(ctx, uid, "2031-01-10"); err != nil || used != 2 || !last.Equal(now) {
+		t.Fatalf("%d %v %v", used, last, err)
+	}
+	// Lượt đọc hóa đơn tính riêng.
+	if err := s.Reserve(ctx, uid, "2031-01-10", 1); err != nil {
+		t.Fatal(err)
+	}
+}
