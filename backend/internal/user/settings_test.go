@@ -37,6 +37,7 @@ func TestValidate(t *testing.T) {
 		"channels_bad": {Channels: &[]string{"sms"}},
 		"lang":         {Lang: ptr("fr")},
 		"country":      {Country: ptr("JP")},
+		"currency":     {Currency: ptr("EUR")},
 		"remind_freq":  {RemindFreq: ptr("Every Day!")},
 	}
 	for name, p := range bad {

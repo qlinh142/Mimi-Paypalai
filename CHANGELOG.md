@@ -15,6 +15,76 @@ Nhánh `feat/nuoc-vn-us`. Mẹ chốt 03/11: Cài đặt → Quốc gia (giá on
 - Bản thử: chọn Mỹ thì bảng giá online giả giá USD ở Walmart, Target, Costco.
 - Kiểm tra: `go test ./...` (thêm `TestSelectableCountries`, ca US trong CountryFor và Cài đặt), `tsc -b`, bản thử chọn Mỹ ra "Rẻ nhất ở Target · 1.15 USD".
 
+## 2026-11-03 · Thư thông báo theo ngôn ngữ của người nhận
+
+Nhánh `feat/thu-theo-ngon-ngu`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2 (mẹ chốt 03/11): lời nhắc, link mua hộ, email theo ngôn ngữ trong Cài đặt của người nhận.
+
+- Thư sự kiện (nhờ mua, cập nhật, hủy, mua xong, không mua được, chuyển món) và bản tin "món sắp hết" có thêm bản tiếng Anh; chọn theo `settings.lang` của người nhận, vắng là tiếng Việt.
+- Thông báo trong app và màn mua hộ vốn đã dựng chữ theo ngôn ngữ của người đang xem, không cần sửa.
+- Kiểm tra: `TestEventMailLang`, `go test ./internal/notify`.
+- Lưu ý: chưa có dịch vụ gửi email thật (để sau demo), hiện thư chỉ ghi log.
+
+## 2026-11-03 · Chia giảm giá cả hóa đơn về từng dòng
+
+Nhánh `feat/chia-giam-gia`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 4 (mẹ đồng ý 03/11): giảm giá tổng bill chia về từng dòng theo tỷ lệ tiền, để sau này giá vốn mỗi món là giá đã trừ giảm.
+
+- `domain.AllocateDiscount`: chia theo tỷ lệ, tổng các phần đúng bằng số giảm (phần dư làm tròn cho dòng có phần lẻ lớn nhất); dòng chưa rõ giá không nhận phần nào.
+- Lưu hóa đơn có dòng khuyến mãi (số âm): mỗi dòng ghi thêm `discount_alloc_vnd` trong receipts. Tổng đã chi, tiết kiệm, lịch sử giá không đổi.
+- Kiểm tra: `TestAllocateDiscount`, `TestSaveDiscounts` (12.000đ chia 7.529đ + 4.471đ).
+- Chưa dùng: giá vốn từng lô vẫn đang treo; dữ liệu này để sẵn cho lúc làm.
+
+## 2026-11-03 · Giao diện hai ngôn ngữ không tràn trên màn nhỏ
+
+Nhánh `feat/giao-dien-song-ngu`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2.2 (mẹ chốt 03/11): chữ cố định tinh chỉnh riêng cho từng ngôn ngữ, tên sản phẩm theo luật hiển thị.
+
+- Tab và ô Trang chủ tiếng Anh "Shopping List" đổi thành "Plans" (khớp "Kế hoạch", không xuống 2 dòng).
+- Màn mua hộ (tiếng Anh, 320px): nút "Add to Google Calendar" và hai nút cuối màn được xuống dòng thay vì đẩy màn rộng ra; tên món dài được ngắt.
+- Lịch sử mua hàng (cả hai ngôn ngữ, 320px): ô tìm co lại, nút Lọc giữ nguyên cỡ.
+- Tên sản phẩm ở danh sách (Đồ dùng, Kế hoạch, đi mua): tối đa 2 dòng rồi cắt "…" (trước đây Đồ dùng chỉ 1 dòng); màn chi tiết vẫn hiện đủ.
+- Kiểm tra tự động mới `e2e/layout.spec.ts`: mở 13 màn chính ở tiếng Việt và tiếng Anh trên màn 320px, báo lỗi nếu màn nào tràn ngang (chạy trong CI cùng test demo). Bỏ phần sửa CSS thì test báo lỗi, đã thử.
+
+## 2026-11-03 · Dịch tên món theo ngôn ngữ app, giữ tên theo bill để đối chiếu
+
+Nhánh `feat/dich-ten-mon`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2.1 (mẹ chốt 03/11).
+
+- Lúc quét: app gửi ngôn ngữ đang dùng (`lang`, trước đây AI bỏ qua). Bill khác ngôn ngữ đó thì AI trả thêm `name_translated` trong cùng lượt đọc (gọn ~40 ký tự, giữ tên hãng), không gọi thêm.
+- Máy chủ: dòng có tên dịch thì `name` là tên dịch, `original_name` là tên theo bill đã chuẩn hóa; `raw_name` vẫn là chữ in nguyên văn. Lưu `original_name` vào receipts, trả ra ở chi tiết Lịch sử mua hàng. Bản đọc nhớ tạm theo ảnh + ngôn ngữ.
+- App: màn xác nhận hóa đơn và chi tiết Lịch sử mua hàng hiện tên dịch, tên theo bill chữ nhỏ bên dưới. Bill cùng ngôn ngữ thì chỉ một dòng như cũ.
+- Kiểm tra: test mới trong `TestRead` (dòng có/không có tên dịch), `go test ./internal/receipt ./internal/history ./internal/httpapi`, `tsc -b`, Playwright bản tiếng Anh (ảnh `screens/ten-dich-lich-su.png`).
+- Chưa làm: tên món ở Đồ dùng vẫn lấy theo tên trên bill; hóa đơn đã lưu trước đây không có tên dịch.
+
+## 2026-11-03 · Tiền tệ hiển thị theo từng người (VND, USD)
+
+Nhánh `feat/tien-te-hien-thi`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 4–5 (mẹ chốt 03/11): mỗi người tự chọn tiền tệ hiển thị, tạm VND và USD; số tiền quy đổi theo tỷ giá của ngày mua.
+
+- Cài đặt › Ngôn ngữ & khu vực: ô Tiền tệ chọn được VND hoặc USD, lưu vào tài khoản (`settings.currency`). Câu ghi chú sửa lại: ngôn ngữ và tiền tệ chọn riêng.
+- Máy chủ: `GET /fx/rates?currency=USD&from&to` trả tỷ giá từng ngày (kèm ngày gần nhất trước `from`), dùng chung index với `Store.Rate`. Số tiền vẫn lưu bằng đồng, không đổi dữ liệu nào.
+- App (`lib/money.ts`, `app/MoneySync.tsx`): nạp tỷ giá USD 800 ngày, nhớ trên máy; `formatVnd(số, ngày)` quy đổi theo ngày mua, ngày chưa có tỷ giá dùng ngày gần nhất trước đó.
+  - Theo ngày mua: Lịch sử mua hàng (từng hóa đơn, từng dòng), lịch sử giá của món, giá lần mua gần nhất / thấp nhất.
+  - Tổng theo tháng (Sổ chi tiêu): tháng đã qua theo tỷ giá ngày cuối tháng (cố định), tháng này theo hôm nay.
+  - Giá hiện tại, kế hoạch, dự báo: theo tỷ giá hôm nay.
+- Sau khi lưu cài đặt, app ghi ngay vào bản nhớ `/me`; lúc mở app chỉ tin `/me` vừa tải từ máy chủ (bản khôi phục từ IndexedDB có thể còn giá trị cũ).
+- Kiểm tra: `go test ./internal/httpapi ./internal/user` (test mới `TestFXRates`), test emulator `TestRateHistoryEmulator`, `tsc -b`, Playwright đổi sang USD: Trang chủ 1.284.000đ → 50,46 US$, Sổ chi tiêu và Lịch sử đổi theo.
+- Chưa làm: ô nhập tiền (sửa giá, khoản định kỳ) vẫn nhập bằng đồng.
+
+## 2026-11-03 · Ngôn ngữ theo tài khoản, người mới theo ngôn ngữ điện thoại
+
+Nhánh `feat/ngon-ngu-theo-tai-khoan`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2 (mẹ chốt 03/11): một ngôn ngữ chung của app, lưu theo tài khoản; người mới theo ngôn ngữ máy.
+
+- Người mới mở app: máy đặt tiếng Việt thì vào tiếng Việt, còn lại tiếng Anh (trước đây luôn tiếng Việt).
+- Ô VI/EN ở màn đăng nhập trước là "Ngôn ngữ dịch hóa đơn" và không nối vào đâu; giờ là ngôn ngữ của app, bấm là đổi ngay.
+- Sau khi đăng nhập (`app/LangSync.tsx`): tài khoản chưa có ngôn ngữ thì ghi ngôn ngữ đang dùng lên tài khoản; tài khoản đã có ngôn ngữ khác máy thì app đổi theo tài khoản (đăng nhập máy mới vẫn đúng ngôn ngữ). Mở bằng `?ui=` thì ưu tiên `?ui=` và ghi lên tài khoản.
+- Máy chủ: tài khoản mới không còn mặc định `lang: vi`; mô tả `lang` trong API đổi thành ngôn ngữ của tài khoản (giao diện, tên món dịch, lời nhắc, email).
+- Kiểm tra: Playwright với máy vi-VN, en-US, fr-FR ra đúng ngôn ngữ và nút VI/EN đổi được; `go test ./internal/user ./internal/httpapi`, `tsc -b`.
+
+## 2026-11-03 · Tỷ giá đã chốt của một ngày không bị ghi đè
+
+Nhánh `feat/ty-gia-khong-ghi-de`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 5 (mẹ chốt 03/11): quét tỷ giá 1 lần/ngày, ngày đã có thì giữ nguyên, ngày chưa có dùng tỷ giá gần nhất trước đó.
+
+- `fsstore.SaveRates` dùng Create thay cho Set: chạy lại fx-sync trong ngày không đổi tỷ giá đã ghi, nên hóa đơn quy đổi theo ngày đó luôn ra cùng một số.
+- Phần "ngày chưa có dùng tỷ giá gần nhất trước đó" đã đúng từ trước (`Store.Rate`); lịch fx-sync vẫn 6h sáng mỗi ngày.
+- Kiểm tra: test emulator mới `TestSaveRatesKeepsFirstOfDayEmulator` (ghi 2 lần cùng ngày, đọc ra lần đầu).
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.

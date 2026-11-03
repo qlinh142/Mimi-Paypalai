@@ -38,6 +38,8 @@ type Event struct {
 	Items        int       `json:"items,omitempty"`    // số món gửi / mua được / chuyển sang
 	Returned     int       `json:"returned,omitempty"` // run_done: số món chưa mua
 	Read         bool      `json:"read"`
+	// Lang: ngôn ngữ trong Cài đặt của người nhận (vi | en), chỉ dùng để viết thư; vắng là vi.
+	Lang string `json:"-"`
 }
 
 // Task là nội dung một task trong hàng đợi notify.
@@ -67,8 +69,12 @@ type EventStore interface {
 // ErrNotFound: task trỏ tới sự kiện không còn. Không thử lại.
 var ErrNotFound = errors.New("notify: event not found")
 
-// Subject và Lines: nội dung thư cho từng loại sự kiện.
+// Subject và Lines: nội dung thư cho từng loại sự kiện, theo ngôn ngữ của người nhận (mẹ chốt
+// 03/11: lời nhắc, link mua hộ, email theo ngôn ngữ trong Cài đặt của người nhận).
 func EventMail(ev Event) (string, []string) {
+	if ev.Lang == "en" {
+		return eventMailEn(ev)
+	}
 	who := ev.ActorName
 	if who == "" {
 		who = "Người nhà"
@@ -97,6 +103,55 @@ func EventMail(ev Event) (string, []string) {
 		return fmt.Sprintf("Mimi: đã chuyển %d món chưa mua sang kế hoạch mới", ev.Items), []string{plan}
 	}
 	return "Mimi: có thông báo mới", nil
+}
+
+func eventMailEn(ev Event) (string, []string) {
+	who := ev.ActorName
+	if who == "" {
+		who = "A family member"
+	}
+	plan := ev.PlanName
+	if plan == "" || plan == "Kế hoạch chính" {
+		plan = "Main plan"
+	}
+	at := ev.At.In(vnZone).Format("15:04")
+	switch ev.Kind {
+	case EventPlanSent:
+		return fmt.Sprintf("Mimi: %s asked you to buy %s", who, itemsEn(ev.Items)), []string{plan}
+	case EventPlanUpdated:
+		return fmt.Sprintf("Mimi: %s updated the plan at %s", who, at), []string{plan}
+	case EventPlanCancelled:
+		return fmt.Sprintf("Mimi: %s cancelled the plan at %s", who, at), []string{plan}
+	case EventRunDone:
+		lines := []string{fmt.Sprintf("Bought %s", itemsEn(ev.Items))}
+		if ev.Returned > 0 {
+			lines = append(lines, fmt.Sprintf("%s not bought", itemsEn(ev.Returned)))
+		}
+		return fmt.Sprintf("Mimi: %s finished shopping for %s", who, plan), lines
+	case EventRunDeclined:
+		return fmt.Sprintf("Mimi: %s couldn't shop for %s", who, plan), []string{"The items are back in your plan"}
+	case EventPlanSplit:
+		return fmt.Sprintf("Mimi: moved %s not bought to a new plan", itemsEn(ev.Items)), []string{plan}
+	}
+	return "Mimi: you have a new notification", nil
+}
+
+func itemsEn(n int) string {
+	if n == 1 {
+		return "1 item"
+	}
+	return fmt.Sprintf("%d items", n)
+}
+
+// DigestSubject: tiêu đề bản tin hằng ngày theo ngôn ngữ người nhận.
+func DigestSubject(n int, lang string) string {
+	if lang == "en" {
+		if n == 1 {
+			return "Mimi: 1 item running low"
+		}
+		return fmt.Sprintf("Mimi: %d items running low", n)
+	}
+	return fmt.Sprintf("Mimi: %d món sắp hết", n)
 }
 
 var vnZone = func() *time.Location {

@@ -29,6 +29,8 @@ type SettingsPatch struct {
 	// Country: nước để lấy giá online. Cài đặt cho chọn VN, US (mẹ chốt 03/11); SG vẫn nhận để
 	// người đã chọn trước đó dùng tiếp. Vắng: đoán theo múi giờ.
 	Country *string `json:"country"`
+	// Currency: tiền tệ hiển thị của người này (VND, USD), mẹ chốt 03/11. Vắng: VND.
+	Currency *string `json:"currency"`
 	// Relations: tên gọi người nhà mà người này đặt, theo uid (Anh, Chị, Bố...). Chỉ gửi
 	// phần thay đổi; giá trị "" xóa tên gọi của uid đó. Mỗi tài khoản giữ bản riêng.
 	Relations map[string]string `json:"relations"`
@@ -112,8 +114,11 @@ func (p SettingsPatch) Validate() error {
 	if p.Country != nil && *p.Country != "VN" && *p.Country != "US" && *p.Country != "SG" {
 		return bad("country", "Quốc gia chỉ là VN, US hoặc SG.")
 	}
+	if p.Currency != nil && *p.Currency != "VND" && *p.Currency != "USD" {
+		return bad("currency", "Tiền tệ hiển thị chỉ là VND hoặc USD.")
+	}
 	if p.Lang != nil && *p.Lang != "vi" && *p.Lang != "en" {
-		return bad("lang", "Ngôn ngữ dịch hóa đơn chỉ là vi hoặc en.")
+		return bad("lang", "Ngôn ngữ chỉ là vi hoặc en.")
 	}
 	if len(p.Relations) > maxRelations {
 		return bad("relations", "Tối đa 50 tên gọi người nhà.")
@@ -129,7 +134,7 @@ func (p SettingsPatch) Validate() error {
 func (p SettingsPatch) empty() bool {
 	return p.DisplayName == nil && p.LeadDays == nil && p.RemindEnabled == nil && p.RemindFreq == nil &&
 		p.DigestTime == nil && p.Timezone == nil && p.Channels == nil && p.ReplacementEnabled == nil &&
-		p.SaleEnabled == nil && p.Lang == nil && p.Country == nil && len(p.Relations) == 0
+		p.SaleEnabled == nil && p.Lang == nil && p.Country == nil && p.Currency == nil && len(p.Relations) == 0
 }
 
 // Apply gộp bản vá vào cài đặt hiện tại và tính lại lịch gửi bản tin khi cần.
@@ -176,6 +181,9 @@ func (p SettingsPatch) Apply(cur Stored, now time.Time) Stored {
 	}
 	if p.Country != nil {
 		set("country", *p.Country)
+	}
+	if p.Currency != nil {
+		set("currency", *p.Currency)
 	}
 	if len(p.Relations) > 0 {
 		rels := map[string]any{}

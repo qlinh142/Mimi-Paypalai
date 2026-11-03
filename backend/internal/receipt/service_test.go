@@ -152,6 +152,24 @@ func TestRead(t *testing.T) {
 		}
 	})
 
+	t.Run("translated name shown first, bill name kept as original_name", func(t *testing.T) {
+		pg := Page{Store: "WinMart", PurchasedOn: "2026-10-15", Lines: []PageLine{
+			{RawName: "Nước rửa chén Sunlight 750ml", Translated: "Sunlight dish soap 750ml", SourceLang: "vi", Qty: 1, Amount: "38000"},
+			{RawName: "Sữa tươi", Qty: 1, Amount: "30000"},
+		}}
+		s := newSvc(t, &fakeReader{fn: func(int) (Page, error) { return pg, nil }}, &fakeQuota{}, &fakeStore{})
+		d, err := s.Read(context.Background(), owner, "r-tr", "en", []Image{{jpeg, "image/jpeg"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if l := d.Lines[0]; l.Name != "Sunlight dish soap 750ml" || l.OriginalName == "" || l.RawName != "Nước rửa chén Sunlight 750ml" {
+			t.Fatalf("translated line %+v", l)
+		}
+		if l := d.Lines[1]; l.OriginalName != "" {
+			t.Fatalf("untranslated line has original_name %q", l.OriginalName)
+		}
+	})
+
 	t.Run("replay returns cached draft without calling AI or quota", func(t *testing.T) {
 		r := &fakeReader{fn: func(int) (Page, error) { return page, nil }}
 		q := &fakeQuota{}
@@ -493,5 +511,9 @@ func TestSaveDiscounts(t *testing.T) {
 	}
 	if r.Lines[0].GroupKey != "sua-tuoi" || r.Lines[0].Unit != "hop" {
 		t.Fatalf("line %+v", r.Lines[0])
+	}
+	// Giảm giá cả hóa đơn chia về từng dòng theo tỷ lệ tiền: 64k/102k và 38k/102k của 12k.
+	if r.Lines[0].DiscountVND+r.Lines[1].DiscountVND != 12000 || r.Lines[0].DiscountVND != 7529 {
+		t.Fatalf("allocated %d %d", r.Lines[0].DiscountVND, r.Lines[1].DiscountVND)
 	}
 }

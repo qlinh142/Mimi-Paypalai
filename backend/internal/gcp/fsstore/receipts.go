@@ -148,10 +148,14 @@ func lineDoc(l receipt.Line) map[string]any {
 		"line_id": l.ID, "name": l.Name, "name_norm": l.NameNorm, "qty": l.Qty, "unit": l.Unit, "orig": l.Orig,
 		"line_total_vnd": vnd, "category_key": l.CategoryKey, "group_key": l.GroupKey, "habit": l.Habit,
 		"raw_name": l.RawName, "brand": l.Brand, "product_name": l.ProductName, "detail_name": l.DetailName,
-		"product_key": l.ProductKey, "source_language": l.SourceLang,
+		"product_key": l.ProductKey, "source_language": l.SourceLang, "original_name": l.OriginalName,
 		"package_count": l.PackageCount, "package_size": l.PackageSize, "package_unit": l.PackageUnit,
 		"structure": l.Structure, "canonical_quantity": l.CanonicalQty, "canonical_unit": l.CanonicalUnit,
 		"needs_review": l.NeedsReview, "inventory_owner": l.InventoryOwner, "price_source": l.PriceSource,
+	}
+	if l.DiscountVND > 0 {
+		// Phần giảm giá của cả hóa đơn chia về dòng (mẹ đồng ý 03/11); giá sau giảm = line_total_vnd - discount_alloc_vnd.
+		doc["discount_alloc_vnd"] = int64(l.DiscountVND)
 	}
 	if l.PlanSet {
 		// B3: Kế hoạch mà dòng này đã trừ vào. Dòng cũ không có ô này: đọc theo source_plan_id.

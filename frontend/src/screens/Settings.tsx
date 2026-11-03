@@ -1,4 +1,5 @@
-import { t, uiLang } from "../i18n";
+import { switchUiLang, t, uiLang } from "../i18n";
+import { displayCurrency, switchCurrency, type DisplayCurrency } from "../lib/money";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -231,8 +232,8 @@ function NotifyForm({ me }: { me: Me }) {
 }
 
 /**
- * Ngôn ngữ & khu vực. Một ngôn ngữ cho cả giao diện lẫn hóa đơn (chốt 31/10): đổi thì lưu `lang`
- * lên API rồi tải lại trang với giao diện mới. Tiền tệ cố định VND.
+ * Ngôn ngữ & khu vực. Một ngôn ngữ chung của app (mẹ chốt 03/11): đổi thì lưu `lang` vào tài
+ * khoản rồi tải lại trang với giao diện mới. Tiền tệ hiển thị chọn riêng (VND, USD), mẹ chốt 03/11.
  */
 export function SettingsLanguage() {
   const me = useMeData();
@@ -251,8 +252,7 @@ export function SettingsLanguage() {
             disabled={save.isPending}
             onChange={(e) => {
               const lang = e.target.value as "vi" | "en";
-              const go = () =>
-                location.assign(import.meta.env.VITE_ROUTER === "hash" ? `?ui=${lang}#/settings/language` : `/settings/language?ui=${lang}`);
+              const go = () => switchUiLang(lang);
               save.mutate({ lang }, { onSuccess: go, onError: go });
             }}
           >
@@ -262,7 +262,19 @@ export function SettingsLanguage() {
         </label>
         <label className="field15">
           <span>{S.currency}</span>
-          <input value="VND (đ)" readOnly aria-readonly="true" className="set15__ro" />
+          <select
+            className="pick15"
+            value={displayCurrency()}
+            disabled={!me || save.isPending}
+            onChange={(e) => {
+              const currency = e.target.value as DisplayCurrency;
+              const go = () => switchCurrency(currency);
+              save.mutate({ currency }, { onSuccess: go, onError: go });
+            }}
+          >
+            <option value="VND">{S.currencyName.VND}</option>
+            <option value="USD">{S.currencyName.USD}</option>
+          </select>
         </label>
         <label className="field15">
           <span>{S.country}</span>
