@@ -3,6 +3,9 @@
  * để sinh src/api/schema.d.ts và thay file này bằng các kiểu sinh ra.
  * Mọi con số tiền và số ngày đều do backend tính; client chỉ hiển thị.
  */
+/** Nước lấy giá online. Cài đặt cho chọn VN, US (mẹ chốt 03/11); SG vẫn giữ cho người đã chọn. */
+export type Country = "VN" | "US" | "SG";
+
 export type Role = "owner" | "member" | "solo";
 
 export type Me = {
@@ -14,7 +17,7 @@ export type Me = {
     lead_days: number;
     lang?: "vi" | "en";      // ngôn ngữ của tài khoản; vắng khi người mới chưa ghi
     timezone: string;
-    country?: "VN" | "SG";     // nước lấy giá online; vắng thì máy chủ đoán theo múi giờ
+    country?: Country;     // nước lấy giá online; vắng thì máy chủ đoán theo múi giờ
     currency?: "VND" | "USD";  // tiền tệ hiển thị của người này; vắng là VND
     remind_enabled?: boolean;
     digest_time?: string;      // HH:MM
@@ -301,7 +304,7 @@ export type SettingsPatch = Partial<{
   digest_time: string;
   timezone: string;
   lang: "vi" | "en";
-  country: "VN" | "SG";
+  country: Country;
   currency: "VND" | "USD";
   /** Chỉ gửi phần đổi; "" là xóa tên gọi của uid đó. */
   relations: Record<string, string>;
@@ -451,7 +454,7 @@ export type ItemPriceHistory = {
   other_dimension_count: number; history: PriceObservation[]; window_days: number;
 };
 /** ADR-004: giá đang bán từ bảng giá chung (chỉ nguồn công khai). */
-/** local, currency: số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5 SGD). */
+/** local, currency: số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5 USD). */
 export type MarketPrice = { store: string; price_vnd: number; local?: number; currency?: string; size?: string; source: string; url?: string; on: string };
 /** Nút "Cập nhật giá": còn mấy lần hôm nay, lần bấm gần nhất. */
 export type MarketRefreshStatus = { daily: number; left: number; last_at?: string };

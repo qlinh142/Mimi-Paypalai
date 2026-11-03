@@ -26,7 +26,7 @@ import (
 type Price struct {
 	Store    string `json:"store"`
 	PriceVND int64  `json:"price_vnd"` // quy ra VND để so với giá trên hóa đơn
-	// Local, Currency: số tiền gốc nơi bán ghi (ví dụ 4.5 SGD). Ở Việt Nam Local = PriceVND.
+	// Local, Currency: số tiền gốc nơi bán ghi (ví dụ 4.5 USD). Ở Việt Nam Local = PriceVND.
 	Local    float64 `json:"local,omitempty"`
 	Currency string  `json:"currency,omitempty"`
 	Size     string  `json:"size,omitempty"` // quy cách nguồn ghi (1L, 900g...), để người dùng tự so

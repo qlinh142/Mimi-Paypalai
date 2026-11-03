@@ -69,6 +69,9 @@ func TestApplyMergesAndReschedules(t *testing.T) {
 	}
 
 	// Không đổi lịch nhắc thì không ghi next_notify_at.
+	if g := (SettingsPatch{Country: ptr("US")}); g.Validate() != nil || g.Apply(cur, now).Settings["country"] != "US" {
+		t.Fatal("country US")
+	}
 	if g := (SettingsPatch{Country: ptr("SG")}); g.Validate() != nil || g.Apply(cur, now).Settings["country"] != "SG" {
 		t.Fatal("country SG")
 	}

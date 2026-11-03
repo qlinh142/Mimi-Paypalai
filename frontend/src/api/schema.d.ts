@@ -2993,10 +2993,10 @@ export interface components {
              */
             lang?: "vi" | "en";
             /**
-             * @description Nước để lấy giá online. Vắng: đoán theo múi giờ (Asia/Singapore là SG, còn lại VN)
+             * @description Nước để lấy giá online. Cài đặt cho chọn VN, US; SG vẫn nhận. Vắng: đoán theo múi giờ (múi giờ Mỹ là US, Asia/Singapore là SG, còn lại VN)
              * @enum {string}
              */
-            country?: "VN" | "SG";
+            country?: "VN" | "US" | "SG";
             /**
              * @description Tiền tệ hiển thị của người này. Vắng: VND. Số tiền vẫn lưu bằng VND, chỉ quy đổi lúc hiển thị
              * @enum {string}
@@ -3382,7 +3382,7 @@ export interface components {
             price_vnd: number;
             /** @description Số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5) */
             local?: number;
-            /** @description Tiền gốc: VND, SGD */
+            /** @description Tiền gốc: VND, USD, SGD */
             currency?: string;
             /** @description Quy cách nguồn ghi (1L */
             size?: string;

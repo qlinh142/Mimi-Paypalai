@@ -140,7 +140,8 @@ func TestNormalizeSGConvertsToVND(t *testing.T) {
 }
 
 func TestCountryForAndItemID(t *testing.T) {
-	if CountryFor("sg", "") != "SG" || CountryFor("", "Asia/Singapore") != "SG" || CountryFor("XX", "Asia/Ho_Chi_Minh") != "VN" {
+	if CountryFor("sg", "") != "SG" || CountryFor("", "Asia/Singapore") != "SG" || CountryFor("XX", "Asia/Ho_Chi_Minh") != "VN" ||
+		CountryFor("us", "") != "US" || CountryFor("", "America/Los_Angeles") != "US" {
 		t.Fatal("country")
 	}
 	if ItemID("SG", "Sữa tươi 1L") != "sg_sua-tuoi-1l" || ItemID("", "Sữa tươi 1L") != "vn_sua-tuoi-1l" {
@@ -302,5 +303,17 @@ func TestPagesForUsesSearchTemplate(t *testing.T) {
 	}
 	if u := PagesFor([]SourceRecord{{Hits: 2, SearchURL: "https://x.vn/s?k={q}"}}, []Wanted{{Name: "Sữa"}}, 5)[0].URL; u != "https://x.vn/s?k=S%E1%BB%AFa" {
 		t.Fatal(u)
+	}
+}
+
+// Nước cho chọn trong Cài đặt đều có trong bảng nước (mẹ chốt 03/11: Việt Nam, Mỹ).
+func TestSelectableCountries(t *testing.T) {
+	for _, c := range Selectable {
+		if Countries[c].Code != c || Countries[c].Currency == "" || len(Countries[c].Shops) == 0 {
+			t.Fatalf("thiếu nước %s", c)
+		}
+	}
+	if Countries["US"].Currency != "USD" || Countries["SG"].Code != "SG" {
+		t.Fatal(Countries["US"], Countries["SG"])
 	}
 }
