@@ -62,7 +62,7 @@ let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase
 let receiptCount = 5;
 let defaultPlanIcon = "bag";
 let mockSettings: Me["settings"] & { display_name?: string } = {
-  lead_days: 7, lang: "vi", timezone: "Asia/Ho_Chi_Minh", remind_enabled: true, digest_time: "08:00",
+  lead_days: 7, lang: uiLang, timezone: "Asia/Ho_Chi_Minh", remind_enabled: true, digest_time: "08:00",
 };
 /** Bản trước lần sửa tồn gần nhất của từng món, để Hoàn tác trả lại đúng trạng thái cũ. */
 const beforeOverride = new Map<string, Item>();
