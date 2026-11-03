@@ -38,6 +38,18 @@ func (s *Store) FreshKeys(ctx context.Context, since time.Time) (map[string]bool
 	}
 }
 
+// priceDoc là một giá như lưu trong Firestore. Phải có tag firestore: market.Price chỉ có
+// tag json, và Firestore khớp tên trường không phân biệt hoa thường nên "store" vẫn đọc
+// được nhưng "price_vnd" không khớp PriceVND, giá ra 0đ (lỗi mẹ thấy 02/11).
+type priceDoc struct {
+	Store    string `firestore:"store"`
+	PriceVND int64  `firestore:"price_vnd"`
+	Size     string `firestore:"size"`
+	Source   string `firestore:"source"`
+	URL      string `firestore:"url"`
+	On       string `firestore:"on"`
+}
+
 func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
 	prices := make([]map[string]any, 0, len(e.Prices))
 	for _, p := range e.Prices {
@@ -83,10 +95,10 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 			continue
 		}
 		var raw struct {
-			Name      string         `firestore:"name"`
-			GroupKey  string         `firestore:"group_key"`
-			Prices    []market.Price `firestore:"prices"`
-			UpdatedAt time.Time      `firestore:"updated_at"`
+			Name      string     `firestore:"name"`
+			GroupKey  string     `firestore:"group_key"`
+			Prices    []priceDoc `firestore:"prices"`
+			UpdatedAt time.Time  `firestore:"updated_at"`
 		}
 		if err := d.DataTo(&raw); err != nil {
 			continue // dòng hỏng: bỏ qua, không làm hỏng cả Giỏ
@@ -94,7 +106,11 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 		if len(raw.Prices) == 0 {
 			continue
 		}
-		out[d.Ref.ID] = market.Entry{Key: d.Ref.ID, Name: raw.Name, GroupKey: raw.GroupKey, Prices: raw.Prices, UpdatedAt: raw.UpdatedAt}
+		prices := make([]market.Price, 0, len(raw.Prices))
+		for _, p := range raw.Prices {
+			prices = append(prices, market.Price(p))
+		}
+		out[d.Ref.ID] = market.Entry{Key: d.Ref.ID, Name: raw.Name, GroupKey: raw.GroupKey, Prices: prices, UpdatedAt: raw.UpdatedAt}
 	}
 	return out, nil
 }
