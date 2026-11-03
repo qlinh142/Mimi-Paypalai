@@ -153,6 +153,10 @@ func lineDoc(l receipt.Line) map[string]any {
 		"structure": l.Structure, "canonical_quantity": l.CanonicalQty, "canonical_unit": l.CanonicalUnit,
 		"needs_review": l.NeedsReview, "inventory_owner": l.InventoryOwner, "price_source": l.PriceSource,
 	}
+	if l.DiscountVND > 0 {
+		// Phần giảm giá của cả hóa đơn chia về dòng (mẹ đồng ý 03/11); giá sau giảm = line_total_vnd - discount_alloc_vnd.
+		doc["discount_alloc_vnd"] = int64(l.DiscountVND)
+	}
 	if l.PlanSet {
 		// B3: Kế hoạch mà dòng này đã trừ vào. Dòng cũ không có ô này: đọc theo source_plan_id.
 		ps := make([]any, 0, len(l.Plans))

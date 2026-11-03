@@ -811,6 +811,15 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 	}
 	r.TotalVND -= lineDiscount
 	r.DiscountVND = lineDiscount
+	if lineDiscount > 0 {
+		amts := make([]*domain.VND, len(r.Lines))
+		for i := range r.Lines {
+			amts[i] = r.Lines[i].VND
+		}
+		for i, d := range domain.AllocateDiscount(amts, lineDiscount) {
+			r.Lines[i].DiscountVND = d
+		}
+	}
 	if req.DiscountTotal != "" {
 		// Tiết kiệm = discount_total in trên hóa đơn (spec mục 3), không tự tính từ giá gốc.
 		// Số in có thể âm ("-10.000"): lấy giá trị tuyệt đối. Khi có cả dòng khuyến mãi

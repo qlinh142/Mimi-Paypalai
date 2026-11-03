@@ -494,4 +494,8 @@ func TestSaveDiscounts(t *testing.T) {
 	if r.Lines[0].GroupKey != "sua-tuoi" || r.Lines[0].Unit != "hop" {
 		t.Fatalf("line %+v", r.Lines[0])
 	}
+	// Giảm giá cả hóa đơn chia về từng dòng theo tỷ lệ tiền: 64k/102k và 38k/102k của 12k.
+	if r.Lines[0].DiscountVND+r.Lines[1].DiscountVND != 12000 || r.Lines[0].DiscountVND != 7529 {
+		t.Fatalf("allocated %d %d", r.Lines[0].DiscountVND, r.Lines[1].DiscountVND)
+	}
 }

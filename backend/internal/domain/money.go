@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 )
 
@@ -74,4 +75,46 @@ func ConvertToVND(amount, rate string) (VND, error) {
 		return 0, ErrAmountTooLarge
 	}
 	return NewVND(q.Int64())
+}
+
+// AllocateDiscount chia tổng giảm giá của cả hóa đơn (dòng khuyến mãi in số âm) về từng dòng
+// theo tỷ lệ tiền của dòng (mẹ đồng ý 03/11), để sau này giá vốn mỗi món là giá đã trừ giảm.
+// Dòng chưa rõ giá (nil) hoặc 0đ không nhận phần nào. Tổng các phần đúng bằng discount
+// (phần dư do làm tròn chia cho dòng có phần lẻ lớn nhất, hòa thì dòng đứng trước). Phần của
+// một dòng không vượt tiền của dòng; giảm giá lớn hơn tổng các dòng thì trả nil.
+func AllocateDiscount(amounts []*VND, discount VND) []VND {
+	out := make([]VND, len(amounts))
+	if discount <= 0 {
+		return out
+	}
+	var total VND
+	for _, a := range amounts {
+		if a != nil && *a > 0 {
+			total += *a
+		}
+	}
+	if total <= 0 || discount > total {
+		return nil
+	}
+	type rem struct {
+		i int
+		r int64
+	}
+	var given VND
+	rems := make([]rem, 0, len(amounts))
+	for i, a := range amounts {
+		if a == nil || *a <= 0 {
+			continue
+		}
+		num := int64(*a) * int64(discount) // tiền đồng: không tràn int64 với hóa đơn thực tế
+		out[i] = VND(num / int64(total))
+		given += out[i]
+		rems = append(rems, rem{i, num % int64(total)})
+	}
+	sort.SliceStable(rems, func(a, b int) bool { return rems[a].r > rems[b].r })
+	for k := 0; given < discount; k++ {
+		out[rems[k%len(rems)].i]++
+		given++
+	}
+	return out
 }
