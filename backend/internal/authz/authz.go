@@ -31,7 +31,7 @@ type Principal struct {
 	HouseholdID string // rỗng nếu chưa vào nhà nào
 	Role        Role
 	Timezone    string
-	Country     string // VN, SG: nước để lấy bảng giá chung (Cài đặt, chưa chọn thì đoán theo múi giờ)
+	Country     string // VN, US, SG: nước để lấy bảng giá chung (Cài đặt, chưa chọn thì đoán theo múi giờ)
 	LeadDays    int
 }
 

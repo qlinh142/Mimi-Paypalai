@@ -26,7 +26,8 @@ type SettingsPatch struct {
 	ReplacementEnabled *bool     `json:"replacement_enabled"`
 	SaleEnabled        *bool     `json:"sale_enabled"`
 	Lang               *string   `json:"lang"`
-	// Country: nước để lấy giá online (VN, SG), mẹ chốt 02/11. Vắng: đoán theo múi giờ.
+	// Country: nước để lấy giá online. Cài đặt cho chọn VN, US (mẹ chốt 03/11); SG vẫn nhận để
+	// người đã chọn trước đó dùng tiếp. Vắng: đoán theo múi giờ.
 	Country *string `json:"country"`
 	// Currency: tiền tệ hiển thị của người này (VND, USD), mẹ chốt 03/11. Vắng: VND.
 	Currency *string `json:"currency"`
@@ -110,8 +111,8 @@ func (p SettingsPatch) Validate() error {
 			seen[c] = true
 		}
 	}
-	if p.Country != nil && *p.Country != "VN" && *p.Country != "SG" {
-		return bad("country", "Quốc gia chỉ là VN hoặc SG.")
+	if p.Country != nil && *p.Country != "VN" && *p.Country != "US" && *p.Country != "SG" {
+		return bad("country", "Quốc gia chỉ là VN, US hoặc SG.")
 	}
 	if p.Currency != nil && *p.Currency != "VND" && *p.Currency != "USD" {
 		return bad("currency", "Tiền tệ hiển thị chỉ là VND hoặc USD.")
