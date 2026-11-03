@@ -376,7 +376,7 @@ const vi = {
 const en: typeof vi = {
   home: {
     tagline: "Mimi helps your life become smarter and lighter",
-    tiles: { spending: "Spending", items: "My Items", plan: "Shopping List", settings: "Settings" },
+    tiles: { spending: "Spending", items: "My Items", plan: "Plans", settings: "Settings" },
     spentMonth: (v) => `This month: ${v}`,
     noSpend: "No receipts this month",
     low: (n) => (n > 0 ? `${n} ${n === 1 ? "item" : "items"} running low` : "Nothing running low"),
