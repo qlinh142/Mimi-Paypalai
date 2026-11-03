@@ -183,6 +183,7 @@ func newTestServer(t *testing.T) (http.Handler, *fakeReceipts) {
 		Home: fakeHome{}, Spending: spending.New(fakeSpendingStore{}), Settings: user.NewSettingsService(fakeSettingsStore{}, nil),
 		Plan:  plan.New(&fakePlanStore{lines: map[string]plan.Line{}}, fakePlanItems{}, nil),
 		Notes: fakeNotes{},
+		FX:    fakeFX{},
 	}, WithWriteLimit(2))
 	if err != nil {
 		t.Fatal(err)

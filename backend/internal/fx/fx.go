@@ -19,6 +19,19 @@ import (
 // Currencies: ngoại tệ hay gặp trên hóa đơn đi du lịch, mua hàng nước ngoài.
 var Currencies = []string{"USD", "EUR", "JPY", "KRW", "CNY", "THB", "SGD", "GBP", "AUD", "TWD", "HKD", "MYR"}
 
+// DisplayCurrencies: tiền tệ người dùng được chọn để xem (mẹ chốt 03/11: tạm VND và USD).
+// Số tiền vẫn lưu bằng VND và tiền gốc của khoản; chỉ lúc hiển thị mới quy đổi.
+var DisplayCurrencies = []string{"VND", "USD"}
+
+// MaxHistoryDays: khoảng dài nhất GET /fx/rates trả một lần.
+const MaxHistoryDays = 800
+
+// Point là tỷ giá của một ngày, gửi cho app để quy đổi lúc hiển thị.
+type Point struct {
+	On        string `json:"on"`   // YYYY-MM-DD
+	VNDPerOne string `json:"rate"` // số đồng cho 1 đơn vị ngoại tệ
+}
+
 // Rate là một dòng fx_rates.
 type Rate struct {
 	Currency  string

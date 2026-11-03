@@ -229,9 +229,20 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       receipt_count: receiptCount,
       settings: { lead_days: mockSettings.lead_days, lang: mockSettings.lang, timezone: mockSettings.timezone,
         remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {},
-        ...(mockSettings.country ? { country: mockSettings.country } : {}) },
+        ...(mockSettings.country ? { country: mockSettings.country } : {}),
+        // Bản thử không có máy chủ: tiền tệ hiển thị nhớ theo máy.
+        currency: mockSettings.currency ?? (localStorage.getItem("mimi.currency") === "USD" ? "USD" : "VND") },
     };
     return json(me);
+  }
+
+  if (method === "GET" && p === "/fx/rates") {
+    // Tỷ giá mẫu: 90 ngày gần nhất, mỗi ngày nhích nhẹ quanh 25.300 đ/USD.
+    const rates = Array.from({ length: 90 }, (_, i) => {
+      const d = new Date(Date.now() - (89 - i) * 86_400_000);
+      return { on: d.toISOString().slice(0, 10), rate: String(25_000 + i * 5) };
+    });
+    return json({ currency: "USD", rates });
   }
 
   if (method === "GET" && p === "/home") {

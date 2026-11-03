@@ -276,6 +276,12 @@ export function useSaveSettings() {
   return useMutation({
     mutationFn: (patch: SettingsPatch) => apiSend<Record<string, unknown>>("PUT", "/settings", patch),
     onSuccess: (_d, patch) => {
+      // Ghi ngay vào bản nhớ: app có thể tải lại trang (đổi ngôn ngữ, tiền tệ) trước khi kịp tải lại /me.
+      qc.setQueryData<Me>(qk.me, (old) => {
+        if (!old) return old;
+        const { display_name, relations: _rel, ...rest } = patch;
+        return { ...old, display_name: display_name ?? old.display_name, settings: { ...old.settings, ...rest } };
+      });
       qc.invalidateQueries({ queryKey: qk.me });
       // Đổi nước thì bảng giá online đổi theo nước.
       if (patch.country) qc.invalidateQueries({ queryKey: ["plan", "market-prices"] });
