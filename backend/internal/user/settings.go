@@ -112,7 +112,7 @@ func (p SettingsPatch) Validate() error {
 		return bad("country", "Quốc gia chỉ là VN hoặc SG.")
 	}
 	if p.Lang != nil && *p.Lang != "vi" && *p.Lang != "en" {
-		return bad("lang", "Ngôn ngữ dịch hóa đơn chỉ là vi hoặc en.")
+		return bad("lang", "Ngôn ngữ chỉ là vi hoặc en.")
 	}
 	if len(p.Relations) > maxRelations {
 		return bad("relations", "Tối đa 50 tên gọi người nhà.")

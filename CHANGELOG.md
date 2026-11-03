@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Ngôn ngữ theo tài khoản, người mới theo ngôn ngữ điện thoại
+
+Nhánh `feat/ngon-ngu-theo-tai-khoan`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2 (mẹ chốt 03/11): một ngôn ngữ chung của app, lưu theo tài khoản; người mới theo ngôn ngữ máy.
+
+- Người mới mở app: máy đặt tiếng Việt thì vào tiếng Việt, còn lại tiếng Anh (trước đây luôn tiếng Việt).
+- Ô VI/EN ở màn đăng nhập trước là "Ngôn ngữ dịch hóa đơn" và không nối vào đâu; giờ là ngôn ngữ của app, bấm là đổi ngay.
+- Sau khi đăng nhập (`app/LangSync.tsx`): tài khoản chưa có ngôn ngữ thì ghi ngôn ngữ đang dùng lên tài khoản; tài khoản đã có ngôn ngữ khác máy thì app đổi theo tài khoản (đăng nhập máy mới vẫn đúng ngôn ngữ). Mở bằng `?ui=` thì ưu tiên `?ui=` và ghi lên tài khoản.
+- Máy chủ: tài khoản mới không còn mặc định `lang: vi`; mô tả `lang` trong API đổi thành ngôn ngữ của tài khoản (giao diện, tên món dịch, lời nhắc, email).
+- Kiểm tra: Playwright với máy vi-VN, en-US, fr-FR ra đúng ngôn ngữ và nút VI/EN đổi được; `go test ./internal/user ./internal/httpapi`, `tsc -b`.
+
 ## 2026-11-03 · Tỷ giá đã chốt của một ngày không bị ghi đè
 
 Nhánh `feat/ty-gia-khong-ghi-de`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 5 (mẹ chốt 03/11): quét tỷ giá 1 lần/ngày, ngày đã có thì giữ nguyên, ngày chưa có dùng tỷ giá gần nhất trước đó.

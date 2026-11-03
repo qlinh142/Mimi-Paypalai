@@ -1,4 +1,4 @@
-import { t, uiLang } from "../i18n";
+import { switchUiLang, t, uiLang } from "../i18n";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -223,8 +223,8 @@ function NotifyForm({ me }: { me: Me }) {
 }
 
 /**
- * Ngôn ngữ & khu vực. Một ngôn ngữ cho cả giao diện lẫn hóa đơn (chốt 31/10): đổi thì lưu `lang`
- * lên API rồi tải lại trang với giao diện mới. Tiền tệ cố định VND.
+ * Ngôn ngữ & khu vực. Một ngôn ngữ chung của app (mẹ chốt 03/11): đổi thì lưu `lang` vào tài
+ * khoản rồi tải lại trang với giao diện mới. Tiền tệ cố định VND.
  */
 export function SettingsLanguage() {
   const me = useMeData();
@@ -242,8 +242,7 @@ export function SettingsLanguage() {
             disabled={save.isPending}
             onChange={(e) => {
               const lang = e.target.value as "vi" | "en";
-              const go = () =>
-                location.assign(import.meta.env.VITE_ROUTER === "hash" ? `?ui=${lang}#/settings/language` : `/settings/language?ui=${lang}`);
+              const go = () => switchUiLang(lang);
               save.mutate({ lang }, { onSuccess: go, onError: go });
             }}
           >

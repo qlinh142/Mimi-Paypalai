@@ -12,7 +12,7 @@ export type Me = {
   receipt_count: number;
   settings: {
     lead_days: number;
-    lang: "vi" | "en";
+    lang?: "vi" | "en";      // ngôn ngữ của tài khoản; vắng khi người mới chưa ghi
     timezone: string;
     country?: "VN" | "SG";     // nước lấy giá online; vắng thì máy chủ đoán theo múi giờ
     remind_enabled?: boolean;
