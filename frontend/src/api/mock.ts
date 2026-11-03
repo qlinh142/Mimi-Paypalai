@@ -417,7 +417,10 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       else delete rels[uid];
     }
     mockSettings = { ...mockSettings, ...body, relations: rels };
-    return json({ ...mockSettings, display_name: mockSettings.display_name ?? "Lan" });
+    return json({
+      ...mockSettings, display_name: mockSettings.display_name ?? "Lan",
+      currency: mockSettings.currency ?? (localStorage.getItem("mimi.currency") === "USD" ? "USD" : "VND"),
+    });
   }
 
   if (method === "GET" && p === "/spending") {

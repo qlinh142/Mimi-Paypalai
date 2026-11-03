@@ -275,12 +275,19 @@ export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: SettingsPatch) => apiSend<Record<string, unknown>>("PUT", "/settings", patch),
-    onSuccess: (_d, patch) => {
+    onSuccess: (saved, patch) => {
       // Ghi ngay vào bản nhớ: app có thể tải lại trang (đổi ngôn ngữ, tiền tệ) trước khi kịp tải lại /me.
+      // Lấy cài đặt máy chủ trả về (đủ mọi ô), không chỉ phần vừa đổi: bản nhớ có thể là bản cũ
+      // khôi phục từ máy, ghép phần vừa đổi vào đó sẽ làm ô khác (tiền tệ) trông như mới mà sai.
       qc.setQueryData<Me>(qk.me, (old) => {
         if (!old) return old;
         const { display_name, relations: _rel, ...rest } = patch;
-        return { ...old, display_name: display_name ?? old.display_name, settings: { ...old.settings, ...rest } };
+        const { display_name: savedName, ...savedSettings } = (saved ?? {}) as Partial<Me["settings"]> & { display_name?: string };
+        return {
+          ...old,
+          display_name: display_name ?? savedName ?? old.display_name,
+          settings: { ...old.settings, ...savedSettings, ...rest },
+        };
       });
       qc.invalidateQueries({ queryKey: qk.me });
       // Đổi nước thì bảng giá online đổi theo nước.
