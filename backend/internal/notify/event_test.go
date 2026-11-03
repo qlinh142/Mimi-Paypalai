@@ -106,3 +106,22 @@ func TestEventMail(t *testing.T) {
 		t.Fatalf("%v", lines)
 	}
 }
+
+// Thư viết theo ngôn ngữ trong Cài đặt của người nhận (mẹ chốt 03/11).
+func TestEventMailLang(t *testing.T) {
+	ev := Event{Kind: EventPlanSent, ActorName: "Lan", PlanName: "Kế hoạch chính", Items: 3}
+	if s, l := EventMail(ev); s != "Mimi: Lan nhờ bạn mua 3 món" || l[0] != "Kế hoạch chính" {
+		t.Fatalf("vi: %q %v", s, l)
+	}
+	ev.Lang = "en"
+	if s, l := EventMail(ev); s != "Mimi: Lan asked you to buy 3 items" || l[0] != "Main plan" {
+		t.Fatalf("en: %q %v", s, l)
+	}
+	ev = Event{Kind: EventRunDone, ActorName: "Minh", PlanName: "Weekend", Items: 1, Returned: 2, Lang: "en"}
+	if s, l := EventMail(ev); s != "Mimi: Minh finished shopping for Weekend" || l[0] != "Bought 1 item" || l[1] != "2 items not bought" {
+		t.Fatalf("en run_done: %q %v", s, l)
+	}
+	if DigestSubject(1, "en") != "Mimi: 1 item running low" || DigestSubject(4, "vi") != "Mimi: 4 món sắp hết" || DigestSubject(2, "") != "Mimi: 2 món sắp hết" {
+		t.Fatal("digest subject")
+	}
+}

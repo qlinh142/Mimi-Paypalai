@@ -23,6 +23,7 @@ type DueUser struct {
 	Name     string
 	// DigestTime "HH:MM" theo giờ người dùng (settings.digest_time); rỗng: giờ mặc định.
 	DigestTime string
+	Lang       string // settings.lang: thư viết theo ngôn ngữ người nhận; rỗng là vi
 }
 
 // RetryAfter: gửi lỗi tạm thời thì thử lại sau chừng này; MaxAttempts: số lần gửi tối đa
@@ -148,6 +149,7 @@ func (j *DigestJob) one(ctx context.Context, u DueUser, now time.Time) string {
 		_ = j.store.Reschedule(ctx, u.UID, next)
 		return "skipped"
 	}
+	content.Subject = DigestSubject(len(content.Lines), u.Lang)
 	id := today.String() + "_daily"
 	claimed, err := j.store.ClaimDigest(ctx, u.UID, id, now)
 	if err != nil || !claimed {
