@@ -176,6 +176,7 @@ export function toSaveRequest(
       brand: l.brand,
       product_name: l.product_name,
       source_language: l.source_language,
+      original_name: l.original_name,
       package_count: l.package_count,
       package_size: l.package_size,
       package_unit: l.package_unit,

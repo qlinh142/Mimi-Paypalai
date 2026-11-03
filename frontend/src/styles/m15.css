@@ -238,8 +238,10 @@
 .lines15 { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
 .line15 { border-radius: 12px; background: #eef4ff; padding: var(--s2) var(--s3); }
 .line15__row { display: flex; align-items: center; gap: var(--s3); }
-.line15__text { flex: 1; display: grid; min-width: 0; }
+.line15__text { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .line15__name { font-weight: 700; color: var(--m15-blue); }
+/* Tên theo bill dưới tên đã dịch (mẹ chốt 03/11): chữ nhỏ, một dòng. */
+.name15__orig { display: block; font-size: var(--fs-xs); font-weight: 400; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .line15__sub { font-size: var(--fs-sm); color: var(--ink-soft); }
 .line15 .icon-btn { color: var(--m15-blue); }
 .line15__edit { display: grid; grid-template-columns: 1fr auto; gap: var(--s2); margin-top: var(--s2); }
