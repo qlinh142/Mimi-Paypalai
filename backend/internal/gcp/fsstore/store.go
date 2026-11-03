@@ -24,6 +24,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/notify"
 	"github.com/smartlife-lab/mimi/backend/internal/user"
 )
@@ -110,6 +111,8 @@ func (s *Store) LoadPrincipal(ctx context.Context, uid string) (authz.Principal,
 	if ld, ok := ud.Settings["lead_days"].(int64); ok {
 		p.LeadDays = int(ld)
 	}
+	c, _ := ud.Settings["country"].(string)
+	p.Country = market.CountryFor(c, p.Timezone)
 	return p, nil
 }
 

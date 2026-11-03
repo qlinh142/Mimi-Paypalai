@@ -10,6 +10,11 @@ import type { Assignment, Cart, MarketPrice } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { formatDateTime, formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 
+/** Giá tiền gốc ngoài Việt Nam, ví dụ "4.50 SGD". */
+function formatLocal(amount: number, currency: string) {
+  return `${amount.toFixed(2)} ${currency}`;
+}
+
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : t.common.genericError;
 }
@@ -316,6 +321,10 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
     }
     return m && best ? [{ key: i.key, name: i.name, own: false, price: best.price_vnd, store: best.store, online: best, more: m.prices.length - 1 }] : [];
   });
+  // Lần cập nhật giá gần nhất: mới nhất giữa lần tra đêm (updated_at của từng món) và lần bấm nút.
+  const lastAt = [st?.last_at, ...mp.data.items.map((i) => i.updated_at)]
+    .filter((t): t is string => !!t)
+    .reduce<string | undefined>((a, t) => (!a || Date.parse(t) > Date.parse(a) ? t : a), undefined);
   return (
     <section className="plan-sec" aria-labelledby="plan-market">
       <h2 id="plan-market">{m1.marketPrices.title}</h2>
@@ -334,6 +343,7 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
             ) : (
               <>
                 {m1.marketPrices.cheapest(r.store ?? "")}
+                {r.online?.local != null && r.online.currency && r.online.currency !== "VND" && ` · ${formatLocal(r.online.local, r.online.currency)}`}
                 {r.online?.size && ` · ${r.online.size}`}
                 {r.online && ` · ${formatDayMonth(r.online.on)}`}
                 {!!r.more && ` · ${m1.marketPrices.more(r.more)}`}
@@ -359,9 +369,11 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
             ? done.looked > 0 ? m1.marketPrices.refreshed(done.looked, done.found) : m1.marketPrices.upToDate
             : null}
         {st && <>{(refresh.isError || done) && <br />}{m1.marketPrices.refreshHint(st.left, st.daily)}</>}
-        {st?.last_at && <><br />{m1.marketPrices.lastRefresh(formatDateTime(st.last_at))}</>}
       </p>
-      <p className="hint">{m1.marketPrices.disclaimer}</p>
+      <p className="hint">
+        {lastAt && <>{m1.marketPrices.lastRefresh(formatDateTime(lastAt))}<br /></>}
+        {m1.marketPrices.disclaimer}
+      </p>
     </section>
   );
 }

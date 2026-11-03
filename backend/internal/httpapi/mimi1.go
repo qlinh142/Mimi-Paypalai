@@ -182,7 +182,7 @@ func (s *Server) getPlanMarketPrices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := principalFrom(r.Context())
-	out, err := s.marketPrices(r.Context(), cart)
+	out, err := s.marketPrices(r.Context(), p.Country, cart)
 	if err == nil && s.priceRefresh != nil {
 		st, serr := s.priceRefresh.Status(r.Context(), p.UID, today(p))
 		if serr != nil {
@@ -215,14 +215,14 @@ func (s *Server) refreshPlanMarketPrices(w http.ResponseWriter, r *http.Request)
 	}
 	items := make([]market.Wanted, 0, len(cart.Items))
 	for _, it := range cart.Items {
-		items = append(items, market.Wanted{Key: market.Key(it.Name), Name: it.Name, GroupKey: it.Key})
+		items = append(items, market.Wanted{Key: market.ItemID(p.Country, it.Name), Country: p.Country, Name: it.Name, GroupKey: it.Key, Category: it.CategoryKey})
 	}
 	res, err := s.priceRefresh.Refresh(r.Context(), p.UID, today(p), items)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	prices, err := s.marketPrices(r.Context(), cart)
+	prices, err := s.marketPrices(r.Context(), p.Country, cart)
 	out := MarketRefreshResult{Items: prices.Items, Looked: res.Looked, Found: res.Found, Fresh: res.Fresh}
 	if st, serr := s.priceRefresh.Status(r.Context(), p.UID, today(p)); serr == nil {
 		out.Refresh = &st
@@ -235,10 +235,11 @@ type marketPricesOut struct {
 	Refresh *market.RefreshStatus `json:"refresh,omitempty"` // nút Cập nhật giá: còn mấy lần, lần gần nhất
 }
 
-func (s *Server) marketPrices(ctx context.Context, cart plan.Cart) (marketPricesOut, error) {
+// marketPrices: giá chung của nước người dùng cho các món trong kế hoạch.
+func (s *Server) marketPrices(ctx context.Context, country string, cart plan.Cart) (marketPricesOut, error) {
 	keys := make([]string, 0, len(cart.Items))
 	for _, it := range cart.Items {
-		keys = append(keys, market.Key(it.Name))
+		keys = append(keys, market.ItemID(country, it.Name))
 	}
 	entries, err := s.market.Entries(ctx, keys)
 	out := marketPricesOut{Items: []MarketItem{}}

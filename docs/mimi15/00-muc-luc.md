@@ -19,6 +19,7 @@ Ngày: 31/10/2026 17:15, cập nhật 01/11/2026 05:15. Memory của dự án đ
 | `notes/loi-trien-khai.md` | **Sổ lỗi triển khai:** lỗ hổng đối chiếu theo bảng 100 vấn đề, đã sửa ở PR nào, còn mở gì | Sửa hoặc tìm thấy một lỗi triển khai |
 | `notes/CHANGELOG.md` (bản sao của `CHANGELOG.md` trong repo) | Lịch sử theo đợt, mỗi PR một mục | Mỗi PR |
 | `notes/kich-ban-demo.md` | Kịch bản demo đã chốt | Đổi kịch bản |
+| `notes/luat-gia.md` (bản sao của `docs/mimi15/luat-gia.md`) | **Luật giá:** hai loại giá, chọn giá hiện, theo nước, sổ nguồn, job đêm, nút Cập nhật giá, lịch sử thay đổi | Đổi bất kỳ luật nào về giá |
 | `notes/huong-dan-chay-demo.md` | Cách chạy app với dữ liệu mẫu | Đổi cách chạy |
 | Repo GitHub `qlinh142/Mimi-Test` | Code, lịch sử commit, `backend/api/openapi.yaml` (API) | Mọi thay đổi code |
 

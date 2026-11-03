@@ -2941,6 +2941,11 @@ export interface components {
              * @enum {string}
              */
             lang?: "vi" | "en";
+            /**
+             * @description Nước để lấy giá online. Vắng: đoán theo múi giờ (Asia/Singapore là SG, còn lại VN)
+             * @enum {string}
+             */
+            country?: "VN" | "SG";
             /** @description Tên gọi người nhà theo uid, riêng từng tài khoản. PUT chỉ gửi phần đổi; "" là xóa */
             relations?: {
                 [key: string]: "anh" | "chi" | "em" | "bo" | "me" | "con" | "ong" | "ba" | "khac" | "";
@@ -3312,8 +3317,15 @@ export interface components {
         };
         MarketPrice: {
             store: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Quy ra VND để so với giá trên hóa đơn
+             */
             price_vnd: number;
+            /** @description Số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5) */
+            local?: number;
+            /** @description Tiền gốc: VND, SGD */
+            currency?: string;
             /** @description Quy cách nguồn ghi (1L */
             size?: string;
             /** @description gemini_search hoặc partner_... */

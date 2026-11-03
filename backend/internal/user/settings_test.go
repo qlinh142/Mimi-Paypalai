@@ -36,6 +36,7 @@ func TestValidate(t *testing.T) {
 		"channels":     {Channels: &[]string{"email", "email"}},
 		"channels_bad": {Channels: &[]string{"sms"}},
 		"lang":         {Lang: ptr("fr")},
+		"country":      {Country: ptr("JP")},
 		"remind_freq":  {RemindFreq: ptr("Every Day!")},
 	}
 	for name, p := range bad {
@@ -67,6 +68,9 @@ func TestApplyMergesAndReschedules(t *testing.T) {
 	}
 
 	// Không đổi lịch nhắc thì không ghi next_notify_at.
+	if g := (SettingsPatch{Country: ptr("SG")}); g.Validate() != nil || g.Apply(cur, now).Settings["country"] != "SG" {
+		t.Fatal("country SG")
+	}
 	if g := (SettingsPatch{Lang: ptr("en")}).Apply(cur, now); g.NextNotifyAt != nil {
 		t.Fatalf("unexpected reschedule %v", g.NextNotifyAt)
 	}

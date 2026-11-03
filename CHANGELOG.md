@@ -5,6 +5,21 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Quét giá theo nước và sổ nguồn
+
+Nhánh `feat/gia-theo-nuoc` (trên `feat/gia-nha-minh`). Mẹ chốt 02/11. Luật đầy đủ: `docs/mimi15/luat-gia.md`.
+
+- Cài đặt có ô "Quốc gia (giá online)": Việt Nam, Singapore. Chưa chọn thì đoán theo múi giờ (Asia/Singapore là Singapore).
+- Bảng giá chung tách theo nước: khóa `market_prices/{nước}_{món}` (ví dụ `vn_sua-tuoi`). Giá ngoài Việt Nam lưu số tiền gốc (`local`, `currency`) và quy ra VND theo tỷ giá job fx-sync; chưa có tỷ giá thì bỏ, không đoán. Giá vô lý kiểm theo tiền gốc từng nước.
+- Hỏi AI gộp tối đa 5 món cùng nước, cùng ngành hàng một lần (job đêm và nút Cập nhật giá).
+- Sổ nguồn `price_sources/{nước}_{web}`: lưu link ngành hàng và mẫu link tìm kiếm, không lưu link từng sản phẩm. Lần sau đưa link cho AI đọc trước (URL context), thiếu mới tìm Google. Web mới vào sổ khi ra giá 2 lần; đọc trang 2 lần liền không ra giá thì đánh dấu, quay về Google, một tháng sau thử lại.
+- Shopee, Lazada chỉ nhận gian hàng chính hãng (Mall, Official).
+- Dòng giá Singapore hiện thêm tiền gốc, ví dụ "1.49 SGD".
+- Lưu ý: các dòng bảng giá cũ (khóa chưa có nước) không dùng nữa, job đêm tra lại. Gemini đọc trang kèm tìm Google chưa thử trên Vertex thật; nếu lỗi thì tự hỏi lại chỉ bằng Google.
+- Kiểm tra: `go test -race ./...` (test mới cho Normalize SGD, batches, sổ nguồn, câu hỏi AI), test emulator `TestPriceSourcesEmulator`, `TestWantedItemsCountryEmulator`; bản thử chọn Singapore thấy giá SGD.
+
+---
+
 ## 2026-11-02 · Giá tốt nhất: so giá online với giá nhà mình từng mua
 
 Nhánh `feat/gia-nha-minh` (trên `feat/cap-nhat-gia`). Mẹ chốt 02/11: mỗi tài khoản có lịch sử giá riêng; giá online bằng 0 (chưa có) hoặc cao hơn giá nhà mình từng mua thì lấy giá trong lịch sử mua sắm.
