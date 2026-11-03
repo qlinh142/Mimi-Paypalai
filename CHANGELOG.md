@@ -5,6 +5,17 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Giá tốt nhất: so giá online với giá nhà mình từng mua
+
+Nhánh `feat/gia-nha-minh` (trên `feat/cap-nhat-gia`). Mẹ chốt 02/11: mỗi tài khoản có lịch sử giá riêng; giá online bằng 0 (chưa có) hoặc cao hơn giá nhà mình từng mua thì lấy giá trong lịch sử mua sắm.
+
+- Khối "Giá đang bán" đổi tên "Giá tốt nhất". Mỗi món lấy giá thấp hơn giữa giá online rẻ nhất và giá nhà mình từng mua (`unit_price`, `best_store` của Kế hoạch, đọc từ hóa đơn của chính nhà).
+- Dòng dùng giá nhà mình ghi rõ "Giá nhà mình từng mua ở … (chỉ nhà mình thấy)", kèm giá online để so hoặc "chưa có giá online".
+- Chỉ đổi giao diện: giá nhà mình không gửi lên, không ghi vào bảng giá chung.
+- Lưu ý: giá online theo quy cách nguồn ghi (ví dụ 4x180ml), giá nhà mình theo đơn vị đã mua, nên so chỉ là tương đối.
+
+---
+
 ## 2026-11-02 · Nút "Cập nhật giá" trong Kế hoạch
 
 Nhánh `feat/cap-nhat-gia` (trên `feat/gia-online`). Mẹ hỏi 02/11: không phải chờ job đêm, chỉ tra các món của kế hoạch đang mở.

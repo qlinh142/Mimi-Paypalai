@@ -6,7 +6,7 @@ import { ApiError } from "../api/client";
 import {
   useAssignments, useBasketPrices, useDelegated, useHousehold, useMarketPrices, useMe, usePlanItem, useRefreshMarketPrices, usePlanMeta, usePlans, useTaxonomySearch,
 } from "../api/hooks";
-import type { Assignment, Cart } from "../api/types";
+import type { Assignment, Cart, MarketPrice } from "../api/types";
 import { DEFAULT_PLAN, setCurrentPlanId, useCurrentPlanId } from "../lib/currentPlan";
 import { formatDateTime, formatDayMonth, formatVnd, normalizeVi } from "../lib/text";
 
@@ -303,28 +303,46 @@ export function MarketPricesPanel({ cart }: { cart: Cart }) {
   if (!mp.data || cart.item_count === 0) return null;
   const done = refresh.data;
   const st = done?.refresh ?? mp.data.refresh;
-  const rows = mp.data.items.filter((i) => i.prices.length > 0);
+  // Mỗi món lấy giá thấp hơn giữa giá online và giá nhà mình từng mua (mẹ chốt 02/11): chưa có
+  // giá online, hoặc online đắt hơn, thì hiện giá nhà mình. Giá nhà mình đọc từ lịch sử của chính
+  // tài khoản, chỉ hiện ở đây, không ghi vào bảng giá chung.
+  const market = new Map(mp.data.items.filter((i) => i.prices.length > 0).map((i) => [i.key, i]));
+  type Row = { key: string; name: string; own: boolean; price: number; store?: string; online?: MarketPrice; more?: number };
+  const rows = cart.items.flatMap((i): Row[] => {
+    const m = market.get(i.key);
+    const best = m?.prices[0];
+    if (i.unit_price != null && (!best || i.unit_price < best.price_vnd)) {
+      return [{ key: i.key, name: i.name, own: true, price: i.unit_price, store: i.best_store, online: best }];
+    }
+    return m && best ? [{ key: i.key, name: i.name, own: false, price: best.price_vnd, store: best.store, online: best, more: m.prices.length - 1 }] : [];
+  });
   return (
     <section className="plan-sec" aria-labelledby="plan-market">
       <h2 id="plan-market">{m1.marketPrices.title}</h2>
-      {rows.map((r) => {
-        const best = r.prices[0];
-        return (
-          <div key={r.key} className="plan-stop">
-            <div className="plan-stop__head">
-              <span>{r.name}</span>
-              <span className="num">{formatVnd(best.price_vnd)}</span>
-            </div>
-            <div className="plan-stop__items">
-              {m1.marketPrices.cheapest(best.store)}
-              {best.size && ` · ${best.size}`}
-              {` · ${formatDayMonth(best.on)}`}
-              {r.prices.length > 1 && ` · ${m1.marketPrices.more(r.prices.length - 1)}`}
-            </div>
+      {rows.map((r) => (
+        <div key={r.key} className="plan-stop">
+          <div className="plan-stop__head">
+            <span>{r.name}</span>
+            <span className="num">{formatVnd(r.price)}</span>
           </div>
-        );
-      })}
-      {rows.length < cart.item_count && <p className="hint">{m1.marketPrices.noneYet}</p>}
+          <div className="plan-stop__items">
+            {r.own ? (
+              <>
+                {m1.marketPrices.ownPrice(r.store)}
+                {` · ${r.online ? m1.marketPrices.onlineHigher(formatVnd(r.online.price_vnd), r.online.store) : m1.marketPrices.noOnline}`}
+              </>
+            ) : (
+              <>
+                {m1.marketPrices.cheapest(r.store ?? "")}
+                {r.online?.size && ` · ${r.online.size}`}
+                {r.online && ` · ${formatDayMonth(r.online.on)}`}
+                {!!r.more && ` · ${m1.marketPrices.more(r.more)}`}
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+      {rows.length < cart.items.length && <p className="hint">{m1.marketPrices.noneYet}</p>}
       <button
         type="button"
         className="btn btn--quiet btn--block"
