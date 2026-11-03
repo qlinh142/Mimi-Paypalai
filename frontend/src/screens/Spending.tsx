@@ -119,12 +119,15 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
   const maxCat = Math.max(1, ...cats.map((c) => c.amount));
   const best = r.top_saving_receipts[0];
   const stores = byStore(r.recent_receipts);
+  // Tổng của tháng đã qua quy đổi theo tỷ giá ngày cuối tháng (cố định); tháng này theo hôm nay.
+  const [y, m] = ym(month);
+  const rateDay = month >= currentMonth() ? undefined : `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
   return (
     <>
       <section className="hero15" aria-label={m15.spending.spent}>
-        <p className="hero15__num num">{formatVnd(r.spent)}</p>
+        <p className="hero15__num num">{formatVnd(r.spent, rateDay)}</p>
         <p className="hero15__sub">{compare(r, month)}</p>
-        {(r.delegated_spent ?? 0) > 0 && <p className="hero15__sub">{m15.spending.delegated(formatVnd(r.delegated_spent ?? 0))}</p>}
+        {(r.delegated_spent ?? 0) > 0 && <p className="hero15__sub">{m15.spending.delegated(formatVnd(r.delegated_spent ?? 0, rateDay))}</p>}
       </section>
 
       {cats.length > 0 && (
@@ -136,7 +139,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
                 const row = (
                   <>
                     <span className="bars15__label">{categoryLabel(c.key)}{c.key === REC && <ChevronRight size={16} aria-hidden />}</span>
-                    <span className="bars15__value num">{formatVnd(c.amount)}</span>
+                    <span className="bars15__value num">{formatVnd(c.amount, rateDay)}</span>
                     <span className="bars15__pct">{Math.round(c.pct)}%</span>
                     <span className="bars15__track" aria-hidden>
                       <span style={{ width: `${Math.max(2, (c.amount / maxCat) * 100)}%` }} />
@@ -166,7 +169,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
           <span>
             <strong>{m15.spending.topSaving}</strong>
             <span>{best.store || t.confirm.unknown}</span>
-            <span className="save15__amt">{m15.spending.saved(formatVnd(best.discount_vnd))}</span>
+            <span className="save15__amt">{m15.spending.saved(formatVnd(best.discount_vnd, rateDay))}</span>
           </span>
         </section>
       )}
@@ -182,7 +185,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
                   <span>{s.store}</span>
                   <small>{formatDayMonth(s.last)}</small>
                 </span>
-                <span className="num">{formatVnd(s.total)}</span>
+                <span className="num">{formatVnd(s.total, rateDay)}</span>
               </li>
             ))}
           </ul>

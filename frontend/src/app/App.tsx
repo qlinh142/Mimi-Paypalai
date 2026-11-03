@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "../lib/auth";
 import { queryClient, queryPersister } from "./queryClient";
 import { Welcome } from "../screens/Welcome";
 import { Home } from "../screens/Home";
+import { MoneySync } from "./MoneySync";
 
 // Màn ít vào ngay được tách bundle riêng để lần mở đầu nhẹ.
 const Items = lazy(() => import("../screens/Items").then((m) => ({ default: m.Items })));
@@ -74,6 +75,7 @@ function Gate() {
 
   return (
     <Suspense fallback={null}>
+      <MoneySync>
       <Routes>
         <Route path="/" element={<Home entering={wasSignedOut.current === true} />} />
         <Route path="/items" element={<Items />} />
@@ -101,6 +103,7 @@ function Gate() {
         <Route path="/today" element={<TodayMeal />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </MoneySync>
     </Suspense>
   );
 }

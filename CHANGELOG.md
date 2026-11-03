@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Tiền tệ hiển thị theo từng người (VND, USD)
+
+Nhánh `feat/tien-te-hien-thi`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 4–5 (mẹ chốt 03/11): mỗi người tự chọn tiền tệ hiển thị, tạm VND và USD; số tiền quy đổi theo tỷ giá của ngày mua.
+
+- Cài đặt › Ngôn ngữ & khu vực: ô Tiền tệ chọn được VND hoặc USD, lưu vào tài khoản (`settings.currency`). Câu ghi chú sửa lại: ngôn ngữ và tiền tệ chọn riêng.
+- Máy chủ: `GET /fx/rates?currency=USD&from&to` trả tỷ giá từng ngày (kèm ngày gần nhất trước `from`), dùng chung index với `Store.Rate`. Số tiền vẫn lưu bằng đồng, không đổi dữ liệu nào.
+- App (`lib/money.ts`, `app/MoneySync.tsx`): nạp tỷ giá USD 800 ngày, nhớ trên máy; `formatVnd(số, ngày)` quy đổi theo ngày mua, ngày chưa có tỷ giá dùng ngày gần nhất trước đó.
+  - Theo ngày mua: Lịch sử mua hàng (từng hóa đơn, từng dòng), lịch sử giá của món, giá lần mua gần nhất / thấp nhất.
+  - Tổng theo tháng (Sổ chi tiêu): tháng đã qua theo tỷ giá ngày cuối tháng (cố định), tháng này theo hôm nay.
+  - Giá hiện tại, kế hoạch, dự báo: theo tỷ giá hôm nay.
+- Sau khi lưu cài đặt, app ghi ngay vào bản nhớ `/me`; lúc mở app chỉ tin `/me` vừa tải từ máy chủ (bản khôi phục từ IndexedDB có thể còn giá trị cũ).
+- Kiểm tra: `go test ./internal/httpapi ./internal/user` (test mới `TestFXRates`), test emulator `TestRateHistoryEmulator`, `tsc -b`, Playwright đổi sang USD: Trang chủ 1.284.000đ → 50,46 US$, Sổ chi tiêu và Lịch sử đổi theo.
+- Chưa làm: ô nhập tiền (sửa giá, khoản định kỳ) vẫn nhập bằng đồng.
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.
