@@ -5,6 +5,15 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Chia giảm giá cả hóa đơn về từng dòng
+
+Nhánh `feat/chia-giam-gia`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 4 (mẹ đồng ý 03/11): giảm giá tổng bill chia về từng dòng theo tỷ lệ tiền, để sau này giá vốn mỗi món là giá đã trừ giảm.
+
+- `domain.AllocateDiscount`: chia theo tỷ lệ, tổng các phần đúng bằng số giảm (phần dư làm tròn cho dòng có phần lẻ lớn nhất); dòng chưa rõ giá không nhận phần nào.
+- Lưu hóa đơn có dòng khuyến mãi (số âm): mỗi dòng ghi thêm `discount_alloc_vnd` trong receipts. Tổng đã chi, tiết kiệm, lịch sử giá không đổi.
+- Kiểm tra: `TestAllocateDiscount`, `TestSaveDiscounts` (12.000đ chia 7.529đ + 4.471đ).
+- Chưa dùng: giá vốn từng lô vẫn đang treo; dữ liệu này để sẵn cho lúc làm.
+
 ## 2026-11-03 · Giao diện hai ngôn ngữ không tràn trên màn nhỏ
 
 Nhánh `feat/giao-dien-song-ngu`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2.2 (mẹ chốt 03/11): chữ cố định tinh chỉnh riêng cho từng ngôn ngữ, tên sản phẩm theo luật hiển thị.
