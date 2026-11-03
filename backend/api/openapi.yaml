@@ -1444,6 +1444,9 @@ components:
         unit_price_vnd: { $ref: "#/components/schemas/Vnd" }
         snapshot_price_vnd: { $ref: "#/components/schemas/Vnd" }
         total_vnd: { $ref: "#/components/schemas/Vnd" }
+        source_currency: { type: string, description: Tiền gốc của merchant (thị trường Mỹ là USD) }
+        unit_price_source: { type: string, description: Giá gốc mỗi gói, ví dụ "4.29" }
+        total_source: { type: string, description: Tổng gốc của dòng }
         need_by: { type: string, format: date }
         eta: { type: string, format: date }
         verified_qty: { type: number }
@@ -1459,6 +1462,14 @@ components:
         vnd_per_usd: { type: integer }
         rate_source: { type: string, description: Tỷ giá lấy từ đâu }
         rate_as_of: { type: string, format: date, description: Tỷ giá của ngày nào }
+        fx:
+          type: object
+          description: Bản chép tỷ giá USD của ngày đặt hàng (fx_rates); vắng khi dùng tỷ giá cấu hình
+          properties:
+            rate: { type: string, description: Số đồng cho 1 USD }
+            source: { type: string }
+            at: { type: string, format: date-time }
+            on: { type: string, format: date, description: Ngày của tỷ giá đã dùng }
         snapshot_at: { type: string, format: date }
         decision: { $ref: "#/components/schemas/Decision" }
     Order:
@@ -1475,7 +1486,20 @@ components:
         rate_as_of: { type: string, format: date, description: Tỷ giá của ngày nào }
         decision: { $ref: "#/components/schemas/Decision" }
         approved_by_user: { type: boolean }
-        paypal_order_id: { type: string }
+        provider: { type: string, enum: [paypal, braintree], description: Cổng đã thu tiền }
+        provider_order_id: { type: string }
+        provider_txn_id: { type: string, description: Capture (PayPal) hoặc transaction (Braintree) }
+        source_currency: { type: string, description: Tiền thật đã thu (USD) }
+        source_amount: { type: string, description: Số tiền đã thu, ví dụ "15.76" }
+        fx:
+          type: object
+          description: Bản chép tỷ giá USD của ngày đặt hàng (fx_rates); vắng khi dùng tỷ giá cấu hình
+          properties:
+            rate: { type: string, description: Số đồng cho 1 USD }
+            source: { type: string }
+            at: { type: string, format: date-time }
+            on: { type: string, format: date, description: Ngày của tỷ giá đã dùng }
+        paypal_order_id: { type: string, description: Ô cũ, giữ để đọc đơn trước 03/11 }
         approve_url: { type: string, format: uri }
         paypal_capture_id: { type: string }
         paid_at: { type: string, format: date-time }

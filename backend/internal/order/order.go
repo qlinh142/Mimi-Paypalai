@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -47,39 +48,47 @@ var nextFulfillment = map[State]State{StatePaid: StateOrdered, StateOrdered: Sta
 
 // Line là một dòng giỏ online / đơn hàng. Qty tính theo gói của sản phẩm.
 type Line struct {
-	Key              string   `json:"key"`
-	Name             string   `json:"name"` // tên nhóm trong Kế hoạch
-	ProductName      string   `json:"product_name"`
-	CategoryKey      string   `json:"category_key,omitempty"` // danh mục chi tiêu
-	Category         string   `json:"category"`               // grocery | household (mandate)
-	Qty              float64  `json:"qty"`                    // số gói
-	Unit             string   `json:"unit"`                   // đơn vị của gói
-	PackQty          float64  `json:"pack_qty"`
-	PlanQty          float64  `json:"plan_qty"`
-	PlanUnit         string   `json:"plan_unit,omitempty"`
-	UnitPriceVND     int64    `json:"unit_price_vnd"`     // giá đang bán mỗi gói
-	SnapshotPriceVND int64    `json:"snapshot_price_vnd"` // giá tốt nhất ở lần quét gần nhất
-	TotalVND         int64    `json:"total_vnd"`
-	NeedBy           string   `json:"need_by,omitempty"`
-	ETA              string   `json:"eta"`
-	InPlan           bool     `json:"-"`
-	OverPlan         bool     `json:"-"`
-	VerifiedQty      *float64 `json:"verified_qty,omitempty"` // số gói thực nhận sau Verify
-	Match            string   `json:"match,omitempty"`        // match | partial | missing
+	Key              string  `json:"key"`
+	Name             string  `json:"name"` // tên nhóm trong Kế hoạch
+	ProductName      string  `json:"product_name"`
+	CategoryKey      string  `json:"category_key,omitempty"` // danh mục chi tiêu
+	Category         string  `json:"category"`               // grocery | household (mandate)
+	Qty              float64 `json:"qty"`                    // số gói
+	Unit             string  `json:"unit"`                   // đơn vị của gói
+	PackQty          float64 `json:"pack_qty"`
+	PlanQty          float64 `json:"plan_qty"`
+	PlanUnit         string  `json:"plan_unit,omitempty"`
+	UnitPriceVND     int64   `json:"unit_price_vnd"`     // giá đang bán mỗi gói, quy ra VND theo tỷ giá của đơn
+	SnapshotPriceVND int64   `json:"snapshot_price_vnd"` // giá tốt nhất ở lần quét gần nhất
+	TotalVND         int64   `json:"total_vnd"`
+	// Giá gốc của merchant (thị trường Mỹ: USD). Tổng tiền PayPal thu là tổng các TotalSource.
+	SourceCurrency  string `json:"source_currency,omitempty"`
+	UnitPriceSource string `json:"unit_price_source,omitempty"` // "4.29"
+	TotalSource     string `json:"total_source,omitempty"`
+	totalCents      int64
+	NeedBy          string   `json:"need_by,omitempty"`
+	ETA             string   `json:"eta"`
+	InPlan          bool     `json:"-"`
+	OverPlan        bool     `json:"-"`
+	VerifiedQty     *float64 `json:"verified_qty,omitempty"` // số gói thực nhận sau Verify
+	Match           string   `json:"match,omitempty"`        // match | partial | missing
 }
 
 // Basket là giỏ online đã resolve product, giá, ETA và đã qua Household Mandate.
 type Basket struct {
-	Merchant   string    `json:"merchant"`
-	Lines      []Line    `json:"lines"`
-	Missing    []string  `json:"missing"` // món trong Kế hoạch merchant không bán
-	TotalVND   int64     `json:"total_vnd"`
-	AmountUSD  string    `json:"amount_usd"`
-	VNDPerUSD  int64     `json:"vnd_per_usd"`
-	RateSource string    `json:"rate_source,omitempty"` // tỷ giá lấy từ đâu
-	RateAsOf   string    `json:"rate_as_of,omitempty"`  // tỷ giá của ngày nào, YYYY-MM-DD
-	SnapshotAt time.Time `json:"snapshot_at"`
-	Decision   Decision  `json:"decision"`
+	Merchant   string   `json:"merchant"`
+	Lines      []Line   `json:"lines"`
+	Missing    []string `json:"missing"` // món trong Kế hoạch merchant không bán
+	TotalVND   int64    `json:"total_vnd"`
+	AmountUSD  string   `json:"amount_usd"`
+	VNDPerUSD  int64    `json:"vnd_per_usd"`
+	RateSource string   `json:"rate_source,omitempty"` // tỷ giá lấy từ đâu
+	RateAsOf   string   `json:"rate_as_of,omitempty"`  // tỷ giá của ngày nào, YYYY-MM-DD
+	// FX: bản chép tỷ giá USD của ngày đặt hàng từ fx_rates (nil: chưa có bảng tỷ giá,
+	// dùng tỷ giá cấu hình PAYPAL_VND_PER_USD).
+	FX         *receipt.FX `json:"fx,omitempty"`
+	SnapshotAt time.Time   `json:"snapshot_at"`
+	Decision   Decision    `json:"decision"`
 }
 
 // Refund là một lần hoàn tiền; giữ nguyên để audit cùng giao dịch gốc.
@@ -100,29 +109,40 @@ type Event struct {
 
 // Order là đơn Mimi Online, lưu nguyên khối (users/{uid}/orders/{id}).
 type Order struct {
-	ID                 string     `json:"id"`
-	State              State      `json:"state"`
-	Merchant           string     `json:"merchant"`
-	Lines              []Line     `json:"lines"`
-	TotalVND           int64      `json:"total_vnd"`
-	AmountUSD          string     `json:"amount_usd"`
-	VNDPerUSD          int64      `json:"vnd_per_usd"`
-	RateSource         string     `json:"rate_source,omitempty"`
-	RateAsOf           string     `json:"rate_as_of,omitempty"`
-	Decision           Decision   `json:"decision"`
-	ApprovedByUser     bool       `json:"approved_by_user"` // người dùng duyệt đơn ASK
-	PayPalOrderID      string     `json:"paypal_order_id"`
-	ApproveURL         string     `json:"approve_url,omitempty"`
-	CaptureID          string     `json:"paypal_capture_id,omitempty"`
-	PaidAt             *time.Time `json:"paid_at,omitempty"`
-	ETA                string     `json:"eta"`
-	Events             []Event    `json:"events"`
-	Refunds            []Refund   `json:"refunds"`
-	RefundedVND        int64      `json:"refunded_vnd"`
-	NetVND             int64      `json:"net_vnd"` // = total - refunded, chỉ có nghĩa sau khi paid
-	SuggestedRefundVND int64      `json:"suggested_refund_vnd"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID             string   `json:"id"`
+	State          State    `json:"state"`
+	Merchant       string   `json:"merchant"`
+	Lines          []Line   `json:"lines"`
+	TotalVND       int64    `json:"total_vnd"`
+	AmountUSD      string   `json:"amount_usd"`
+	VNDPerUSD      int64    `json:"vnd_per_usd"`
+	RateSource     string   `json:"rate_source,omitempty"`
+	RateAsOf       string   `json:"rate_as_of,omitempty"`
+	Decision       Decision `json:"decision"`
+	ApprovedByUser bool     `json:"approved_by_user"` // người dùng duyệt đơn ASK
+	// Cổng thanh toán (Mimi 2.0, chốt 03/11: PayPal mặc định, thẻ qua Braintree). Đơn lưu
+	// trước khi có các ô này là PayPal: Upgrade() điền lại từ hai ô PayPal cũ.
+	Provider        string `json:"provider"`                  // paypal | braintree
+	ProviderOrderID string `json:"provider_order_id"`         // PayPal order ID; Braintree chưa có
+	ProviderTxnID   string `json:"provider_txn_id,omitempty"` // capture (PayPal) hoặc transaction (Braintree)
+	// Tiền thật đã thu, theo luật tiền tệ 03/11: PayPal thu bằng USD, tỷ giá ngày đặt hàng
+	// khóa vào đơn (FX). Hoàn tiền dùng đúng tỷ giá này. AmountUSD, VNDPerUSD, RateSource,
+	// RateAsOf giữ lại để đọc đơn cũ và cho app đang chạy.
+	SourceCurrency     string      `json:"source_currency"`
+	SourceAmount       string      `json:"source_amount"`
+	FX                 *receipt.FX `json:"fx,omitempty"`
+	PayPalOrderID      string      `json:"paypal_order_id"`
+	ApproveURL         string      `json:"approve_url,omitempty"`
+	CaptureID          string      `json:"paypal_capture_id,omitempty"`
+	PaidAt             *time.Time  `json:"paid_at,omitempty"`
+	ETA                string      `json:"eta"`
+	Events             []Event     `json:"events"`
+	Refunds            []Refund    `json:"refunds"`
+	RefundedVND        int64       `json:"refunded_vnd"`
+	NetVND             int64       `json:"net_vnd"` // = total - refunded, chỉ có nghĩa sau khi paid
+	SuggestedRefundVND int64       `json:"suggested_refund_vnd"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
 }
 
 // Phụ thuộc, khai báo ở phía dùng.
@@ -134,6 +154,10 @@ type (
 	}
 	PlanLines interface {
 		OpenLines(ctx context.Context, uid string) ([]plan.Line, error)
+	}
+	// Rates là bảng tỷ giá theo ngày (fx_rates): tỷ giá gần nhất không sau ngày on.
+	Rates interface {
+		Rate(ctx context.Context, currency string, on domain.Date) (receipt.FX, bool, error)
 	}
 	// Verifier đọc ảnh hàng nhận và đếm từng món (Mimi 2.0 mục 17).
 	Verifier interface {
@@ -179,6 +203,7 @@ type Service struct {
 	payments  Payments // nil: chưa cấu hình PayPal
 	verifier  Verifier // nil: chỉ cho nhập tay
 	vndPerUSD int64
+	rates     Rates // nil: chỉ dùng tỷ giá cấu hình
 	rateSrc   string
 	rateAsOf  string
 	log       *slog.Logger
@@ -200,6 +225,37 @@ func (s *Service) WithRateInfo(source, asOf string) *Service {
 	s.rateSrc, s.rateAsOf = source, asOf
 	return s
 }
+
+// WithRates cho đơn dùng tỷ giá USD của ngày đặt hàng trong fx_rates thay cho tỷ giá cấu
+// hình. Ngày chưa có tỷ giá thì lấy ngày gần nhất trước đó; bảng trống thì về tỷ giá cấu hình.
+func (s *Service) WithRates(r Rates) *Service {
+	s.rates = r
+	return s
+}
+
+// usdRate trả tỷ giá USD cho ngày day: số đồng cho 1 USD (làm tròn đồng), nguồn, ngày.
+func (s *Service) usdRate(ctx context.Context, day domain.Date) (int64, string, string, *receipt.FX) {
+	if s.rates != nil {
+		fx, ok, err := s.rates.Rate(ctx, Currency, day)
+		if err != nil && s.log != nil {
+			s.log.WarnContext(ctx, "order fx", "err", err)
+		}
+		if err == nil && ok {
+			if v, perr := strconv.ParseFloat(fx.Rate, 64); perr == nil && v >= 1_000 && v <= 1_000_000 {
+				on := fx.On
+				if on == "" {
+					on = day.String()
+				}
+				fx.On = on
+				return int64(math.Round(v)), fx.Source, on, &fx
+			}
+		}
+	}
+	return s.vndPerUSD, s.rateSrc, s.rateAsOf, nil
+}
+
+// Currency: tiền PayPal và Braintree thu (luật tiền tệ 03/11: thanh toán mặc định USD).
+const Currency = "USD"
 
 // ToUSD quy đồng sang USD 2 chữ số thập phân, làm tròn nửa lên. PayPal không nhận VND.
 func ToUSD(vnd, vndPerUSD int64) string {
@@ -251,9 +307,9 @@ func (s *Service) Basket(ctx context.Context, p authz.Principal, keys []string) 
 		}
 	}
 	today := domain.Today(s.now(), domain.Location(p.Timezone))
-	b := buildBasket(s.catalog, lines, keys, today)
-	b.VNDPerUSD, b.AmountUSD = s.vndPerUSD, ToUSD(b.TotalVND, s.vndPerUSD)
-	b.RateSource, b.RateAsOf = s.rateSrc, s.rateAsOf
+	rate, src, asOf, fx := s.usdRate(ctx, today)
+	b := buildBasket(s.catalog, lines, keys, today, rate)
+	b.VNDPerUSD, b.RateSource, b.RateAsOf, b.FX = rate, src, asOf, fx
 	m, err := s.store.Mandate(ctx, p.UID)
 	if err != nil {
 		return Basket{}, err
@@ -269,7 +325,7 @@ func (s *Service) Basket(ctx context.Context, p authz.Principal, keys []string) 
 // buildBasket: product resolution theo group (exact product do merchant Sandbox bán).
 // Số gói = làm tròn lên lượng Kế hoạch / cỡ gói khi cùng loại đơn vị; khác loại thì mua
 // đúng số lượng Kế hoạch. Không thay thế sản phẩm (substitution để phase sau).
-func buildBasket(c Catalog, lines []plan.Line, keys []string, today domain.Date) Basket {
+func buildBasket(c Catalog, lines []plan.Line, keys []string, today domain.Date, vndPerUSD int64) Basket {
 	want := map[string]bool{}
 	for _, k := range keys {
 		want[k] = true
@@ -279,6 +335,7 @@ func buildBasket(c Catalog, lines []plan.Line, keys []string, today domain.Date)
 		inPlan[l.Key] = l
 	}
 	b := Basket{Merchant: c.Merchant(), Lines: []Line{}, Missing: []string{}, SnapshotAt: c.SnapshotAt()}
+	var cents int64
 	ordered := keys
 	if len(keys) == 0 {
 		for _, l := range lines {
@@ -323,14 +380,39 @@ func buildBasket(c Catalog, lines []plan.Line, keys []string, today domain.Date)
 		l := Line{
 			Key: k, Name: pl.Name, ProductName: pr.Name, CategoryKey: pl.CategoryKey, Category: pr.Category,
 			Qty: packs, Unit: pr.Unit, PackQty: pr.PackQty, PlanQty: planQty, PlanUnit: pl.Unit,
-			UnitPriceVND: pr.OfferVND, SnapshotPriceVND: pr.SnapshotVND, NeedBy: pl.NeedBy,
+			UnitPriceVND: centsToVND(pr.OfferCents, vndPerUSD), SnapshotPriceVND: centsToVND(pr.SnapshotCents, vndPerUSD), NeedBy: pl.NeedBy,
 			ETA: today.AddDays(pr.EtaDays).String(), InPlan: true, OverPlan: overPlan,
+			SourceCurrency: Currency, UnitPriceSource: FormatCents(pr.OfferCents),
 		}
-		l.TotalVND = int64(math.Round(packs * float64(pr.OfferVND)))
+		l.totalCents = int64(math.Round(packs * float64(pr.OfferCents)))
+		l.TotalSource = FormatCents(l.totalCents)
+		l.TotalVND = centsToVND(l.totalCents, vndPerUSD)
 		b.TotalVND += l.TotalVND
+		cents += l.totalCents
 		b.Lines = append(b.Lines, l)
 	}
+	b.AmountUSD = FormatCents(cents)
 	return b
+}
+
+// centsToVND quy cent USD ra đồng theo tỷ giá đồng/USD, làm tròn nửa lên.
+func centsToVND(cents, vndPerUSD int64) int64 { return (cents*vndPerUSD + 50) / 100 }
+
+// FormatCents: 429 → "4.29".
+func FormatCents(c int64) string { return fmt.Sprintf("%d.%02d", c/100, c%100) }
+
+// parseCents: "4.29" → 429. Chuỗi do Mimi tạo bằng FormatCents nên luôn đúng dạng.
+func parseCents(s string) (int64, bool) {
+	whole, frac, ok := strings.Cut(s, ".")
+	if !ok || len(frac) != 2 {
+		return 0, false
+	}
+	w, err1 := strconv.ParseInt(whole, 10, 64)
+	f, err2 := strconv.ParseInt(frac, 10, 64)
+	if err1 != nil || err2 != nil || w < 0 {
+		return 0, false
+	}
+	return w*100 + f, true
 }
 
 func (s *Service) paidOn(ctx context.Context, p authz.Principal, day domain.Date) (int64, error) {
@@ -385,6 +467,7 @@ func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutR
 	o := Order{
 		ID: newID(), State: StateAwaitingPayment, Merchant: b.Merchant, Lines: b.Lines,
 		TotalVND: b.TotalVND, AmountUSD: b.AmountUSD, VNDPerUSD: b.VNDPerUSD, RateSource: b.RateSource, RateAsOf: b.RateAsOf, Decision: b.Decision,
+		Provider: ProviderPayPal, SourceCurrency: Currency, SourceAmount: b.AmountUSD, FX: b.FX,
 		ApprovedByUser: b.Decision.Result == Ask, Refunds: []Refund{}, CreatedAt: now, UpdatedAt: now,
 		Events: []Event{{State: StateAwaitingPayment, At: now}},
 	}
@@ -393,11 +476,11 @@ func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutR
 			o.ETA = l.ETA
 		}
 	}
-	ppo, err := s.payments.CreateOrder(ctx, o.ID, o.AmountUSD, fmt.Sprintf("Mimi · %s · %d món", o.Merchant, len(o.Lines)))
+	ppo, err := s.payments.CreateOrder(ctx, o.ID, o.AmountUSD, Description(len(o.Lines)))
 	if err != nil {
 		return Order{}, paymentErr(err)
 	}
-	o.PayPalOrderID, o.ApproveURL = ppo.ID, ppo.ApproveURL
+	o.PayPalOrderID, o.ProviderOrderID, o.ApproveURL = ppo.ID, ppo.ID, ppo.ApproveURL
 	if err := s.store.CreateOrder(ctx, p.UID, o); err != nil {
 		return Order{}, err
 	}
@@ -419,6 +502,9 @@ func (s *Service) Capture(ctx context.Context, p authz.Principal, id string) (Or
 	if s.payments == nil {
 		return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
 	}
+	if err := s.recheckBudget(ctx, p, o); err != nil {
+		return Order{}, err
+	}
 	cp, err := s.payments.CaptureOrder(ctx, o.PayPalOrderID, o.ID)
 	if err != nil {
 		return Order{}, paymentErr(err)
@@ -427,13 +513,47 @@ func (s *Service) Capture(ctx context.Context, p authz.Principal, id string) (Or
 		return Order{}, apperr.New(apperr.CodePaymentFailed, "PayPal chưa hoàn tất thanh toán.").With("paypal_status", cp.Status)
 	}
 	now := s.now()
-	o.State, o.CaptureID, o.PaidAt, o.UpdatedAt = StatePaid, cp.ID, &now, now
+	o.State, o.CaptureID, o.ProviderTxnID, o.PaidAt, o.UpdatedAt = StatePaid, cp.ID, cp.ID, &now, now
 	o.NetVND = o.TotalVND
 	o.Events = append(o.Events, Event{State: StatePaid, At: now})
 	if err := s.store.RecordPayment(ctx, p.UID, o, domain.Location(p.Timezone)); err != nil {
 		return Order{}, err
 	}
 	return o, nil
+}
+
+// recheckBudget (lỗi N1): hạn mức của Mandate được kiểm lại ngay trước khi thu tiền, theo
+// Mandate và các đơn đã trả lúc này. Lúc tạo đơn chỉ cộng các đơn đã trả, nên tạo 2–3 đơn
+// liền rồi trả lần lượt từng vượt trần ngày mà không bị chặn. Trần nào người dùng đã duyệt
+// vượt lúc đặt (ASK budget_order / budget_day) thì không chặn lại.
+func (s *Service) recheckBudget(ctx context.Context, p authz.Principal, o Order) error {
+	m, err := s.store.Mandate(ctx, p.UID)
+	if err != nil {
+		return err
+	}
+	approved := map[string]bool{}
+	if o.ApprovedByUser {
+		for _, r := range o.Decision.Reasons {
+			approved[r.Code] = true
+		}
+	}
+	var reasons []Reason
+	if m.MaxOrderVND > 0 && o.TotalVND > m.MaxOrderVND && !approved["budget_order"] {
+		reasons = append(reasons, Reason{Code: "budget_order", Result: Block, Detail: fmt.Sprintf("Tổng đơn %dđ vượt trần %dđ/đơn", o.TotalVND, m.MaxOrderVND)})
+	}
+	if m.MaxDayVND > 0 && !approved["budget_day"] {
+		paid, err := s.paidOn(ctx, p, domain.Today(s.now(), domain.Location(p.Timezone)))
+		if err != nil {
+			return err
+		}
+		if paid+o.TotalVND > m.MaxDayVND {
+			reasons = append(reasons, Reason{Code: "budget_day", Result: Block, Detail: fmt.Sprintf("Vượt trần %dđ/ngày (đã chi hôm nay %dđ)", m.MaxDayVND, paid)})
+		}
+	}
+	if len(reasons) > 0 {
+		return apperr.New(apperr.CodeMandateBlocked, "Đơn vượt hạn mức ủy quyền nên chưa thu tiền. Đặt lại đơn để duyệt.").With("reasons", reasons)
+	}
+	return nil
 }
 
 // Advance đẩy đơn sang bước giao hàng tiếp theo (merchant Sandbox giả lập:
@@ -551,7 +671,7 @@ func (s *Service) Refund(ctx context.Context, p authz.Principal, id string, req 
 	if err != nil {
 		return Order{}, err
 	}
-	if o.State != StateVerified || o.CaptureID == "" {
+	if o.State != StateVerified || o.ProviderTxnID == "" {
 		return Order{}, invalidState(o.State)
 	}
 	if !validRefundReason[req.Reason] {
@@ -572,8 +692,8 @@ func (s *Service) Refund(ctx context.Context, p authz.Principal, id string, req 
 		return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
 	}
 	ref := fmt.Sprintf("%s-r%d", o.ID, len(o.Refunds)+1)
-	usd := ToUSD(amount, o.VNDPerUSD)
-	pr, err := s.payments.RefundCapture(ctx, o.CaptureID, usd, ref, note)
+	usd := refundUSD(o, amount)
+	pr, err := s.payments.RefundCapture(ctx, o.ProviderTxnID, usd, ref, domain.ASCII(note, 255))
 	if err != nil {
 		return Order{}, paymentErr(err)
 	}
@@ -590,10 +710,59 @@ func (s *Service) Refund(ctx context.Context, p authz.Principal, id string, req 
 	return o, nil
 }
 
+// refundUSD quy số đồng hoàn ra USD theo tỷ giá khóa trong đơn, không vượt số USD đã thu
+// trừ các lần đã hoàn (làm tròn từng dòng có thể lệch 1 cent; PayPal từ chối hoàn quá).
+func refundUSD(o Order, amountVND int64) string {
+	want := (amountVND*100 + o.VNDPerUSD/2) / o.VNDPerUSD
+	paid, ok := parseCents(o.SourceAmount)
+	if !ok {
+		return ToUSD(amountVND, o.VNDPerUSD)
+	}
+	var done int64
+	for _, r := range o.Refunds {
+		if c, ok := parseCents(r.AmountUSD); ok {
+			done += c
+		}
+	}
+	return FormatCents(max(0, min(want, paid-done)))
+}
+
 // ---------- Đọc ----------
 
 func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Order, error) {
 	return s.owned(ctx, p, id)
+}
+
+// Cổng thanh toán của đơn.
+const (
+	ProviderPayPal    = "paypal"
+	ProviderBraintree = "braintree"
+)
+
+// Upgrade điền các ô mới cho đơn lưu trước 03/11 (chỉ có ô PayPal và AmountUSD).
+func (o *Order) Upgrade() {
+	if o.Provider == "" {
+		o.Provider = ProviderPayPal
+	}
+	if o.ProviderOrderID == "" {
+		o.ProviderOrderID = o.PayPalOrderID
+	}
+	if o.ProviderTxnID == "" {
+		o.ProviderTxnID = o.CaptureID
+	}
+	if o.SourceCurrency == "" {
+		o.SourceCurrency, o.SourceAmount = Currency, o.AmountUSD
+	}
+}
+
+// Description là mô tả đơn gửi cổng thanh toán: tiếng Anh không dấu (luật 4.1), tối đa
+// 127 ký tự như giới hạn của PayPal.
+func Description(items int) string {
+	unit := "items"
+	if items == 1 {
+		unit = "item"
+	}
+	return domain.ASCII(fmt.Sprintf("Mimi order - %d %s", items, unit), 127)
 }
 
 func (s *Service) List(ctx context.Context, p authz.Principal) ([]Order, error) {
@@ -603,6 +772,9 @@ func (s *Service) List(ctx context.Context, p authz.Principal) ([]Order, error) 
 	out, err := s.store.ListOrders(ctx, p.UID, 50)
 	if out == nil {
 		out = []Order{}
+	}
+	for i := range out {
+		out[i].Upgrade()
 	}
 	return out, err
 }
@@ -614,7 +786,12 @@ func (s *Service) owned(ctx context.Context, p authz.Principal, id string) (Orde
 	if !ValidID(id) {
 		return Order{}, apperr.ErrNotFound
 	}
-	return s.store.GetOrder(ctx, p.UID, id)
+	o, err := s.store.GetOrder(ctx, p.UID, id)
+	if err != nil {
+		return Order{}, err
+	}
+	o.Upgrade()
+	return o, nil
 }
 
 // ValidID: "o-" + 16 ký tự hex do server sinh.

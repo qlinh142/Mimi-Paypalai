@@ -3607,6 +3607,12 @@ export interface components {
             unit_price_vnd?: components["schemas"]["Vnd"];
             snapshot_price_vnd?: components["schemas"]["Vnd"];
             total_vnd?: components["schemas"]["Vnd"];
+            /** @description Tiền gốc của merchant (thị trường Mỹ là USD) */
+            source_currency?: string;
+            /** @description Giá gốc mỗi gói */
+            unit_price_source?: string;
+            /** @description Tổng gốc của dòng */
+            total_source?: string;
             /** Format: date */
             need_by?: string;
             /** Format: date */
@@ -3630,6 +3636,19 @@ export interface components {
              * @description Tỷ giá của ngày nào
              */
             rate_as_of?: string;
+            /** @description Bản chép tỷ giá USD của ngày đặt hàng (fx_rates); vắng khi dùng tỷ giá cấu hình */
+            fx?: {
+                /** @description Số đồng cho 1 USD */
+                rate?: string;
+                source?: string;
+                /** Format: date-time */
+                at?: string;
+                /**
+                 * Format: date
+                 * @description Ngày của tỷ giá đã dùng
+                 */
+                on?: string;
+            };
             /** Format: date */
             snapshot_at?: string;
             decision?: components["schemas"]["Decision"];
@@ -3652,6 +3671,32 @@ export interface components {
             rate_as_of?: string;
             decision?: components["schemas"]["Decision"];
             approved_by_user?: boolean;
+            /**
+             * @description Cổng đã thu tiền
+             * @enum {string}
+             */
+            provider?: "paypal" | "braintree";
+            provider_order_id?: string;
+            /** @description Capture (PayPal) hoặc transaction (Braintree) */
+            provider_txn_id?: string;
+            /** @description Tiền thật đã thu (USD) */
+            source_currency?: string;
+            /** @description Số tiền đã thu */
+            source_amount?: string;
+            /** @description Bản chép tỷ giá USD của ngày đặt hàng (fx_rates); vắng khi dùng tỷ giá cấu hình */
+            fx?: {
+                /** @description Số đồng cho 1 USD */
+                rate?: string;
+                source?: string;
+                /** Format: date-time */
+                at?: string;
+                /**
+                 * Format: date
+                 * @description Ngày của tỷ giá đã dùng
+                 */
+                on?: string;
+            };
+            /** @description Ô cũ */
             paypal_order_id?: string;
             /** Format: uri */
             approve_url?: string;

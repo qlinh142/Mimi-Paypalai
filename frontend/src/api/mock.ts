@@ -524,18 +524,22 @@ function toBase(qty: number, unit: string): [number, "g" | "ml" | "pc"] {
   return [qty * f, u];
 }
 
+// Giá gốc USD tính bằng cent cho một gói (thị trường Mỹ, chốt 03/11), giống backend internal/order/catalog.go.
 type Product = { name: string; unit: string; pack: number; snapshot: number; offer: number; eta: number; category: "grocery" | "household" };
-// Cửa hàng sandbox; giá mẫu. Dầu gội có giá cao hơn giá quét để thấy luồng ASK.
+// Cửa hàng sandbox (US); giá mẫu, tên tiếng Anh. Dầu gội có giá cao hơn giá quét để thấy luồng ASK.
 const CATALOG: Record<string, Product> = {
-  "sua-tuoi": { name: "Sữa tươi không đường 1L", unit: "hộp", pack: 1, snapshot: 30_000, offer: 31_000, eta: 1, category: "grocery" },
-  "nuoc-rua-chen": { name: "Nước rửa chén 750ml", unit: "chai", pack: 1, snapshot: 38_000, offer: 37_000, eta: 1, category: "household" },
-  "trung-ga": { name: "Trứng gà vỉ 10", unit: "quả", pack: 10, snapshot: 36_000, offer: 34_000, eta: 1, category: "grocery" },
-  gao: { name: "Gạo ST25 5kg", unit: "túi", pack: 1, snapshot: 120_000, offer: 125_000, eta: 2, category: "grocery" },
-  "dau-goi": { name: "Dầu gội 650g", unit: "chai", pack: 1, snapshot: 95_000, offer: 118_000, eta: 2, category: "household" },
-  "giay-ve-sinh": { name: "Giấy vệ sinh 10 cuộn", unit: "bịch", pack: 1, snapshot: 72_000, offer: 72_000, eta: 1, category: "household" },
-  "bot-giat": { name: "Bột giặt 3kg", unit: "túi", pack: 1, snapshot: 155_000, offer: 149_000, eta: 2, category: "household" },
+  "sua-tuoi": { name: "Whole Milk, 1 gal", unit: "gal", pack: 1, snapshot: 389, offer: 389, eta: 1, category: "grocery" },
+  "nuoc-rua-chen": { name: "Dish Soap, 28 fl oz", unit: "bottle", pack: 1, snapshot: 399, offer: 379, eta: 1, category: "household" },
+  "trung-ga": { name: "Large White Eggs, 12 ct", unit: "egg", pack: 12, snapshot: 399, offer: 399, eta: 1, category: "grocery" },
+  gao: { name: "Jasmine Rice, 5 lb", unit: "bag", pack: 1, snapshot: 899, offer: 849, eta: 2, category: "grocery" },
+  "dau-goi": { name: "Shampoo, 22 fl oz", unit: "bottle", pack: 1, snapshot: 699, offer: 869, eta: 2, category: "household" },
+  "giay-ve-sinh": { name: "Toilet Paper, 12 Mega Rolls", unit: "pack", pack: 1, snapshot: 1699, offer: 1599, eta: 1, category: "household" },
+  "bot-giat": { name: "Liquid Laundry Detergent, 92 fl oz", unit: "bottle", pack: 1, snapshot: 1399, offer: 1299, eta: 2, category: "household" },
 };
 const VND_PER_USD = 25_000;
+const RATE_ON = iso(today);
+const cents = (c: number) => (c / 100).toFixed(2);
+const centsToVnd = (c: number) => Math.round((c * VND_PER_USD) / 100);
 let mandate: Mandate = { enabled: false, categories: ["grocery", "household"], price_tolerance_pct: 10, max_order_vnd: 1_000_000, max_day_vnd: 0 };
 const orders = new Map<string, Order>();
 const addDays = (n: number) => iso(new Date(today.getTime() + n * 86_400_000));
@@ -558,11 +562,13 @@ function buildBasket(keys: string[]): Basket {
     lines.push({
       key: k, name: ci.name, product_name: pr.name, category_key: ci.category_key, category: pr.category,
       qty: packs, unit: pr.unit, pack_qty: pr.pack, plan_qty: ci.qty, plan_unit: ci.unit,
-      unit_price_vnd: pr.offer, snapshot_price_vnd: pr.snapshot, total_vnd: pr.offer * packs,
+      unit_price_vnd: centsToVnd(pr.offer), snapshot_price_vnd: centsToVnd(pr.snapshot), total_vnd: centsToVnd(pr.offer * packs),
+      source_currency: "USD", unit_price_source: cents(pr.offer), total_source: cents(pr.offer * packs),
       need_by: ci.need_by, eta: addDays(pr.eta),
     });
   }
   const total = lines.reduce((a, l) => a + l.total_vnd, 0);
+  const totalCents = lines.reduce((a, l) => a + Math.round(Number(l.total_source) * 100), 0);
   const reasons: MandateReason[] = [];
   let result: Basket["decision"]["result"] = "ALLOW";
   const add = (r: MandateReason) => {
@@ -578,7 +584,9 @@ function buildBasket(keys: string[]): Basket {
   if (mandate.max_order_vnd > 0 && total > mandate.max_order_vnd) add({ code: "budget_order", result: "ASK", detail: `Tổng đơn vượt trần ${mandate.max_order_vnd}đ/đơn` });
   if (!mandate.enabled && result === "ALLOW") add({ code: "mandate_off", result: "ASK", detail: "Chưa bật ủy quyền mua online: cần bạn duyệt đơn này" });
   return {
-    merchant: "Mimi Mart Sandbox", lines, missing, total_vnd: total, amount_usd: usd(total), vnd_per_usd: VND_PER_USD,
+    merchant: "Mimi Mart Sandbox (US)", lines, missing, total_vnd: total, amount_usd: cents(totalCents), vnd_per_usd: VND_PER_USD,
+    rate_source: "open.er-api.com", rate_as_of: RATE_ON,
+    fx: { rate: String(VND_PER_USD), source: "open.er-api.com", at: new Date().toISOString(), on: RATE_ON },
     snapshot_at: iso(today), decision: { result, reasons },
   };
 }
@@ -595,11 +603,15 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
       return json(mandate);
     }
   }
-  if (method === "POST" && p === "/orders/basket") return json(buildBasket((body().keys as string[]) ?? [...cart]));
+  if (method === "POST" && p === "/orders/basket") {
+    // Như backend: keys rỗng nghĩa là cả Kế hoạch chính.
+    const ks = body().keys as string[] | undefined;
+    return json(buildBasket(ks?.length ? ks : [...cart]));
+  }
   if (method === "GET" && p === "/orders") return json({ orders: [...orders.values()].reverse() });
   if (method === "POST" && p === "/orders") {
     const b = body() as { keys?: string[]; approve?: boolean };
-    const basket = buildBasket(b.keys ?? [...cart]);
+    const basket = buildBasket(b.keys?.length ? b.keys : [...cart]);
     if (!basket.lines.length) return json({ code: "validation_failed", message: "empty" }, 422);
     if (basket.decision.result === "BLOCK") return json({ code: "mandate_blocked", message: "Blocked" }, 403);
     if (basket.decision.result === "ASK" && !b.approve) return json({ code: "approval_required", message: "Approve" }, 409);
@@ -607,6 +619,8 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
     const o: Order = {
       id, state: "awaiting_payment", merchant: basket.merchant, lines: basket.lines, total_vnd: basket.total_vnd,
       amount_usd: basket.amount_usd, vnd_per_usd: VND_PER_USD, decision: basket.decision, approved_by_user: !!b.approve,
+      rate_source: basket.rate_source, rate_as_of: basket.rate_as_of, fx: basket.fx,
+      provider: "paypal", provider_order_id: `FAKE-${basket.amount_usd}-mock`, source_currency: "USD", source_amount: basket.amount_usd,
       paypal_order_id: `FAKE-${basket.amount_usd}-mock`, eta: basket.lines.reduce((a, l) => (l.eta > a ? l.eta : a), ""),
       events: [{ state: "awaiting_payment", at: now() }], refunds: [], refunded_vnd: 0, net_vnd: basket.total_vnd,
       suggested_refund_vnd: 0, created_at: now(),
@@ -628,7 +642,7 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
       return json(o);
     case "POST/capture":
       if (o.state !== "awaiting_payment") return o.state === "paid" ? json(o) : bad();
-      return set({ ...o, state: "paid", paypal_capture_id: "FAKECAP-mock", paid_at: now(), events: [...o.events, { state: "paid", at: now() }] });
+      return set({ ...o, state: "paid", paypal_capture_id: "FAKECAP-mock", provider_txn_id: "FAKECAP-mock", paid_at: now(), events: [...o.events, { state: "paid", at: now() }] });
     case "POST/advance": {
       const next = NEXT[o.state];
       if (!next) return bad();

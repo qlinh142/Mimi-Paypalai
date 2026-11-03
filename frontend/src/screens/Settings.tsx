@@ -1,5 +1,6 @@
 import { switchUiLang, t, uiLang } from "../i18n";
-import { displayCurrency, switchCurrency, type DisplayCurrency } from "../lib/money";
+import { displayCurrency, rateOn, switchCurrency, type DisplayCurrency } from "../lib/money";
+import { ONLINE_BUY } from "../lib/paypal";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -116,11 +117,19 @@ export function Settings() {
 
         <Group title={S.family}>
           <Row to="/settings/members" Icon={UsersRound} label={S.members} sub={h.data ? S.membersSub(h.data.members.length) : undefined} />
-          <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+          {ONLINE_BUY ? (
+            <Row to="/settings/mandate" Icon={Wallet} label={S.mandate} />
+          ) : (
+            <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+          )}
         </Group>
 
         <Group title={S.shopping}>
-          <Row Icon={Package} label={S.orders} chip={S.comingSoon} soon onSoon={() => setSoon(true)} />
+          {ONLINE_BUY ? (
+            <Row to="/orders" Icon={Package} label={S.orders} />
+          ) : (
+            <Row Icon={Package} label={S.orders} chip={S.comingSoon} soon onSoon={() => setSoon(true)} />
+          )}
         </Group>
         {soon && <p className="hint hint15" role="status"><Info size={16} aria-hidden /> {S.soonNote}</p>}
 
@@ -401,7 +410,11 @@ export function SettingsMembers() {
       </section>
 
       <ul className="box15 set15__list">
-        <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+        {ONLINE_BUY ? (
+          <Row to="/settings/mandate" Icon={Wallet} label={S.mandate} />
+        ) : (
+          <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+        )}
       </ul>
       {soon && <p className="hint hint15" role="status"><Info size={16} aria-hidden /> {S.soonNote}</p>}
 
@@ -596,6 +609,15 @@ function DeleteAccount() {
 
 const MANDATE_CATS: MandateCategory[] = ["grocery", "household"];
 
+/** Màn Ủy quyền mua online (mở lại cho Mimi 2.0). */
+export function SettingsMandate() {
+  return (
+    <Sub title={S.mandate}>
+      <MandateSection />
+    </Sub>
+  );
+}
+
 /** Household Mandate (Mimi 2.0 mục 13): phạm vi Mimi được tự thanh toán online. Chỉ chủ nhà sửa được. */
 export function MandateSection() {
   const q = useMandate();
@@ -618,6 +640,11 @@ function MandateForm({ initial }: { initial: Mandate }) {
   const toggleCat = (c: MandateCategory, on: boolean) =>
     setM({ ...m, categories: on ? [...m.categories.filter((x) => x !== c), c] : m.categories.filter((x) => x !== c) });
   const num = (v: string, max: number) => Math.min(max, Math.max(0, Math.round(Number(v) || 0)));
+  // Hạn mức lưu bằng đồng. Người chọn USD (thị trường Mỹ) nhập bằng đô, quy theo tỷ giá hôm nay.
+  const rate = displayCurrency() === "USD" ? rateOn() : undefined;
+  const cur = rate ? "US$" : "₫";
+  const shown = (vnd: number) => (rate ? Math.round(vnd / rate) : vnd);
+  const toVnd = (v: string) => num(rate ? String((Number(v) || 0) * rate) : v, 100_000_000);
 
   return (
     <form
@@ -646,12 +673,12 @@ function MandateForm({ initial }: { initial: Mandate }) {
       </label>
       <div className="plan-form__row">
         <label>
-          {t.mandate.maxOrder}
-          <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_order_vnd} onChange={(e) => setM({ ...m, max_order_vnd: num(e.target.value, 100_000_000) })} />
+          {t.mandate.maxOrder(cur)}
+          <input type="number" inputMode="numeric" min={0} step={rate ? 10 : 10000} value={shown(m.max_order_vnd)} onChange={(e) => setM({ ...m, max_order_vnd: toVnd(e.target.value) })} />
         </label>
         <label>
-          {t.mandate.maxDay}
-          <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_day_vnd} onChange={(e) => setM({ ...m, max_day_vnd: num(e.target.value, 100_000_000) })} />
+          {t.mandate.maxDay(cur)}
+          <input type="number" inputMode="numeric" min={0} step={rate ? 10 : 10000} value={shown(m.max_day_vnd)} onChange={(e) => setM({ ...m, max_day_vnd: toVnd(e.target.value) })} />
         </label>
       </div>
       {save.isError && <p className="error" role="alert">{t.settings.saveFailed}</p>}

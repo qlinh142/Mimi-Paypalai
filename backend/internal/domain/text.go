@@ -74,3 +74,40 @@ func CleanItemName(s string) string {
 	}
 	return s
 }
+
+// ASCII đưa chữ về dạng gửi được cho cổng thanh toán và tool bên ngoài (luật 4.1, chốt
+// 03/11): bỏ dấu, "đ" thành "d", giữ hoa thường, bỏ ký tự ngoài ASCII in được, gộp khoảng
+// trắng, rồi cắt còn tối đa max ký tự (max <= 0: không cắt). "·" và "–" đổi thành "-".
+func ASCII(s string, max int) string {
+	var b strings.Builder
+	space := false
+	for _, r := range norm.NFD.String(s) {
+		switch {
+		case r == 'đ':
+			r = 'd'
+		case r == 'Đ':
+			r = 'D'
+		case r == '·' || r == '–' || r == '—':
+			r = '-'
+		case unicode.Is(unicode.Mn, r):
+			continue
+		}
+		if unicode.IsSpace(r) {
+			space = b.Len() > 0
+			continue
+		}
+		if r < 0x21 || r > 0x7e {
+			continue
+		}
+		if space {
+			b.WriteByte(' ')
+			space = false
+		}
+		b.WriteRune(r)
+	}
+	out := b.String()
+	if max > 0 && len(out) > max {
+		out = strings.TrimRight(out[:max], " ")
+	}
+	return out
+}

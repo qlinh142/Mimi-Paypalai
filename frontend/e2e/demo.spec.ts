@@ -50,7 +50,8 @@ test("kịch bản demo: quét bill, Đồ dùng, Sổ chi tiêu, Kế hoạch",
   await expect(page.getByText("Sữa và chế phẩm sữa")).toBeVisible();
   await expect(page.getByText("Khoản chi định kỳ").first()).toBeVisible();
 
-  // Cảnh 3b và 3c: Kế hoạch có gợi ý món sắp hết, ước tính chi, ba cách mua và Mimi đang khóa.
+  // Cảnh 3b và 3c: Kế hoạch có gợi ý món sắp hết, ước tính chi, ba cách mua. Mimi 2.0: nút Mimi
+  // mở Mua online ở Kế hoạch chính (bản thử luôn bật), giá USD của cửa hàng sandbox ở Mỹ.
   await home(page);
   await page.getByRole("link", { name: /^Kế hoạch/ }).first().click();
   await page.getByText("Giỏ mua sắm", { exact: true }).first().click();
@@ -58,9 +59,12 @@ test("kịch bản demo: quét bill, Đồ dùng, Sổ chi tiêu, Kế hoạch",
   await expect(page.getByText(/Dự kiến chi/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Tôi", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Gửi cho thành viên" })).toBeVisible();
-  const mimi = page.getByRole("button", { name: /Mimi.*Sắp ra mắt/s });
-  await expect(mimi).toBeVisible();
-  await expect(mimi).toBeDisabled();
+  const mimi = page.getByRole("button", { name: "Mimi", exact: true });
+  await expect(mimi).toBeEnabled();
+  await mimi.click();
+  await expect(page.getByText("Cửa hàng: Mimi Mart Sandbox (US)")).toBeVisible();
+  await expect(page.getByText(/^Thanh toán US\$\d+\.\d{2} · tỷ giá ngày/)).toBeVisible();
+  await expect(page.getByText("Trang thanh toán của PayPal hiện bằng tiếng Anh.")).toBeVisible();
 
   expect(errors).toEqual([]);
 });

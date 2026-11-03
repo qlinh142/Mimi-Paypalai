@@ -342,6 +342,9 @@ export type OrderLine = {
   unit_price_vnd: number;
   snapshot_price_vnd: number;
   total_vnd: number;
+  source_currency?: string;    // tiền gốc của merchant (thị trường Mỹ: USD)
+  unit_price_source?: string;  // "4.29"
+  total_source?: string;
   need_by?: string;
   eta: string;
   verified_qty?: number;
@@ -357,9 +360,13 @@ export type Basket = {
   vnd_per_usd: number;
   rate_source?: string;
   rate_as_of?: string;
+  fx?: OrderFx;
   snapshot_at: string;
   decision: { result: MandateResult; reasons: MandateReason[] };
 };
+
+/** Bản chép tỷ giá USD của ngày đặt hàng (luật tiền tệ 03/11). */
+export type OrderFx = { rate: string; source: string; at: string; on?: string };
 
 export type OrderState = "awaiting_payment" | "paid" | "ordered" | "shipped" | "delivered" | "verified";
 
@@ -381,6 +388,12 @@ export type Order = {
   rate_as_of?: string;
   decision: { result: MandateResult; reasons: MandateReason[] };
   approved_by_user: boolean;
+  provider: "paypal" | "braintree";
+  provider_order_id: string;
+  provider_txn_id?: string;
+  source_currency: string;
+  source_amount: string;
+  fx?: OrderFx;
   paypal_order_id: string;
   approve_url?: string;
   paypal_capture_id?: string;
