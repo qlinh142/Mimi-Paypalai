@@ -155,6 +155,7 @@ func serveAPI(ctx context.Context, cfg config.Config, log *slog.Logger, store *f
 		// Nút "Cập nhật giá": tra lại giá món trong một kế hoạch, cùng nguồn công khai với job.
 		PriceRefresh: market.NewRefresher(store, []market.Source{reader.NewPriceSearch(store, log)}, store, market.RefreshOptions{Log: log, FX: store}),
 		History:      history.New(store),
+		FX:           store, // tỷ giá từng ngày, app quy đổi sang tiền tệ hiển thị
 		Accounts:     account.New(store, store, auth),
 		SignIn:       auth,
 	}, httpapi.WithTimeouts(cfg.ReadTimeout, cfg.DefaultTimeout), httpapi.WithIdempotency(fsstore.NewIdempotency(store)),

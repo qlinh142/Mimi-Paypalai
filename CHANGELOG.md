@@ -15,6 +15,38 @@ Nhánh `feat/dich-ten-mon`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 
 - Kiểm tra: test mới trong `TestRead` (dòng có/không có tên dịch), `go test ./internal/receipt ./internal/history ./internal/httpapi`, `tsc -b`, Playwright bản tiếng Anh (ảnh `screens/ten-dich-lich-su.png`).
 - Chưa làm: tên món ở Đồ dùng vẫn lấy theo tên trên bill; hóa đơn đã lưu trước đây không có tên dịch.
 
+## 2026-11-03 · Tiền tệ hiển thị theo từng người (VND, USD)
+
+Nhánh `feat/tien-te-hien-thi`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 4–5 (mẹ chốt 03/11): mỗi người tự chọn tiền tệ hiển thị, tạm VND và USD; số tiền quy đổi theo tỷ giá của ngày mua.
+
+- Cài đặt › Ngôn ngữ & khu vực: ô Tiền tệ chọn được VND hoặc USD, lưu vào tài khoản (`settings.currency`). Câu ghi chú sửa lại: ngôn ngữ và tiền tệ chọn riêng.
+- Máy chủ: `GET /fx/rates?currency=USD&from&to` trả tỷ giá từng ngày (kèm ngày gần nhất trước `from`), dùng chung index với `Store.Rate`. Số tiền vẫn lưu bằng đồng, không đổi dữ liệu nào.
+- App (`lib/money.ts`, `app/MoneySync.tsx`): nạp tỷ giá USD 800 ngày, nhớ trên máy; `formatVnd(số, ngày)` quy đổi theo ngày mua, ngày chưa có tỷ giá dùng ngày gần nhất trước đó.
+  - Theo ngày mua: Lịch sử mua hàng (từng hóa đơn, từng dòng), lịch sử giá của món, giá lần mua gần nhất / thấp nhất.
+  - Tổng theo tháng (Sổ chi tiêu): tháng đã qua theo tỷ giá ngày cuối tháng (cố định), tháng này theo hôm nay.
+  - Giá hiện tại, kế hoạch, dự báo: theo tỷ giá hôm nay.
+- Sau khi lưu cài đặt, app ghi ngay vào bản nhớ `/me`; lúc mở app chỉ tin `/me` vừa tải từ máy chủ (bản khôi phục từ IndexedDB có thể còn giá trị cũ).
+- Kiểm tra: `go test ./internal/httpapi ./internal/user` (test mới `TestFXRates`), test emulator `TestRateHistoryEmulator`, `tsc -b`, Playwright đổi sang USD: Trang chủ 1.284.000đ → 50,46 US$, Sổ chi tiêu và Lịch sử đổi theo.
+- Chưa làm: ô nhập tiền (sửa giá, khoản định kỳ) vẫn nhập bằng đồng.
+
+## 2026-11-03 · Ngôn ngữ theo tài khoản, người mới theo ngôn ngữ điện thoại
+
+Nhánh `feat/ngon-ngu-theo-tai-khoan`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2 (mẹ chốt 03/11): một ngôn ngữ chung của app, lưu theo tài khoản; người mới theo ngôn ngữ máy.
+
+- Người mới mở app: máy đặt tiếng Việt thì vào tiếng Việt, còn lại tiếng Anh (trước đây luôn tiếng Việt).
+- Ô VI/EN ở màn đăng nhập trước là "Ngôn ngữ dịch hóa đơn" và không nối vào đâu; giờ là ngôn ngữ của app, bấm là đổi ngay.
+- Sau khi đăng nhập (`app/LangSync.tsx`): tài khoản chưa có ngôn ngữ thì ghi ngôn ngữ đang dùng lên tài khoản; tài khoản đã có ngôn ngữ khác máy thì app đổi theo tài khoản (đăng nhập máy mới vẫn đúng ngôn ngữ). Mở bằng `?ui=` thì ưu tiên `?ui=` và ghi lên tài khoản.
+- Máy chủ: tài khoản mới không còn mặc định `lang: vi`; mô tả `lang` trong API đổi thành ngôn ngữ của tài khoản (giao diện, tên món dịch, lời nhắc, email).
+- Kiểm tra: Playwright với máy vi-VN, en-US, fr-FR ra đúng ngôn ngữ và nút VI/EN đổi được; `go test ./internal/user ./internal/httpapi`, `tsc -b`.
+
+## 2026-11-03 · Tỷ giá đã chốt của một ngày không bị ghi đè
+
+Nhánh `feat/ty-gia-khong-ghi-de`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 5 (mẹ chốt 03/11): quét tỷ giá 1 lần/ngày, ngày đã có thì giữ nguyên, ngày chưa có dùng tỷ giá gần nhất trước đó.
+
+- `fsstore.SaveRates` dùng Create thay cho Set: chạy lại fx-sync trong ngày không đổi tỷ giá đã ghi, nên hóa đơn quy đổi theo ngày đó luôn ra cùng một số.
+- Phần "ngày chưa có dùng tỷ giá gần nhất trước đó" đã đúng từ trước (`Store.Rate`); lịch fx-sync vẫn 6h sáng mỗi ngày.
+- Kiểm tra: test emulator mới `TestSaveRatesKeepsFirstOfDayEmulator` (ghi 2 lần cùng ngày, đọc ra lần đầu).
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.

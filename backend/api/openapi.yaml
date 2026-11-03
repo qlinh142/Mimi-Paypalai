@@ -547,6 +547,37 @@ paths:
         - { name: limit, in: query, schema: { type: integer, maximum: 100 } }
       responses: { "200": { description: OK } }
 
+  /fx/rates:
+    get:
+      tags: [items]
+      summary: "Tỷ giá từng ngày (số đồng cho 1 đơn vị ngoại tệ) để app quy đổi sang tiền tệ hiển thị theo ngày mua"
+      description: |
+        Trả các ngày có tỷ giá trong [from, to], cũ trước, kèm một ngày gần nhất trước from (ngày chưa có
+        tỷ giá dùng tỷ giá gần nhất trước đó). Vắng to: hôm nay; vắng from: to lùi 800 ngày.
+      parameters:
+        - { name: currency, in: query, required: true, schema: { type: string, example: USD } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [currency, rates]
+                properties:
+                  currency: { type: string }
+                  rates:
+                    type: array
+                    items:
+                      type: object
+                      required: [on, rate]
+                      properties:
+                        on: { type: string, format: date }
+                        rate: { type: string, description: "Số đồng cho 1 đơn vị, thập phân" }
+        "422": { $ref: "#/components/responses/Error" }
+
   # ---------------- Mimi Online ----------------
   # Chỉ đăng ký khi PAYPAL_MODE khác off. Payment không đổi tồn kho; chỉ Verify mới cộng Confirmed Inventory.
   /mandate:
@@ -857,8 +888,9 @@ components:
         channels: { type: array, items: { type: string, enum: [in_app, email] } }
         replacement_enabled: { type: boolean }
         sale_enabled: { type: boolean }
-        lang: { type: string, enum: [vi, en], description: "Ngôn ngữ dịch hóa đơn, không phải ngôn ngữ giao diện" }
+        lang: { type: string, enum: [vi, en], description: "Ngôn ngữ của tài khoản: giao diện, tên món dịch, lời nhắc, email. Vắng khi người mới chưa ghi; app ghi theo ngôn ngữ điện thoại" }
         country: { type: string, enum: [VN, SG], description: "Nước để lấy giá online. Vắng: đoán theo múi giờ (Asia/Singapore là SG, còn lại VN)" }
+        currency: { type: string, enum: [VND, USD], description: "Tiền tệ hiển thị của người này. Vắng: VND. Số tiền vẫn lưu bằng VND, chỉ quy đổi lúc hiển thị" }
         relations:
           type: object
           maxProperties: 50

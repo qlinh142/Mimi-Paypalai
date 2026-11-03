@@ -12,9 +12,10 @@ export type Me = {
   receipt_count: number;
   settings: {
     lead_days: number;
-    lang: "vi" | "en";
+    lang?: "vi" | "en";      // ngôn ngữ của tài khoản; vắng khi người mới chưa ghi
     timezone: string;
     country?: "VN" | "SG";     // nước lấy giá online; vắng thì máy chủ đoán theo múi giờ
+    currency?: "VND" | "USD";  // tiền tệ hiển thị của người này; vắng là VND
     remind_enabled?: boolean;
     digest_time?: string;      // HH:MM
     relations?: Record<string, string>; // tên gọi người nhà theo uid, lưu trên máy chủ
@@ -301,6 +302,7 @@ export type SettingsPatch = Partial<{
   timezone: string;
   lang: "vi" | "en";
   country: "VN" | "SG";
+  currency: "VND" | "USD";
   /** Chỉ gửi phần đổi; "" là xóa tên gọi của uid đó. */
   relations: Record<string, string>;
 }>;

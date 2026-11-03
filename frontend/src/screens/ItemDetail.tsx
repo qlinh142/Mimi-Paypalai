@@ -157,8 +157,8 @@ function HistoryCard({ itemKey, unit }: { itemKey: string; unit: string }) {
       ) : (
         <>
           <dl className="stats15">
-            <div><dt>{m15.detail.last}</dt><dd className="num">{h.data?.last_purchase ? formatVnd(h.data.last_purchase.paid_price) : "–"}</dd></div>
-            <div><dt>{m15.detail.lowest}</dt><dd className="num">{h.data?.lowest_historical ? formatVnd(h.data.lowest_historical.paid_price) : "–"}</dd></div>
+            <div><dt>{m15.detail.last}</dt><dd className="num">{h.data?.last_purchase ? formatVnd(h.data.last_purchase.paid_price, h.data.last_purchase.purchased_at) : "–"}</dd></div>
+            <div><dt>{m15.detail.lowest}</dt><dd className="num">{h.data?.lowest_historical ? formatVnd(h.data.lowest_historical.paid_price, h.data.lowest_historical.purchased_at) : "–"}</dd></div>
             <div><dt>{m15.detail.avg}</dt><dd className="num">{avg != null ? formatVnd(avg) : "–"}</dd></div>
           </dl>
           <ul className="hist15">
@@ -166,7 +166,7 @@ function HistoryCard({ itemKey, unit }: { itemKey: string; unit: string }) {
               <li key={i}>
                 <span>{formatDayMonth(r.purchased_at.slice(0, 10))}</span>
                 <span>{r.store_name}</span>
-                <span className="num">{formatVnd(r.paid_price)}{per}</span>
+                <span className="num">{formatVnd(r.paid_price, r.purchased_at)}{per}</span>
               </li>
             ))}
           </ul>
