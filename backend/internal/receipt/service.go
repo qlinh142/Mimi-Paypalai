@@ -235,7 +235,7 @@ func (s *Service) readPages(ctx context.Context, uid string, imgs []Image, lang 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			hash := imageHash(img)
+			hash := imageHash(img) + "_" + lang // tên dịch theo ngôn ngữ app nên bản đọc nhớ theo ngôn ngữ
 			if s.pages != nil {
 				if cached, err := s.pages.GetPage(ctx, uid, hash); err == nil && cached != nil {
 					pages[i] = *cached
@@ -399,6 +399,9 @@ func (s *Service) draftLine(l PageLine) (DraftLine, bool) {
 		PackageCount: l.PackageCount, PackageSize: l.PackageSize, PackageUnit: domain.NormalizeUnit(l.PackageUnit),
 	}
 	dl.Name = displayName(pn, raw)
+	if tr := domain.CleanItemName(l.Translated); tr != "" && !strings.EqualFold(tr, dl.Name) {
+		dl.OriginalName, dl.Name = dl.Name, truncateRunes(tr, maxNameRunes)
+	}
 	pk, reasons := measure(raw, dl.Qty, dl.Unit, l.PackageCount, l.PackageSize, l.PackageUnit, dl.GroupKey)
 	dl.CanonicalQty, dl.CanonicalUnit = pk.Total, string(pk.Unit)
 	dl.ReviewReasons = reviewReasons(dl.CategoryKey, dl.GroupKey, reasons)
@@ -599,6 +602,7 @@ type SaveLine struct {
 	Brand        string  `json:"brand,omitempty"`
 	ProductName  string  `json:"product_name,omitempty"`
 	SourceLang   string  `json:"source_language,omitempty"`
+	OriginalName string  `json:"original_name,omitempty"`
 	PackageCount float64 `json:"package_count,omitempty"`
 	PackageSize  float64 `json:"package_size,omitempty"`
 	PackageUnit  string  `json:"package_unit,omitempty"`
@@ -762,6 +766,7 @@ func (s *Service) build(ctx context.Context, p authz.Principal, req SaveRequest)
 			Product: Product{
 				RawName: raw, Brand: pn.Brand, ProductName: pn.ProductName, DetailName: pn.DetailName, ProductKey: pn.ProductKey,
 				SourceLang:   strings.ToLower(strings.TrimSpace(l.SourceLang)),
+				OriginalName: truncateRunes(domain.CleanItemName(l.OriginalName), maxNameRunes),
 				PackageCount: pk.Count, PackageSize: pk.Size, PackageUnit: pk.SizeUnit,
 				CanonicalQty: pk.Total, CanonicalUnit: string(pk.Unit),
 			},
@@ -866,3 +871,14 @@ func userLocation(p authz.Principal) *time.Location {
 // Asia/Ho_Chi_Minh không có giờ mùa hè, nên múi cố định +7 là dự phòng an toàn khi
 // máy chủ thiếu tzdata (image distroless/static có kèm tzdata nếu import time/tzdata).
 var vnLocation = time.FixedZone("ICT", 7*3600)
+
+// maxNameRunes: tên món tối đa 120 ký tự như ô name của SaveLine.
+const maxNameRunes = 120
+
+func truncateRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return strings.TrimSpace(string(r[:n]))
+}

@@ -30,7 +30,7 @@ export function receiptTitle(r: HistoryReceipt, relationOf: (uid: string) => str
   return r.kind === "delegated" ? m15.history.delegated(buyer, r.plan_name ?? "") : r.store;
 }
 
-const vndOrNone = (v: number | null) => (v == null ? m15.plan.noPrice : formatVnd(v));
+const vndOrNone = (v: number | null, on?: string) => (v == null ? m15.plan.noPrice : formatVnd(v, on));
 
 /** Một dòng hóa đơn (hoặc khoản định kỳ đã trả, góp ý 01/11): dùng ở Sổ chi tiêu (tóm tắt) và màn 4c. */
 export function ReceiptRow({ r }: { r: HistoryReceipt }) {
@@ -46,7 +46,7 @@ export function ReceiptRow({ r }: { r: HistoryReceipt }) {
           <span>{receiptTitle(r, relationOf)}{rec && <span className="tag15 ph15__rectag">{m15.history.recurringTag}</span>}</span>
           <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{rec ? dayTime(r.purchased_at).split(" · ")[0] : dayTime(r.purchased_at)}</small>
         </span>
-        <span className="num">{formatVnd(r.total_vnd)}</span>
+        <span className="num">{formatVnd(r.total_vnd, r.purchased_at)}</span>
         <ChevronRight size={18} aria-hidden />
       </Link>
     </li>
@@ -186,27 +186,28 @@ export function ReceiptDetailScreen() {
                         <span className="line15__name">
                           {l.name}{l.spec ? ` ${l.spec}` : ""}
                           {l.tag && <span className={`tag15 ${l.tag === "mine" ? "tag15--buyer" : "tag15--bought"}`}>{l.tag === "mine" ? m15.run.mineShort : m15.run.forOwner(r.split?.owner_name ?? "")}</span>}
+                          {l.original_name && <span className="name15__orig">{l.original_name}</span>}
                         </span>
                         <span className="line15__sub">
-                          {l.qty} × {vndOrNone(l.unit_price)}
+                          {l.qty} × {vndOrNone(l.unit_price, r.purchased_at)}
                           {l.price_source === "estimate" && <span className="tag15 tag15--draft">{m15.plan.estimated}</span>}
                         </span>
                       </span>
-                      <span className="num run15__total" style={l.amount == null ? { opacity: 0.55 } : undefined}>{vndOrNone(l.amount)}</span>
+                      <span className="num run15__total" style={l.amount == null ? { opacity: 0.55 } : undefined}>{vndOrNone(l.amount, r.purchased_at)}</span>
                     </div>
                   </li>
                 ))}
               </ul>
             </section>
             <section className="box15 ph15__sum">
-              <p><span>{m15.history.subtotal}</span><span className="num">{formatVnd(r.subtotal)}</span></p>
-              {r.discount > 0 && <p className="ph15__disc"><span>{m15.history.discount}</span><span className="num">−{formatVnd(r.discount)}</span></p>}
-              <p className="ph15__total"><span>{m15.history.total}</span><span className="num">{formatVnd(r.total_vnd)}</span></p>
+              <p><span>{m15.history.subtotal}</span><span className="num">{formatVnd(r.subtotal, r.purchased_at)}</span></p>
+              {r.discount > 0 && <p className="ph15__disc"><span>{m15.history.discount}</span><span className="num">−{formatVnd(r.discount, r.purchased_at)}</span></p>}
+              <p className="ph15__total"><span>{m15.history.total}</span><span className="num">{formatVnd(r.total_vnd, r.purchased_at)}</span></p>
               {(r.missing_price ?? 0) > 0 && <p className="hint">{t.confirm.noPriceCount(r.missing_price ?? 0)}</p>}
               {r.split && (
                 <>
-                  <p><span>{m15.run.forOwner(r.split.owner_name)}</span><span className="num">{formatVnd(r.split.for_owner)}</span></p>
-                  <p><span>{m15.run.mineShort}</span><span className="num">{formatVnd(r.split.mine)}</span></p>
+                  <p><span>{m15.run.forOwner(r.split.owner_name)}</span><span className="num">{formatVnd(r.split.for_owner, r.purchased_at)}</span></p>
+                  <p><span>{m15.run.mineShort}</span><span className="num">{formatVnd(r.split.mine, r.purchased_at)}</span></p>
                 </>
               )}
             </section>

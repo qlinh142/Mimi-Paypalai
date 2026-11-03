@@ -50,7 +50,7 @@ export const vi: Messages = {
     resend: "Gửi lại",
     openMockLink: "Mở link (bản thử)",
     footer: "Càng quét nhiều hóa đơn, Mimi càng hiểu bạn.",
-    langGroup: "Ngôn ngữ dịch hóa đơn",
+    langGroup: "Ngôn ngữ",
   },
   home: {
     greet: (name) => (name ? `Chào ${name}!` : "Chào bạn!"),

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
+	"github.com/smartlife-lab/mimi/backend/internal/domain"
+	"github.com/smartlife-lab/mimi/backend/internal/fx"
 	"github.com/smartlife-lab/mimi/backend/internal/history"
 	"github.com/smartlife-lab/mimi/backend/internal/home"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
@@ -112,6 +114,10 @@ type (
 		Detail(ctx context.Context, p authz.Principal, id string) (history.Detail, error)
 	}
 	// Market là bảng giá chung (ADR-004), chỉ từ nguồn công khai.
+	// FXHistory đọc tỷ giá từng ngày để app quy đổi số tiền sang tiền tệ hiển thị.
+	FXHistory interface {
+		RateHistory(ctx context.Context, currency string, from, to domain.Date) ([]fx.Point, error)
+	}
 	Market interface {
 		Entries(ctx context.Context, keys []string) (map[string]market.Entry, error)
 	}
@@ -173,8 +179,9 @@ type Deps struct {
 	Market     Market     // nil: không có route giá đang bán
 	// PriceRefresh nil: không có nút cập nhật giá (cần cả Market).
 	PriceRefresh PriceRefresh
-	History      History  // nil: lịch sử mua hàng trả 404
-	Accounts     Accounts // nil: DELETE /me trả 501
+	History      History   // nil: lịch sử mua hàng trả 404
+	FX           FXHistory // nil: không có GET /fx/rates (app chỉ hiện VND)
+	Accounts     Accounts  // nil: DELETE /me trả 501
 	SignIn       SignInChecker
 	Ready        ReadinessChecker
 	Metrics      Metrics // nil: không ghi metric
@@ -202,6 +209,7 @@ type Server struct {
 	market       Market
 	priceRefresh PriceRefresh
 	history      History
+	fx           FXHistory
 	ready        ReadinessChecker
 	metrics      Metrics
 	limiter      *windowLimiter
@@ -233,7 +241,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		log: d.Log, tokens: d.Tokens, accounts: d.Accounts, signIn: d.SignIn, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
-		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, priceRefresh: d.PriceRefresh, history: d.History,
+		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, priceRefresh: d.PriceRefresh, history: d.History, fx: d.FX,
 		limiter: newWindowLimiter(60), readTimeout: 55 * time.Second, defaultTimeout: 10 * time.Second,
 	}
 	if s.metrics == nil {
@@ -327,6 +335,9 @@ func (s *Server) Handler() http.Handler {
 	if s.pricing != nil {
 		private("GET /items/{key}/price-history", s.defaultTimeout, s.getItemPriceHistory)
 		private("GET /plan/price-history", s.defaultTimeout, s.getPlanPriceHistory)
+	}
+	if s.fx != nil {
+		private("GET /fx/rates", s.defaultTimeout, s.getFXRates)
 	}
 	if s.market != nil {
 		private("GET /plan/market-prices", s.defaultTimeout, s.getPlanMarketPrices)

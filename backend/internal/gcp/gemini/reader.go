@@ -71,7 +71,13 @@ For every item line:
   ("Combo 2 lon ... 900g" is count 2, size 900, unit g; "3 loc x 4 hop x 180ml" is count 12, size 180, unit ml).
   Never convert between g and ml. Leave 0 / empty when not printed.
 - group_key: the product group from the enum; use "khac" when no group fits. Do not invent keys.
-- source_language: language of the printed name (vi, en, ...).`
+- source_language: language of the printed name (vi, en, ...).
+- name_translated: only when the request names a target language different from source_language:
+  brand + product name + size in that language, short (at most about 40 characters), no marketing text,
+  brand names kept as is ("TH true MILK Unsweetened UHT fresh milk 180ml"). Otherwise leave empty.`
+
+// langNames: ngôn ngữ app hỗ trợ (mẹ chốt 03/11: tiếng Việt, tiếng Anh).
+var langNames = map[string]string{"vi": "Vietnamese", "en": "English"}
 
 type output struct {
 	Readable      bool   `json:"readable"`
@@ -88,6 +94,7 @@ type output struct {
 		PackageSize  float64 `json:"package_size"`
 		PackageUnit  string  `json:"package_unit"`
 		SourceLang   string  `json:"source_language"`
+		Translated   string  `json:"name_translated"`
 		Qty          float64 `json:"qty"`
 		Unit         string  `json:"unit"`
 		Amount       string  `json:"amount"`
@@ -127,6 +134,7 @@ func (r *Reader) schema() *genai.Schema {
 						"package_size":    num("size of one package, 0 if not printed"),
 						"package_unit":    str("unit of package_size (g, kg, ml, l, qua, vien...), empty if not printed"),
 						"source_language": str("language of the printed name, ISO 639-1"),
+						"name_translated": str("short name in the target language when it differs from source_language, else empty"),
 						"qty":             {Type: genai.TypeNumber},
 						"unit":            str("unit printed next to the quantity (kg, g, l, ml, hop, goi, chai...), empty if none"),
 						"amount":          str("line total, verbatim, keep the minus sign for discount lines"),
@@ -142,10 +150,12 @@ func (r *Reader) schema() *genai.Schema {
 }
 
 func (r *Reader) ReadPage(ctx context.Context, img receipt.Image, lang string) (receipt.Page, error) {
-	// Tên món giữ nguyên theo bill (tài liệu 1.1): AI chuẩn hóa một lần, không dịch theo
-	// ngôn ngữ giao diện. Nhãn nhóm hiển thị tra từ taxonomy theo ngôn ngữ ở client.
-	_ = lang
+	// Tên món giữ nguyên theo bill (tài liệu 1.1) và AI chuẩn hóa một lần. Bill khác ngôn ngữ
+	// app của người quét thì dịch tên luôn trong lượt đọc này (mẹ chốt 03/11), không gọi thêm.
 	prompt := "Read this receipt."
+	if name, ok := langNames[lang]; ok {
+		prompt += " Target language: " + name + " (" + lang + ")."
+	}
 	temp := float32(0)
 	resp, err := r.client.Models.GenerateContent(ctx, r.model,
 		[]*genai.Content{genai.NewContentFromParts([]*genai.Part{
@@ -179,7 +189,7 @@ func (r *Reader) ReadPage(ctx context.Context, img receipt.Image, lang string) (
 	for _, l := range out.Lines {
 		page.Lines = append(page.Lines, receipt.PageLine{
 			RawName: l.RawName, Brand: l.Brand, ProductName: l.ProductName, PackageCount: l.PackageCount,
-			PackageSize: l.PackageSize, PackageUnit: l.PackageUnit, SourceLang: l.SourceLang,
+			PackageSize: l.PackageSize, PackageUnit: l.PackageUnit, SourceLang: l.SourceLang, Translated: l.Translated,
 			Qty: l.Qty, Unit: l.Unit, Amount: l.Amount, CategoryKey: l.CategoryKey, GroupKey: l.GroupKey,
 		})
 	}
