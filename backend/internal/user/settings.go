@@ -26,6 +26,8 @@ type SettingsPatch struct {
 	ReplacementEnabled *bool     `json:"replacement_enabled"`
 	SaleEnabled        *bool     `json:"sale_enabled"`
 	Lang               *string   `json:"lang"`
+	// Country: nước để lấy giá online (VN, SG), mẹ chốt 02/11. Vắng: đoán theo múi giờ.
+	Country *string `json:"country"`
 	// Relations: tên gọi người nhà mà người này đặt, theo uid (Anh, Chị, Bố...). Chỉ gửi
 	// phần thay đổi; giá trị "" xóa tên gọi của uid đó. Mỗi tài khoản giữ bản riêng.
 	Relations map[string]string `json:"relations"`
@@ -106,6 +108,9 @@ func (p SettingsPatch) Validate() error {
 			seen[c] = true
 		}
 	}
+	if p.Country != nil && *p.Country != "VN" && *p.Country != "SG" {
+		return bad("country", "Quốc gia chỉ là VN hoặc SG.")
+	}
 	if p.Lang != nil && *p.Lang != "vi" && *p.Lang != "en" {
 		return bad("lang", "Ngôn ngữ dịch hóa đơn chỉ là vi hoặc en.")
 	}
@@ -123,7 +128,7 @@ func (p SettingsPatch) Validate() error {
 func (p SettingsPatch) empty() bool {
 	return p.DisplayName == nil && p.LeadDays == nil && p.RemindEnabled == nil && p.RemindFreq == nil &&
 		p.DigestTime == nil && p.Timezone == nil && p.Channels == nil && p.ReplacementEnabled == nil &&
-		p.SaleEnabled == nil && p.Lang == nil && len(p.Relations) == 0
+		p.SaleEnabled == nil && p.Lang == nil && p.Country == nil && len(p.Relations) == 0
 }
 
 // Apply gộp bản vá vào cài đặt hiện tại và tính lại lịch gửi bản tin khi cần.
@@ -167,6 +172,9 @@ func (p SettingsPatch) Apply(cur Stored, now time.Time) Stored {
 	}
 	if p.Lang != nil {
 		set("lang", *p.Lang)
+	}
+	if p.Country != nil {
+		set("country", *p.Country)
 	}
 	if len(p.Relations) > 0 {
 		rels := map[string]any{}

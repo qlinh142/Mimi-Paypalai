@@ -29,3 +29,80 @@ func TestMarketSaveEntriesEmulator(t *testing.T) {
 		t.Fatalf("%+v %v", e, ok)
 	}
 }
+
+func TestMarketTouchedAndRefreshQuotaEmulator(t *testing.T) {
+	s, _, uid := emulator(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	key := "rong-" + uid
+	if err := s.SaveEntry(ctx, market.Entry{Key: key, Name: "Không ra giá", UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Touched(ctx, []string{key, "khong-co-" + uid})
+	if err != nil || len(got) != 1 || !got[key].Equal(now) {
+		t.Fatalf("%v %v", got, err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.ReservePriceRefresh(ctx, uid, "2031-01-10", 2, now); err == nil {
+		t.Fatal("want quota error")
+	}
+	if used, last, err := s.PriceRefreshStatus(ctx, uid, "2031-01-10"); err != nil || used != 2 || !last.Equal(now) {
+		t.Fatalf("%d %v %v", used, last, err)
+	}
+	// Lượt đọc hóa đơn tính riêng.
+	if err := s.Reserve(ctx, uid, "2031-01-10", 1); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPriceSourcesEmulator(t *testing.T) {
+	s, _, uid := emulator(t)
+	ctx := context.Background()
+	country := "T" + uid[len(uid)-6:] // nước giả để không lẫn với test khác
+	set := func(r market.SourceRecord) market.SourceRecord {
+		r.Hits++
+		r.Store = "FairPrice"
+		r.Categories = map[string]string{"dairy": "https://www.fairprice.com.sg/category/milk"}
+		return r
+	}
+	for i := 0; i < 2; i++ {
+		if err := s.Update(ctx, country, "fairprice.com.sg", set); err != nil {
+			t.Fatal(err)
+		}
+	}
+	recs, err := s.Sources(ctx, country)
+	if err != nil || len(recs) != 1 || recs[0].Hits != 2 || !recs[0].Active() || recs[0].Categories["dairy"] == "" {
+		t.Fatalf("%+v %v", recs, err)
+	}
+}
+
+// Món trong kế hoạch mang nước của chủ kế hoạch (Cài đặt), để tra giá đúng nước.
+func TestWantedItemsCountryEmulator(t *testing.T) {
+	s, c, uid := emulator(t)
+	ctx := context.Background()
+	if _, err := c.Collection("users").Doc(uid).Set(ctx, map[string]any{"settings": map[string]any{"country": "SG"}}); err != nil {
+		t.Fatal(err)
+	}
+	name := "Milk " + uid
+	if _, err := c.Collection("users").Doc(uid).Collection("plan_items").Doc("milk").Set(ctx,
+		map[string]any{"status": "open", "name": name, "category_key": "dairy"}); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := s.WantedItems(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range ws {
+		if w.Name == name {
+			if w.Country != "SG" || w.Key != market.ItemID("SG", name) || w.Category != "dairy" || w.GroupKey != "milk" {
+				t.Fatalf("%+v", w)
+			}
+			return
+		}
+	}
+	t.Fatal("not found")
+}

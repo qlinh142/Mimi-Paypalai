@@ -15,6 +15,42 @@ Nhánh `feat/them-vao-lich`. ADR-004 mục Lịch, mẹ chốt: chỉ tạo lị
 - Đã bỏ nút "Lịch trên iPhone" (file .ics): trên iPhone file chỉ bị tải về, không mở app Lịch, kể cả trong Safari (mẹ thử 02/11). Người dùng iPhone dùng nút Google Calendar.
 - Màn đi mua hộ: người được nhờ cũng có nút "Thêm vào Google Calendar" ngay dưới ô tóm tắt, khi kế hoạch đã có ngày (tên, giờ, nơi mua, danh sách món lấy từ kế hoạch gốc). Nút tách ra `components/AddToCalendar.tsx` dùng chung.
 
+## 2026-11-02 · Quét giá theo nước và sổ nguồn
+
+Nhánh `feat/gia-theo-nuoc` (trên `feat/gia-nha-minh`). Mẹ chốt 02/11. Luật đầy đủ: `docs/mimi15/luat-gia.md`.
+
+- Cài đặt có ô "Quốc gia (giá online)": Việt Nam, Singapore. Chưa chọn thì đoán theo múi giờ (Asia/Singapore là Singapore).
+- Bảng giá chung tách theo nước: khóa `market_prices/{nước}_{món}` (ví dụ `vn_sua-tuoi`). Giá ngoài Việt Nam lưu số tiền gốc (`local`, `currency`) và quy ra VND theo tỷ giá job fx-sync; chưa có tỷ giá thì bỏ, không đoán. Giá vô lý kiểm theo tiền gốc từng nước.
+- Hỏi AI gộp tối đa 5 món cùng nước, cùng ngành hàng một lần (job đêm và nút Cập nhật giá).
+- Sổ nguồn `price_sources/{nước}_{web}`: lưu link ngành hàng và mẫu link tìm kiếm, không lưu link từng sản phẩm. Lần sau đưa link cho AI đọc trước (URL context), thiếu mới tìm Google. Web mới vào sổ khi ra giá 2 lần; đọc trang 2 lần liền không ra giá thì đánh dấu, quay về Google, một tháng sau thử lại.
+- Shopee, Lazada chỉ nhận gian hàng chính hãng (Mall, Official).
+- Dòng giá Singapore hiện thêm tiền gốc, ví dụ "1.49 SGD".
+- Lưu ý: các dòng bảng giá cũ (khóa chưa có nước) không dùng nữa, job đêm tra lại. Gemini đọc trang kèm tìm Google chưa thử trên Vertex thật; nếu lỗi thì tự hỏi lại chỉ bằng Google.
+- Kiểm tra: `go test -race ./...` (test mới cho Normalize SGD, batches, sổ nguồn, câu hỏi AI), test emulator `TestPriceSourcesEmulator`, `TestWantedItemsCountryEmulator`; bản thử chọn Singapore thấy giá SGD.
+
+---
+
+## 2026-11-02 · Giá tốt nhất: so giá online với giá nhà mình từng mua
+
+Nhánh `feat/gia-nha-minh` (trên `feat/cap-nhat-gia`). Mẹ chốt 02/11: mỗi tài khoản có lịch sử giá riêng; giá online bằng 0 (chưa có) hoặc cao hơn giá nhà mình từng mua thì lấy giá trong lịch sử mua sắm.
+
+- Khối "Giá đang bán" đổi tên "Giá tốt nhất". Mỗi món lấy giá thấp hơn giữa giá online rẻ nhất và giá nhà mình từng mua (`unit_price`, `best_store` của Kế hoạch, đọc từ hóa đơn của chính nhà).
+- Dòng dùng giá nhà mình ghi rõ "Giá nhà mình từng mua ở … (chỉ nhà mình thấy)", kèm giá online để so hoặc "chưa có giá online".
+- Chỉ đổi giao diện: giá nhà mình không gửi lên, không ghi vào bảng giá chung.
+- Lưu ý: giá online theo quy cách nguồn ghi (ví dụ 4x180ml), giá nhà mình theo đơn vị đã mua, nên so chỉ là tương đối.
+
+---
+
+## 2026-11-02 · Nút "Cập nhật giá" trong Kế hoạch
+
+Nhánh `feat/cap-nhat-gia` (trên `feat/gia-online`). Mẹ hỏi 02/11: không phải chờ job đêm, chỉ tra các món của kế hoạch đang mở.
+
+- `POST /plan/market-prices/refresh`: tra lại giá các món của kế hoạch, cùng nguồn công khai với job. Bỏ qua món đã tra trong 24 giờ, tối đa 12 món mỗi lần, tra song song 6 món để kịp giới hạn 60 giây của Hosting, 3 lần mỗi người mỗi ngày (`quota/price-{ngày}`, tách khỏi lượt đọc hóa đơn). Mẹ chốt 24 giờ và 3 lần (02/11). Không có món nào cần tra thì không tốn lượt.
+- Nút "Cập nhật giá" dưới khối "Giá đang bán", báo "Đã tra N món, có giá M món" hoặc lỗi hết lượt. Dưới nút hiện "Hôm nay còn x/3 lần" và "Lần cập nhật gần nhất" (lưu ở `quota/price-last`, `GET /plan/market-prices` trả kèm `refresh`).
+- Kiểm tra: `go test ./internal/market ./internal/httpapi`, test emulator `TestMarketTouchedAndRefreshQuotaEmulator`, bản thử bấm nút trên iPhone 13.
+
+---
+
 ## 2026-11-02 · Giá online: bảng giá chung và job price-sync
 
 Nhánh `feat/gia-online`. Theo ADR-004 (mẹ duyệt 02/11): bảng giá chung chỉ từ nguồn công khai; giá trên hóa đơn của nhà nào chỉ dùng cho nhà đó.

@@ -33,6 +33,14 @@ export function formatDayMonth(iso: string): string {
   return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
 }
 
+/** Thời điểm ISO → giờ máy: "22:45 02/11" (cả hai ngôn ngữ). */
+export function formatDateTime(iso: string): string {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(t.getHours())}:${p(t.getMinutes())} ${p(t.getDate())}/${p(t.getMonth() + 1)}`;
+}
+
 /** "YYYY-MM" → en: "October 2026" · vi: "tháng 10/2026" */
 export function formatMonth(ym: string): string {
   const [y, m] = ym.split("-").map(Number);
