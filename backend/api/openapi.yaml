@@ -975,6 +975,7 @@ components:
               brand: { type: string }
               product_name: { type: string }
               source_language: { type: string }
+              original_name: { type: string, maxLength: 120, description: "Tên theo bill khi name là tên đã dịch sang ngôn ngữ app; gửi lại nguyên vẹn" }
               package_count: { type: number }
               package_size: { type: number }
               package_unit: { type: string }
