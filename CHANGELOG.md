@@ -5,6 +5,20 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-02 · Quét hóa đơn thật báo "chụp lại" dù ảnh rõ
+
+Nhánh `fix/quet-hoa-don-that`.
+
+- Thử trên mimi-1-5 với bill GO! rõ nét, app báo "Mimi chưa đọc được hóa đơn này. Chụp lại rõ hơn".
+- Nguyên nhân nghi nhiều nhất: schema gửi Gemini có `category_key` với enum chứa chuỗi rỗng, Vertex AI từ chối (400). Mọi lỗi 4xx của AI lại bị xếp thành "ảnh không đọc được".
+- Sửa: bỏ chuỗi rỗng khỏi enum; lỗi 400/403/404 từ AI thành `ai_unavailable` ("thử lại sau hoặc nhập tay"), không bảo chụp lại, không thử lại; log `receipt read` ghi thêm `cause` (lời Google trả về) để lần sau thấy ngay.
+- Nguyên nhân thật (log mới chỉ ra): Google trả 404 cho `gemini-2.5-flash` vì dòng Gemini 2.5 trên Vertex AI đã bị tắt ngày 20/10/2026. Script deploy đổi mặc định sang `gemini-3.8-flash` (thử trên mimi-1-5: 3.8, 3.7, 3.5 flash trả 200).
+- Sau khi đổi model, quét 1 ảnh được nhưng chậm; chụp 2 đến 3 ảnh thì ảnh sau báo `read_failed`. Thời gian chờ mỗi ảnh tăng từ 20 lên 40 giây (request vẫn trong 55 giây).
+- Màn chụp trên iPhone: khung camera co thành dải mỏng khi có ảnh. Video giờ phủ kín khung (vị trí tuyệt đối), khung giữ tối thiểu 40% chiều cao màn hình, màn cuộn được nếu chật.
+- Thử lại trên iPhone: khung vẫn chỉ hiện video ở một dải dưới đáy sau ảnh 1. Khung camera giờ cao cố định (44% màn hình), không đổi cỡ khi thêm ảnh hay hiện thông báo; ảnh thu nhỏ và nút không bị ép bẹp; lời dặn ẩn sau ảnh đầu để nút "Xong" vẫn trong màn hình. Gửi lỗi thì camera tự bật lại thay vì để khung đen.
+- Gemini 3.x mặc định "suy nghĩ" trước khi trả lời, làm đọc bill chậm. Thêm `GEMINI_THINKING` (mặc định `LOW`; đặt rỗng để model tự chọn).
+- Kiểm tra: `TestSchemaEnumsHaveNoEmptyValue`, `TestClassify`, test service mới; chạy lại trên mimi-1-5 với bill thật.
+
 ## 2026-11-02 · Bật App Check (reCAPTCHA Enterprise)
 
 Nhánh `deploy/app-check`, xếp chồng lên PR #36.

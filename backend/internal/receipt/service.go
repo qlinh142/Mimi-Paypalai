@@ -95,7 +95,7 @@ func New(reader Reader, drafts DraftCache, quota Quota, fx FXRates, store Store,
 		maxPages:     MaxPages,
 		maxPageBytes: MaxPageBytes,
 		maxLines:     150,
-		pageTimeout:  20 * time.Second,
+		pageTimeout:  40 * time.Second, // model Gemini 3.x đọc ảnh dày chữ có lúc quá 20 s; request có 55 s
 		retryBudget:  25 * time.Second,
 	}
 	for _, o := range opts {
@@ -123,7 +123,7 @@ func (s *Service) Read(ctx context.Context, p authz.Principal, receiptID, lang s
 		attrs := []any{"receipt_id", receiptID, "stage", stage, "image_count", len(imgs),
 			"image_bytes", imageSizes(imgs), "duration_ms", s.now().Sub(started).Milliseconds()}
 		if err != nil {
-			attrs = append(attrs, "error_code", string(apperr.From(err).Code))
+			attrs = append(attrs, "error_code", string(apperr.From(err).Code), "cause", err.Error())
 		}
 		s.log.InfoContext(ctx, "receipt read", append(attrs, extra...)...)
 	}
@@ -265,6 +265,8 @@ func (s *Service) readPages(ctx context.Context, uid string, imgs []Image, lang 
 		case err == nil:
 		case errors.Is(err, ErrUnreadable):
 			unreadable = append(unreadable, i+1)
+		case errors.Is(err, ErrAIRejected):
+			return nil, calls, apperr.Wrap(apperr.CodeAIUnavailable, "Mimi tạm thời chưa đọc được hóa đơn. Mẹ thử lại sau hoặc nhập tay nhé.", err)
 		default:
 			return nil, calls, apperr.Wrap(apperr.CodeReadFailed, "Mimi chưa đọc được. Ảnh vẫn được giữ, hãy thử lại.", err).
 				With("image_index", i+1)
@@ -294,7 +296,7 @@ func (s *Service) readOne(ctx context.Context, img Image, lang string) (Page, er
 		if errors.Is(err, ErrNoItems) {
 			return Page{}, nil // ảnh chỉ có phần tổng của hóa đơn dài: hợp lệ, không có dòng
 		}
-		if err == nil || errors.Is(err, ErrUnreadable) || attempt >= 1 {
+		if err == nil || errors.Is(err, ErrUnreadable) || errors.Is(err, ErrAIRejected) || attempt >= 1 {
 			return page, err
 		}
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < s.retryBudget {

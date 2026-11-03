@@ -58,6 +58,10 @@ var ErrUnreadable = errors.New("receipt: page unreadable")
 // ErrNoItems: ảnh đọc được nhưng không thấy dòng món nào (BUG-05 mã no_items).
 var ErrNoItems = errors.New("receipt: no items on page")
 
+// ErrAIRejected: dịch vụ AI từ chối yêu cầu (sai cấu hình, thiếu quyền, model không có).
+// Không phải lỗi của ảnh nên không bảo người dùng chụp lại, và không retry.
+var ErrAIRejected = errors.New("receipt: AI request rejected")
+
 // ErrTransient: AI quá tải hoặc lỗi tạm thời. Có thể retry trong ngân sách thời gian.
 var ErrTransient = errors.New("receipt: transient AI failure")
 

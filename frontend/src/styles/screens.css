@@ -169,11 +169,17 @@
 .stock-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
 
 /* ================= Màn quét: nền tối toàn màn hình ================= */
-.scan { position: fixed; inset: 0; background: var(--dark); color: #fff; display: flex; flex-direction: column; padding: calc(var(--safe-t) + var(--s2)) var(--s4) calc(var(--safe-b) + var(--s4)); }
+.scan { position: fixed; inset: 0; overflow-y: auto; background: var(--dark); color: #fff; display: flex; flex-direction: column; padding: calc(var(--safe-t) + var(--s2)) var(--s4) calc(var(--safe-b) + var(--s4)); }
 .scan__top { display: flex; align-items: center; justify-content: space-between; min-height: var(--tap); }
 .scan__top .icon-btn { color: #fff; }
-.scan__view { flex: 1; margin: var(--s2) 0; border-radius: var(--r-tile); overflow: hidden; background: #0a0f29; display: grid; place-items: center; position: relative; }
-.scan__view video { width: 100%; height: 100%; object-fit: cover; }
+/* Khung camera cao cố định: khi thêm ảnh hay hiện thông báo, khung không đổi cỡ.
+   Trình duyệt trên iPhone vẽ video lệch (chỉ còn một dải dưới đáy) mỗi khi khung bị co lại. */
+.scan__view { flex: none; height: clamp(220px, 44svh, 520px); margin: var(--s2) 0; border-radius: var(--r-tile); overflow: hidden; background: #0a0f29; display: grid; place-items: center; position: relative; }
+/* Video phủ kín khung theo vị trí tuyệt đối: luồng camera điện thoại thường nằm ngang, để theo lưới thì
+   khung bị co thành một dải mỏng khi danh sách ảnh và nút bên dưới dài ra. */
+.scan > * { flex-shrink: 0; } /* màn thấp thì cuộn, không ép bẹp ảnh thu nhỏ hay nút */
+.scan[aria-busy="true"] .scan__view { flex: 1; height: auto; } /* màn chờ đọc: không có camera */
+.scan__view video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .scan__hint { font-size: var(--fs-sm); color: #c9d4f5; text-align: center; padding: 0 var(--s4); }
 .scan__thumbs { display: flex; gap: var(--s2); min-height: 64px; overflow-x: auto; padding: var(--s2) 0; }
 .scan__thumbs img { width: 48px; height: 64px; object-fit: cover; border-radius: 8px; border: 2px solid rgb(255 255 255 / .3); }

@@ -51,8 +51,11 @@ function ScanSession({ onNext }: { onNext: () => void }) {
   const read = useReadReceipt();
   const urls = useRef<string[]>([]);
 
+  // Bật camera; bật lại sau khi gửi lỗi (lúc gửi camera đã tắt để đỡ tốn pin).
+  const [cameraOn, setCameraOn] = useState(0);
   useEffect(() => {
     let s: MediaStream | undefined;
+    let stopped = false;
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraFailed(true);
       return;
@@ -60,13 +63,21 @@ function ScanSession({ onNext }: { onNext: () => void }) {
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, audio: false })
       .then((ms) => {
+        if (stopped) return ms.getTracks().forEach((t) => t.stop());
         s = ms;
         setStream(ms);
-        if (videoRef.current) videoRef.current.srcObject = ms;
+        const v = videoRef.current;
+        if (v) {
+          v.srcObject = ms;
+          v.play().catch(() => {}); // iPhone đôi khi không tự chạy lại video khi gán luồng mới
+        }
       })
       .catch(() => setCameraFailed(true));
-    return () => s?.getTracks().forEach((t) => t.stop());
-  }, []);
+    return () => {
+      stopped = true;
+      s?.getTracks().forEach((t) => t.stop());
+    };
+  }, [cameraOn]);
 
   // Thu hồi mọi URL xem trước khi rời màn.
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
@@ -130,7 +141,12 @@ function ScanSession({ onNext }: { onNext: () => void }) {
     // ảnh), nên chỉ ảnh mới được đọc lại (1.1).
     read.mutate(
       { receiptId, images: photos.map((p) => p.blob), lang: uiLang },
-      { onError: () => setStream(null) }, // camera đã tắt: chụp lại bằng camera hệ thống
+      {
+        onError: () => {
+          setStream(null);
+          setCameraOn((n) => n + 1); // bật lại camera để chụp lại ngay trong khung
+        },
+      },
     );
   }
 
@@ -184,11 +200,8 @@ function ScanSession({ onNext }: { onNext: () => void }) {
         )}
       </div>
 
-      <p className="scan__hint">
-        {fromLibrary
-          ? t.scan.hintLibrary
-          : t.scan.hintCamera}
-      </p>
+      {/* Có ảnh rồi thì bỏ lời dặn để nút "Xong" không bị đẩy khỏi màn hình */}
+      {photos.length === 0 && <p className="scan__hint">{fromLibrary ? t.scan.hintLibrary : t.scan.hintCamera}</p>}
 
       {photos.length > 0 && (
         <ul className="scan__thumbs" aria-label={t.scan.photosOfReceipt(photos.length)}>
