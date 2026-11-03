@@ -70,7 +70,7 @@ export const en = {
     tiles: {
       spending: "Spending",
       items: "My Items",
-      plan: "Shopping List",
+      plan: "Plans",
       settings: "Settings",
     },
     spentThisMonth: "Spent this month",

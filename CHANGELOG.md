@@ -5,6 +5,16 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-03 · Giao diện hai ngôn ngữ không tràn trên màn nhỏ
+
+Nhánh `feat/giao-dien-song-ngu`. Theo `notes/mimi-v2-chot-ngon-ngu-tien-te.md` mục 2.2 (mẹ chốt 03/11): chữ cố định tinh chỉnh riêng cho từng ngôn ngữ, tên sản phẩm theo luật hiển thị.
+
+- Tab và ô Trang chủ tiếng Anh "Shopping List" đổi thành "Plans" (khớp "Kế hoạch", không xuống 2 dòng).
+- Màn mua hộ (tiếng Anh, 320px): nút "Add to Google Calendar" và hai nút cuối màn được xuống dòng thay vì đẩy màn rộng ra; tên món dài được ngắt.
+- Lịch sử mua hàng (cả hai ngôn ngữ, 320px): ô tìm co lại, nút Lọc giữ nguyên cỡ.
+- Tên sản phẩm ở danh sách (Đồ dùng, Kế hoạch, đi mua): tối đa 2 dòng rồi cắt "…" (trước đây Đồ dùng chỉ 1 dòng); màn chi tiết vẫn hiện đủ.
+- Kiểm tra tự động mới `e2e/layout.spec.ts`: mở 13 màn chính ở tiếng Việt và tiếng Anh trên màn 320px, báo lỗi nếu màn nào tràn ngang (chạy trong CI cùng test demo). Bỏ phần sửa CSS thì test báo lỗi, đã thử.
+
 ## 2026-11-03 · Mã nhà cố định, có nút Đổi mã
 
 Nhánh `feat/ma-nha-co-dinh`. Mẹ chốt 03/11: mỗi nhà một mã cố định, dùng như ID nhà; chủ nhà có nút "Đổi mã" khi lỡ lộ.

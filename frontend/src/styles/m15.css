@@ -104,7 +104,10 @@
 .card15__main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .card15__icon .row__icon { width: 56px; height: 56px; border-radius: 12px; background: #eef3fd; color: var(--m15-blue); }
 .card15__text { display: grid; gap: 2px; min-width: 0; }
-.card15__name { font-weight: 700; font-size: var(--fs-md); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tên sản phẩm ở danh sách (mẹ chốt 03/11): tối đa 2 dòng rồi cắt "…", từ dài được ngắt để không
+   đẩy màn hình tràn ngang. Màn chi tiết hiện đủ. */
+.card15__name { font-weight: 700; font-size: var(--fs-md); color: var(--ink); overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .card15__sub { font-size: var(--fs-xs); color: var(--ink-soft); }
 .card15__edit { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--m15-blue); font-weight: 500; }
 .cart15 {
@@ -230,7 +233,7 @@
 .trip15__view > svg { color: var(--m15-blue); flex: none; }
 .cal15 { margin-top: var(--s3); display: grid; gap: var(--s2); }
 .cal15__row { display: flex; flex-wrap: wrap; gap: var(--s2); }
-.cal15__row .btn { flex: 1 1 auto; gap: 6px; text-decoration: none; white-space: nowrap; }
+.cal15__row .btn { flex: 1 1 auto; gap: 6px; text-decoration: none; white-space: normal; text-align: center; min-width: 0; }
 .cal15 .hint { margin: 0; }
 .trip15__lines { display: grid; gap: 4px; }
 .trip15__lines span { display: flex; align-items: center; gap: var(--s2); }
@@ -239,7 +242,8 @@
 .line15 { border-radius: 12px; background: #eef4ff; padding: var(--s2) var(--s3); }
 .line15__row { display: flex; align-items: center; gap: var(--s3); }
 .line15__text { flex: 1; display: grid; min-width: 0; }
-.line15__name { font-weight: 700; color: var(--m15-blue); }
+.line15__name { font-weight: 700; color: var(--m15-blue); overflow-wrap: anywhere; }
+.line15__name:not(:has(.name15__orig)) { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .line15__sub { font-size: var(--fs-sm); color: var(--ink-soft); }
 .line15 .icon-btn { color: var(--m15-blue); }
 .line15__edit { display: grid; grid-template-columns: 1fr auto; gap: var(--s2); margin-top: var(--s2); }
@@ -360,7 +364,7 @@
 .run15__note textarea { font: inherit; font-weight: 400; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 10px; resize: vertical; }
 .run15__offline { display: grid; gap: var(--s2); padding: var(--s3); border-radius: 12px; background: #fff4e5; color: #8a4b00; }
 .run15__offline p { margin: 0; font-weight: 700; }
-.run15 .pd15__actions { grid-template-columns: 1fr 1fr; }
+.run15 .pd15__actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .run15__saved { color: #1f7a3a; }
 .run15__done { justify-items: center; text-align: center; }
 .run15__done h1 { margin: 0; font-size: var(--fs-xl, 24px); }
@@ -369,7 +373,7 @@
 .run15__big { font-size: 28px; font-weight: 800; color: var(--m15-blue); }
 .run15__split { display: flex; justify-content: space-between; width: 100%; }
 .run15 .pd15__head { display: flex; align-items: center; gap: var(--s2); }
-.run15 .pd15__actions .btn { font-size: var(--fs-md); white-space: nowrap; }
+.run15 .pd15__actions .btn { font-size: var(--fs-md); white-space: normal; text-align: center; line-height: 1.2; }
 .run15__editrow { display: flex; align-items: center; gap: var(--s2); }
 .run15__editrow .stepper15 { flex: 1; grid-template-columns: 44px 1fr 44px; }
 .run15__name { flex: 1; font: inherit; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 10px; min-width: 0; background: #fff; }
@@ -392,7 +396,8 @@
 .ph15 { display: grid; gap: var(--s3); }
 .ph15__head { display: flex; align-items: center; gap: var(--s2); }
 .ph15__search { display: flex; gap: var(--s2); }
-.ph15__q { flex: 1; display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--m15-line); border-radius: 12px; padding: 0 12px; background: #fff; }
+.ph15__search > .btn { flex: none; }
+.ph15__q { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--m15-line); border-radius: 12px; padding: 0 12px; background: #fff; }
 .ph15__q input { flex: 1; border: 0; font: inherit; padding: 12px 0; min-width: 0; outline: none; }
 .ph15__sel { display: grid; gap: 4px; font-size: var(--fs-sm); }
 .ph15__sel select { font: inherit; padding: 10px 12px; border: 1.5px solid var(--m15-line); border-radius: 12px; background: #fff; }
