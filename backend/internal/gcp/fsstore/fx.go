@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/fx"
 )
 
@@ -37,4 +38,36 @@ func (s *Store) SaveRates(ctx context.Context, rates []fx.Rate) error {
 		}
 	}
 	return nil
+}
+
+// RateHistory trả tỷ giá từng ngày của một ngoại tệ trong [from, to], cũ trước, kèm thêm một
+// dòng gần nhất trước from (nếu có) để ngày đầu khoảng vẫn quy đổi được theo quy tắc "ngày
+// chưa có dùng tỷ giá gần nhất trước đó". Dùng chung index (currency, on giảm dần) với Rate.
+func (s *Store) RateHistory(ctx context.Context, currency string, from, to domain.Date) ([]fx.Point, error) {
+	docs, err := s.c.Collection("fx_rates").
+		Where("currency", "==", currency).
+		Where("on", "<=", to.String()).
+		OrderBy("on", firestore.Desc).Limit(fx.MaxHistoryDays + 1).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("fx history %s: %w", currency, err)
+	}
+	out := make([]fx.Point, 0, len(docs))
+	for _, d := range docs {
+		var v struct {
+			On   string `firestore:"on"`
+			Rate string `firestore:"rate"`
+		}
+		if err := d.DataTo(&v); err != nil {
+			return nil, fmt.Errorf("fx history decode: %w", err)
+		}
+		out = append(out, fx.Point{On: v.On, VNDPerOne: v.Rate})
+		if v.On < from.String() {
+			break // dòng gần nhất trước from là đủ
+		}
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
 }
