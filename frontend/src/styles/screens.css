@@ -276,6 +276,8 @@
   min-height: 64px; padding: var(--s2) 0; border-bottom: 1px solid var(--sky-line);
 }
 .plan-row__text { min-width: 0; display: grid; gap: 2px; }
+.plan-row--online { grid-template-columns: 1fr auto; }
+.plan-row--online .plan-row__name { white-space: normal; }
 .plan-row__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plan-row__sub { font-size: var(--fs-xs); color: var(--ink-soft); }
 .plan-row .btn { min-height: 40px; padding: 0 var(--s4); font-size: var(--fs-sm); }

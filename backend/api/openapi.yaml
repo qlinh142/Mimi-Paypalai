@@ -29,6 +29,7 @@ tags:
   - { name: system, description: Sức khỏe dịch vụ }
   - { name: me, description: "Đăng nhập, Cài đặt, Quyền riêng tư (spec mục 1, 6)" }
   - { name: home, description: Trang chủ (spec mục 2) }
+  - { name: ai, description: "Hỏi Mimi trên màn Phân tích chi tiêu (AG Studio)" }
   - { name: receipts, description: "Quét, Xác nhận, Đã lưu" }
   - { name: items, description: "Đồ dùng, Chi tiết món, Cần mua (spec mục 4, 5)" }
   - { name: spending, description: "Sổ chi tiêu, Dự báo 30 ngày, Khoản chi định kỳ (spec mục 3)" }
@@ -341,6 +342,23 @@ paths:
       summary: "8.1 mục 14.1: giá gần nhất, thấp nhất, trung bình theo đơn giá chuẩn hóa (đ / g, ml, m, item)"
       parameters: [{ $ref: "#/components/parameters/ItemKey" }]
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ItemPriceHistory" } } } } }
+  /items/market-prices:
+    get:
+      tags: [items]
+      summary: "Mimi 2.2: giá chung của mọi món đang theo dõi, cho dòng Rẻ nhất trên thẻ món. Chỉ món đã có giá."
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/ItemMarketPrices" } } } } } }
+  /items/{key}/market-prices:
+    get:
+      tags: [items]
+      summary: "Mimi 2.2: giá đang bán của một món (bảng giá chung, nước của người dùng), cho mục So sánh giá trong Chi tiết món"
+      description: Bảng giá lấy mọi món từng có trong tồn kho, hóa đơn, kế hoạch của mọi tài khoản (anh chốt 09/11). updated_at null khi món chưa được tra lần nào.
+      parameters: [{ $ref: "#/components/parameters/ItemKey" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ItemMarketPrices" } } } }
+        "404": { $ref: "#/components/responses/Error" }
   /needs:
     get:
       tags: [items]
@@ -510,10 +528,25 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MarketRefresh" } } } }
         "429": { $ref: "#/components/responses/Error" }
+  /ai/turn:
+    post:
+      tags: [ai]
+      summary: "Hỏi Mimi (màn Phân tích chi tiêu, AG Studio): một lượt Gemini"
+      description: >-
+        App giữ vòng lặp agent của AG Studio và tự chạy mọi tool; máy chủ chỉ gọi Gemini (Vertex AI) một lượt với
+        hội thoại và khai báo tool app gửi lên, rồi trả lời văn bản hoặc lời đề nghị gọi tool. Dạng tin nhắn theo REST
+        của Gemini. Giới hạn lượt mỗi người mỗi ngày (AI_DAILY_LIMIT).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AiTurnRequest" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AiTurnResponse" } } } }
+        "413": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /plan/delegated:
     get:
       tags: [plan, household]
-      summary: "4.1 mục 9.2: vòng mua hộ được giao cho tôi (to_me, còn mở) và vòng tôi đã gửi (from_me)"
+      summary: "4.1 mục 9.2: vòng mua hộ được giao cho tôi (to_me, còn mở; to_me_done, đã mua xong) và vòng tôi đã gửi (from_me)"
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Delegated" } } } } }
   /plans:
     get:
@@ -597,6 +630,7 @@ paths:
     post:
       tags: [online]
       summary: Dựng giỏ online từ các dòng Kế hoạch và đánh giá Mandate (ALLOW / ASK / BLOCK). Không tạo giao dịch.
+      parameters: [{ $ref: "#/components/parameters/PlanId" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OrderKeys" } } } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Basket" } } } }
@@ -612,6 +646,7 @@ paths:
       tags: [online]
       summary: Checkout, tạo PayPal order (intent CAPTURE, tính bằng USD theo PAYPAL_VND_PER_USD)
       description: BLOCK trả 403 mandate_blocked; ASK chưa có approve=true trả 409 approval_required.
+      parameters: [{ $ref: "#/components/parameters/PlanId" }]
       requestBody:
         required: true
         content:
@@ -619,9 +654,12 @@ paths:
             schema:
               allOf:
                 - $ref: "#/components/schemas/OrderKeys"
-                - { type: object, properties: { approve: { type: boolean, description: Người dùng duyệt các ngoại lệ ASK } } }
+                - type: object
+                  properties:
+                    approve: { type: boolean, description: Người dùng duyệt các ngoại lệ ASK }
+                    provider: { type: string, enum: [paypal, braintree], description: "Cổng thanh toán; mặc định paypal. braintree: trả bằng thẻ, thu tiền ở /orders/{id}/card" }
       responses:
-        "201": { description: Đơn ở trạng thái awaiting_payment, kèm paypal_order_id và approve_url, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "201": { description: "Đơn ở trạng thái awaiting_payment; PayPal kèm paypal_order_id và approve_url", content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
         "403": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
         "503": { $ref: "#/components/responses/Error" }
@@ -642,6 +680,44 @@ paths:
         "200": { description: Đơn paid, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
         "402": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
+  /orders/card-token:
+    post:
+      tags: [online]
+      summary: Client token Braintree cho Drop-in UI (trả bằng thẻ). Chế độ giả lập trả "fake-client-token".
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: object, required: [client_token], properties: { client_token: { type: string } } } } }
+        "503": { $ref: "#/components/responses/Error" }
+  /orders/{id}/card:
+    post:
+      tags: [online]
+      summary: Thu tiền đơn braintree bằng nonce Drop-in trả về. Gọi lại an toàn. Ghi Spending, không cộng tồn kho.
+      description: Số thẻ không qua server Mimi; Drop-in gửi thẳng cho Braintree và trả nonce dùng một lần.
+      parameters: [{ $ref: "#/components/parameters/OrderId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [nonce], properties: { nonce: { type: string, maxLength: 512 } } } } }
+      responses:
+        "200": { description: Đơn paid, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "402": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+  /webhooks/braintree:
+    post:
+      tags: [online]
+      security: []
+      summary: Webhook Braintree (settle, từ chối quyết toán, khiếu nại). Tin nhờ chữ ký bt_signature, không cần token.
+      description: Chỉ ghi card_status vào đơn thẻ; không đổi bước giao hàng hay Spending. Thông báo không khớp đơn nào vẫn trả 200.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { type: object, required: [bt_signature, bt_payload], properties: { bt_signature: { type: string }, bt_payload: { type: string } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /orders/{id}/advance:
     post:
       tags: [online]
@@ -851,6 +927,52 @@ components:
       content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
 
   schemas:
+    AiPart:
+      type: object
+      description: Một phần tin nhắn. Có đúng một trong text, functionCall, functionResponse.
+      properties:
+        text: { type: string }
+        thoughtSignature: { type: string, description: "Chữ ký Gemini 3 (base64) của lượt gọi tool, gửi trả nguyên vẹn" }
+        functionCall:
+          type: object
+          required: [name]
+          properties: { id: { type: string }, name: { type: string }, args: { type: object, additionalProperties: true } }
+        functionResponse:
+          type: object
+          required: [name, response]
+          properties: { id: { type: string }, name: { type: string }, response: { type: object, additionalProperties: true } }
+    AiTurnRequest:
+      type: object
+      required: [contents]
+      properties:
+        system: { type: string }
+        contents:
+          type: array
+          maxItems: 120
+          items:
+            type: object
+            required: [role, parts]
+            properties: { role: { type: string, enum: [user, model] }, parts: { type: array, items: { $ref: "#/components/schemas/AiPart" } } }
+        tools:
+          type: array
+          maxItems: 64
+          items:
+            type: object
+            required: [name, description]
+            properties: { name: { type: string }, description: { type: string }, parameters: { type: object, additionalProperties: true, description: JSON Schema } }
+        tool_mode: { type: string, enum: [AUTO, ANY, NONE] }
+        allowed_tools: { type: array, items: { type: string } }
+        json_schema: { type: object, additionalProperties: true }
+        model: { type: string, description: "Bỏ qua: máy chủ dùng model đã cấu hình" }
+    AiTurnResponse:
+      type: object
+      required: [id, parts]
+      properties:
+        id: { type: string }
+        model: { type: string }
+        parts: { type: array, items: { $ref: "#/components/schemas/AiPart" } }
+        finish_reason: { type: string }
+        usage: { type: object, properties: { input_tokens: { type: integer }, output_tokens: { type: integer }, total_tokens: { type: integer } } }
     ClientId:
       type: string
       pattern: "^[a-z0-9-]{1,64}$"
@@ -896,6 +1018,7 @@ components:
           maxProperties: 50
           description: "Tên gọi người nhà theo uid, riêng từng tài khoản. PUT chỉ gửi phần đổi; \"\" là xóa"
           additionalProperties: { type: string, enum: [anh, chi, em, bo, me, con, ong, ba, khac, ""] }
+        monthly_budget_vnd: { type: integer, format: int64, minimum: 0, maximum: 1000000000, description: "Ngân sách chi mỗi tháng, bằng đồng. PUT 0 là bỏ ngân sách; vắng là chưa đặt" }
     Profile:
       type: object
       properties:
@@ -1078,6 +1201,8 @@ components:
         month: { type: string }
         spent: { $ref: "#/components/schemas/Vnd" }
         spent_prev_month_pct: { type: [number, "null"], description: "Phần trăm so với tháng trước; null khi tháng trước chưa có chi tiêu" }
+        spent_prev_same_range_pct: { type: [number, "null"], description: "Chỉ tháng hiện tại: phần trăm so với cùng khoảng ngày (1 đến same_range_day) tháng trước, tính trên hóa đơn quét và phần người nhà mua hộ. null khi tháng trước chưa có hóa đơn trong khoảng đó hoặc không phải tháng hiện tại" }
+        same_range_day: { type: integer, minimum: 1, maximum: 31, description: "Ngày cuối của khoảng so cùng kỳ (hôm nay theo giờ Việt Nam). Vắng ở tháng cũ" }
         saved: { $ref: "#/components/schemas/Vnd" }
         saved_ratio: { type: [number, "null"], description: "discount / (spent + discount); null khi không có discount" }
         receipt_count: { type: integer }
@@ -1263,6 +1388,14 @@ components:
         daily: { type: integer, description: Số lần bấm Cập nhật giá mỗi ngày }
         left: { type: integer, description: Số lần còn lại hôm nay }
         last_at: { type: string, format: date-time, description: Lần bấm gần nhất; vắng khi chưa bấm lần nào }
+    ItemMarketPrices:
+      type: object
+      required: [key, name, prices, updated_at]
+      properties:
+        key: { type: string }
+        name: { type: string }
+        prices: { type: array, items: { $ref: "#/components/schemas/MarketPrice" } }
+        updated_at: { type: [string, "null"], format: date-time }
     MarketPrices:
       type: object
       required: [items]
@@ -1340,6 +1473,7 @@ components:
       properties:
         to_me: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
         from_me: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
+        to_me_done: { type: array, description: "2.2: vòng được nhờ đã mua xong (completed, closed_partial), cho tab Được nhờ mua", items: { $ref: "#/components/schemas/Assignment" } }
     PlanState:
       type: object
       additionalProperties: false
@@ -1410,7 +1544,6 @@ components:
         categories: { type: array, items: { type: string, enum: [grocery, household] } }
         price_tolerance_pct: { type: integer, minimum: 0, maximum: 50 }
         max_order_vnd: { $ref: "#/components/schemas/Vnd" }
-        max_day_vnd: { $ref: "#/components/schemas/Vnd" }
     OrderKeys:
       type: object
       required: [keys]
@@ -1425,7 +1558,7 @@ components:
             type: object
             properties:
               key: { type: string }
-              code: { type: string, enum: [not_in_plan, quantity_guard, category, price_guard, budget_order, budget_day, delivery_guard, mandate_off] }
+              code: { type: string, enum: [not_in_plan, quantity_guard, category, price_guard, budget_order, delivery_guard, mandate_off] }
               result: { type: string, enum: [ALLOW, ASK, BLOCK] }
               detail: { type: string }
     OrderLine:
@@ -1461,10 +1594,15 @@ components:
         rate_as_of: { type: string, format: date, description: Tỷ giá của ngày nào }
         snapshot_at: { type: string, format: date }
         decision: { $ref: "#/components/schemas/Decision" }
+        card_enabled: { type: boolean, description: Server đã cấu hình Braintree; app hiện thêm nút Trả bằng thẻ }
     Order:
       type: object
       properties:
         id: { type: string }
+        plan_id: { type: string, description: Kế hoạch của đơn; kiểm hàng trừ vào Kế hoạch này }
+        provider: { type: string, enum: [paypal, braintree] }
+        provider_order_id: { type: string }
+        provider_txn_id: { type: string }
         state: { type: string, enum: [awaiting_payment, paid, ordered, shipped, delivered, verified] }
         merchant: { type: string }
         lines: { type: array, items: { $ref: "#/components/schemas/OrderLine" } }
@@ -1496,4 +1634,9 @@ components:
         refunded_vnd: { $ref: "#/components/schemas/Vnd" }
         net_vnd: { $ref: "#/components/schemas/Vnd" }
         suggested_refund_vnd: { $ref: "#/components/schemas/Vnd" }
+        card_status:
+          type: string
+          enum: [settled, settlement_declined, disputed, dispute_won, dispute_lost]
+          description: Chỉ đơn braintree. Trạng thái tiền thẻ Braintree báo qua webhook sau khi thu; không có là chưa có tin.
+        card_status_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }

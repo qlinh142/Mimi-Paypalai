@@ -21,6 +21,7 @@ import (
 
 const (
 	maxJSONBody    = 256 << 10 // 256 KiB cho JSON thường
+	maxWebhookBody = 128 << 10 // webhook Braintree: form bt_signature + bt_payload
 	maxUploadBody  = 30 << 20  // dưới giới hạn request 32 MiB của Cloud Run
 	maxImageBytes  = 4 << 20
 	maxImagesCount = 8

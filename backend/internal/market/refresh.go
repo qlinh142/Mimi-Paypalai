@@ -91,7 +91,7 @@ func NewRefresher(st RefreshStore, srcs []Source, q RefreshQuota, o RefreshOptio
 // dùng, dùng để đếm lượt. Không có món nào cần tra thì không tốn lượt.
 func (r *Refresher) Refresh(ctx context.Context, uid, day string, items []Wanted) (Result, error) {
 	var res Result
-	wanted, _ := dedupe(items)
+	wanted, _, _ := dedupe(items)
 	res.Wanted = len(wanted)
 	if len(wanted) == 0 {
 		return res, nil

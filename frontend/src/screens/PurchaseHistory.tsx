@@ -1,15 +1,18 @@
 import { m15 } from "../i18n/m15";
 import { t } from "../i18n";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
-import { useReceiptDetail, useReceiptHistory } from "../api/hooks";
+import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Globe, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
+import { useOrders, useReceiptDetail, useReceiptHistory } from "../api/hooks";
 import { LoadState } from "../components/LoadState";
-import type { HistoryReceipt } from "../api/types";
+import type { HistoryRow, Order } from "../api/types";
+import { p22 } from "../i18n/p22";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
 import { formatVnd } from "../lib/text";
 import { useRelations } from "../lib/relation";
+
+const HistoryGrid = lazy(() => import("../components/HistoryGrid"));
 
 const pad = (n: number) => String(n).padStart(2, "0");
 /** Giờ Việt Nam của một mốc ISO: "14/10 · 18:15". */
@@ -24,27 +27,52 @@ const monthKey = (iso: string) => {
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
 
 /** Người mua hộ hiện bằng tên gọi người dùng đã đặt (Anh, Bố...), không có thì tên hiển thị. */
-export function receiptTitle(r: HistoryReceipt, relationOf: (uid: string) => string = () => "") {
+export function receiptTitle(r: HistoryRow, relationOf: (uid: string) => string = () => "") {
   const rel = r.buyer_uid ? relationOf(r.buyer_uid) : "";
   const buyer = rel ? m15.settings.relations[rel] : (r.buyer_name ?? "");
   return r.kind === "delegated" ? m15.history.delegated(buyer, r.plan_name ?? "") : r.store;
 }
 
+/**
+ * Mimi 2.2 (anh chốt 09/11): Lịch sử đơn hàng gộp hóa đơn mua tại cửa hàng và đơn online. Đơn online
+ * đã trả tiền thành một dòng như hóa đơn; đơn chưa trả vẫn là kế hoạch, không vào lịch sử.
+ */
+export function onlineRows(orders: Order[] | undefined): HistoryRow[] {
+  return (orders ?? [])
+    .filter((o) => o.state !== "awaiting_payment")
+    .map((o) => ({
+      receipt_id: `o:${o.id}`, kind: "online" as const, store: o.merchant, purchased_at: o.paid_at ?? o.created_at,
+      total_vnd: o.net_vnd ?? o.total_vnd, item_names: o.lines.map((l) => l.name), order_id: o.id, order_state: o.state,
+    }));
+}
+
+/** Đường mở một dòng lịch sử: hóa đơn, khoản định kỳ hoặc đơn online. */
+export function historyLink(r: HistoryRow) {
+  if (r.kind === "online") return `/orders/${encodeURIComponent(r.order_id ?? "")}`;
+  if (r.kind === "recurring") return `/items/recurring/${encodeURIComponent(r.recurring_id ?? "")}`;
+  return `/spending/receipt/${encodeURIComponent(r.receipt_id)}`;
+}
+
 const vndOrNone = (v: number | null, on?: string) => (v == null ? m15.plan.noPrice : formatVnd(v, on));
 
 /** Một dòng hóa đơn (hoặc khoản định kỳ đã trả, góp ý 01/11): dùng ở Sổ chi tiêu (tóm tắt) và màn 4c. */
-export function ReceiptRow({ r }: { r: HistoryReceipt }) {
+export function ReceiptRow({ r }: { r: HistoryRow }) {
   const rec = r.kind === "recurring";
+  const online = r.kind === "online";
   const { relationOf } = useRelations();
-  const Icon = rec ? CalendarClock : r.kind === "delegated" ? UsersRound : Store;
-  const to = rec ? `/items/recurring/${encodeURIComponent(r.recurring_id ?? "")}` : `/spending/receipt/${encodeURIComponent(r.receipt_id)}`;
+  const Icon = rec ? CalendarClock : online ? Globe : r.kind === "delegated" ? UsersRound : Store;
+  const to = historyLink(r);
   return (
     <li>
       <Link to={to} className="ph15__row">
         <span className="ph15__icon"><Icon size={22} aria-hidden /></span>
         <span className="rows15__text">
           <span>{receiptTitle(r, relationOf)}{rec && <span className="tag15 ph15__rectag">{m15.history.recurringTag}</span>}</span>
-          <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{rec ? dayTime(r.purchased_at).split(" · ")[0] : dayTime(r.purchased_at)}</small>
+          <small>
+            {r.kind === "delegated" ? `${r.store} · ` : ""}
+            {online ? `${p22.hist.online} · ${t.orders.states[r.order_state as Order["state"]] ?? ""} · ` : ""}
+            {rec ? dayTime(r.purchased_at).split(" · ")[0] : dayTime(r.purchased_at)}
+          </small>
         </span>
         <span className="num">{formatVnd(r.total_vnd, r.purchased_at)}</span>
         <ChevronRight size={18} aria-hidden />
@@ -56,17 +84,45 @@ export function ReceiptRow({ r }: { r: HistoryReceipt }) {
 /**
  * Màn 4c · Lịch sử mua hàng (Spec 1.5 mục 4, ảnh `4c-4d-lich-su-chi-tiet-hoa-don.png`):
  * tìm theo nơi mua hoặc món, lọc cửa hàng, chọn tháng; mỗi tháng một khối 3 hóa đơn mới nhất và "Xem thêm".
+ * Mimi 2.2: đổi tên Lịch sử đơn hàng, gộp tab Tất cả đơn của Kế hoạch (cùng một danh sách ở hai nơi).
  */
 export function PurchaseHistory() {
   const nav = useNavigate();
-  const h = useReceiptHistory();
+  return (
+    <MainFrame>
+      <TopBar title={m15.history.title} />
+      <div className="page p15 ph15">
+        <div className="pd15__head ph15__head">
+          <button type="button" className="pd15__back" aria-label={m15.detail.back} onClick={() => nav("/spending")}>
+            <ChevronLeft size={28} aria-hidden />
+          </button>
+          <h1 className="run15__title">{m15.history.title}</h1>
+        </div>
+        <OrderHistoryList />
+      </div>
+    </MainFrame>
+  );
+}
+
+type HistKind = "all" | "own" | "online" | "delegated" | "recurring";
+
+/** Danh sách Lịch sử đơn hàng: dùng ở Sổ chi tiêu (màn riêng) và tab thứ ba của Kế hoạch. */
+export function OrderHistoryList() {
+  const receipts = useReceiptHistory();
+  const orders = useOrders();
+  const h = receipts;
   const { relationOf } = useRelations();
+  const [kind, setKind] = useState<HistKind>("all");
   const [q, setQ] = useState("");
   const [store, setStore] = useState("");
   const [month, setMonth] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const all = h.data ?? [];
+  const [view, setView] = useState<"list" | "table">("list");
+  const titleOf = useCallback((r: HistoryRow) => receiptTitle(r, relationOf), [relationOf]);
+  const merged = useMemo(() => [...(receipts.data ?? []), ...onlineRows(orders.data)], [receipts.data, orders.data]);
+  const kinds = (["own", "online", "delegated", "recurring"] as const).filter((k) => merged.some((r) => (r.kind ?? "own") === k));
+  const all = kind === "all" ? merged : merged.filter((r) => (r.kind ?? "own") === kind);
   const stores = [...new Set(all.map((r) => r.store))];
   const months = [...new Set(all.map((r) => monthKey(r.purchased_at)))];
   const list = useMemo(() => {
@@ -86,15 +142,7 @@ export function PurchaseHistory() {
   };
 
   return (
-    <MainFrame>
-      <TopBar title={m15.history.title} />
-      <div className="page p15 ph15">
-        <div className="pd15__head ph15__head">
-          <button type="button" className="pd15__back" aria-label={m15.detail.back} onClick={() => nav("/spending")}>
-            <ChevronLeft size={28} aria-hidden />
-          </button>
-          <h1 className="run15__title">{m15.history.title}</h1>
-        </div>
+    <>
         <div className="ph15__search">
           <label className="ph15__q">
             <Search size={18} aria-hidden />
@@ -119,9 +167,29 @@ export function PurchaseHistory() {
           </select>
         </label>
 
+        {kinds.length > 1 && (
+          <div className="chips22" role="group" aria-label={m15.history.title}>
+            {(["all", ...kinds] as HistKind[]).map((k) => (
+              <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>{p22.hist[k]}</button>
+            ))}
+          </div>
+        )}
+        <div className="ph15__view" role="group" aria-label={m15.history.view.table}>
+          {(["list", "table"] as const).map((v) => (
+            <button key={v} type="button" className={`btn ${view === v ? "btn--primary" : "btn--outline"}`} aria-pressed={view === v} onClick={() => setView(v)}>
+              {m15.history.view[v]}
+            </button>
+          ))}
+        </div>
+
         <LoadState q={h} hasData={!!h.data} />
         {h.data && groups.length === 0 && <p className="hint">{m15.history.empty}</p>}
-        {groups.map(({ m, rows }) => {
+        {view === "table" && list.length > 0 && (
+          <Suspense fallback={null}>
+            <HistoryGrid rows={list} titleOf={titleOf} />
+          </Suspense>
+        )}
+        {view === "list" && groups.map(({ m, rows }) => {
           const shown = open[m] ? rows : rows.slice(0, 3);
           return (
             <section key={m} className="box15 ph15__month" aria-label={label(m)}>
@@ -135,8 +203,7 @@ export function PurchaseHistory() {
             </section>
           );
         })}
-      </div>
-    </MainFrame>
+    </>
   );
 }
 

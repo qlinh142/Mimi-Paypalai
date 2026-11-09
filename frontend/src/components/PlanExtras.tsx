@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Check, Plus, RefreshCw } from "lucide-react";
 import { t } from "../i18n";
 import { m1 } from "../i18n/m1";
 import { ApiError } from "../api/client";
@@ -116,14 +116,45 @@ export function PlanSwitcher() {
 }
 
 /** Thêm món chưa từng mua: chọn nhóm từ taxonomy 0.2 hoặc nhập tên tự do (3.1 mục 3A.4). */
-export function AddAnything({ cart }: { cart: Cart }) {
+export function AddAnything({ cart, chips, onAdded }: { cart: Cart; chips?: boolean; onAdded?: () => void }) {
   const [q, setQ] = useState("");
   const found = useTaxonomySearch(q);
   const edit = usePlanItem();
   const inCart = new Set(cart.items.map((i) => i.key));
   const slug = normalizeVi(q).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
   const add = (key: string, name?: string) =>
-    edit.mutate({ key, add: true, body: name ? { name } : undefined }, { onSuccess: () => setQ("") });
+    edit.mutate({ key, add: true, body: name ? { name } : undefined }, { onSuccess: () => { if (!chips) setQ(""); onAdded?.(); } });
+  if (chips)
+    // Mimi 2.2: kết quả là hàng tên món nằm ngang, chạm tên là thêm, không có nút Thêm riêng.
+    return (
+      <section className="plan-sec" aria-labelledby="plan-add">
+        <h2 id="plan-add">{m1.add.title}</h2>
+        <input className="input" value={q} placeholder={m1.add.placeholder} onChange={(e) => setQ(e.target.value)} aria-label={m1.add.placeholder} />
+        <div className="chips22" role="group" aria-label={m1.add.title}>
+          {(found.data ?? []).map((g) => {
+            const has = inCart.has(g.key);
+            return (
+              <button
+                key={g.key}
+                type="button"
+                className={`chip22${has ? " chip22--on" : ""}`}
+                aria-pressed={has}
+                aria-disabled={has || edit.isPending || undefined}
+                onClick={() => !has && !edit.isPending && add(g.key)}
+              >
+                {has && <Check size={16} aria-hidden />} {g.label}
+              </button>
+            );
+          })}
+          {slug.length >= 2 && (
+            <button type="button" className="chip22 chip22--new" aria-disabled={edit.isPending || undefined} onClick={() => !edit.isPending && add(`custom-${slug}`, q.trim())}>
+              <Plus size={16} aria-hidden /> {m1.add.custom(q.trim())}
+            </button>
+          )}
+        </div>
+        {edit.isError && <p className="error" role="alert">{errText(edit.error)}</p>}
+      </section>
+    );
   return (
     <section className="plan-sec" aria-labelledby="plan-add">
       <h2 id="plan-add">{m1.add.title}</h2>

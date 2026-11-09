@@ -70,7 +70,7 @@ func (fakeItems) List(_ context.Context, p authz.Principal, _ item.Query) ([]ite
 	if err := authz.Can(p, authz.ActionReadItemsFull); err != nil {
 		return nil, err
 	}
-	return []item.Item{{Key: "sua"}}, nil
+	return []item.Item{{Key: "sua", Name: "Sữa"}}, nil
 }
 func (fakeItems) Get(_ context.Context, p authz.Principal, key string) (item.Detail, error) {
 	if err := authz.Can(p, authz.ActionReadItemsFull); err != nil {

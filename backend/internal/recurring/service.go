@@ -75,8 +75,8 @@ type Input struct {
 // View là một khoản định kỳ kèm kỳ đang chờ và trạng thái hiển thị.
 type View struct {
 	Recurring
-	Display string      `json:"display"` // overdue | due_today | due_soon | upcoming | paused
-	Current *Occurrence `json:"current,omitempty"`
+	Display string       `json:"display"` // overdue | due_today | due_soon | upcoming | paused
+	Current *Occurrence  `json:"current,omitempty"`
 	History []Occurrence `json:"history"`
 }
 

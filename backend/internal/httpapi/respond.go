@@ -35,7 +35,13 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	if status >= 500 {
 		s.log.ErrorContext(r.Context(), "request failed", "code", ae.Code, "err", err)
 	} else {
-		s.log.InfoContext(r.Context(), "request rejected", "code", ae.Code)
+		// Lỗi 4xx thường là lỗi người dùng, chỉ ghi mã. Riêng khi cổng thanh toán từ chối
+		// thì ghi kèm lý do cổng trả về (issue của PayPal, Braintree) để tra được.
+		if ae.Code == apperr.CodePaymentFailed {
+			s.log.WarnContext(r.Context(), "payment rejected", "code", ae.Code, "err", err)
+		} else {
+			s.log.InfoContext(r.Context(), "request rejected", "code", ae.Code)
+		}
 	}
 	if status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable {
 		w.Header().Set("Retry-After", "30")

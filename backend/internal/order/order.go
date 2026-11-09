@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
+	"github.com/smartlife-lab/mimi/backend/internal/braintree"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/paypal"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
@@ -80,6 +81,8 @@ type Basket struct {
 	RateAsOf   string    `json:"rate_as_of,omitempty"`  // tỷ giá của ngày nào, YYYY-MM-DD
 	SnapshotAt time.Time `json:"snapshot_at"`
 	Decision   Decision  `json:"decision"`
+	// CardEnabled: server có cấu hình Braintree, app hiện thêm nút "Trả bằng thẻ".
+	CardEnabled bool `json:"card_enabled"`
 }
 
 // Refund là một lần hoàn tiền; giữ nguyên để audit cùng giao dịch gốc.
@@ -100,17 +103,24 @@ type Event struct {
 
 // Order là đơn Mimi Online, lưu nguyên khối (users/{uid}/orders/{id}).
 type Order struct {
-	ID                 string     `json:"id"`
-	State              State      `json:"state"`
-	Merchant           string     `json:"merchant"`
-	Lines              []Line     `json:"lines"`
-	TotalVND           int64      `json:"total_vnd"`
-	AmountUSD          string     `json:"amount_usd"`
-	VNDPerUSD          int64      `json:"vnd_per_usd"`
-	RateSource         string     `json:"rate_source,omitempty"`
-	RateAsOf           string     `json:"rate_as_of,omitempty"`
-	Decision           Decision   `json:"decision"`
-	ApprovedByUser     bool       `json:"approved_by_user"` // người dùng duyệt đơn ASK
+	ID             string   `json:"id"`
+	State          State    `json:"state"`
+	Merchant       string   `json:"merchant"`
+	Lines          []Line   `json:"lines"`
+	TotalVND       int64    `json:"total_vnd"`
+	AmountUSD      string   `json:"amount_usd"`
+	VNDPerUSD      int64    `json:"vnd_per_usd"`
+	RateSource     string   `json:"rate_source,omitempty"`
+	RateAsOf       string   `json:"rate_as_of,omitempty"`
+	Decision       Decision `json:"decision"`
+	ApprovedByUser bool     `json:"approved_by_user"` // người dùng duyệt đơn ASK
+	// PlanID là Kế hoạch của đơn ("" là Giỏ mua sắm chính); lúc kiểm hàng, Mimi trừ vào đúng Kế hoạch này.
+	PlanID string `json:"plan_id,omitempty"`
+	// Provider là cổng đã nhận tiền (paypal | braintree). Đơn lưu trước khi có ô này là paypal.
+	Provider        string `json:"provider"`
+	ProviderOrderID string `json:"provider_order_id,omitempty"`
+	ProviderTxnID   string `json:"provider_txn_id,omitempty"`
+	// Ô cũ của PayPal, vẫn ghi cho đơn PayPal để app và đơn đã lưu đọc được.
 	PayPalOrderID      string     `json:"paypal_order_id"`
 	ApproveURL         string     `json:"approve_url,omitempty"`
 	CaptureID          string     `json:"paypal_capture_id,omitempty"`
@@ -121,8 +131,12 @@ type Order struct {
 	RefundedVND        int64      `json:"refunded_vnd"`
 	NetVND             int64      `json:"net_vnd"` // = total - refunded, chỉ có nghĩa sau khi paid
 	SuggestedRefundVND int64      `json:"suggested_refund_vnd"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	// CardStatus: trạng thái tiền thẻ Braintree báo qua webhook sau khi thu
+	// (settled | settlement_declined | disputed | dispute_won | dispute_lost); rỗng: chưa có tin.
+	CardStatus   string     `json:"card_status,omitempty"`
+	CardStatusAt *time.Time `json:"card_status_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 // Phụ thuộc, khai báo ở phía dùng.
@@ -131,6 +145,15 @@ type (
 		CreateOrder(ctx context.Context, ref, amountUSD, description string) (paypal.Order, error)
 		CaptureOrder(ctx context.Context, paypalOrderID, ref string) (paypal.Capture, error)
 		RefundCapture(ctx context.Context, captureID, amountUSD, ref, note string) (paypal.Refund, error)
+	}
+	// Cards là cổng thẻ (Braintree): app lấy client token, Drop-in trả nonce, server thu tiền.
+	Cards interface {
+		ClientToken(ctx context.Context) (string, error)
+		Charge(ctx context.Context, nonce, amountUSD, ref string) (braintree.Transaction, error)
+		// Refund: full=true khi hoàn hết số còn lại (giao dịch chưa quyết toán thì hủy).
+		Refund(ctx context.Context, txnID, amountUSD, ref string, full bool) (braintree.Refund, error)
+		// ParseWebhook kiểm chữ ký và đọc thông báo webhook Braintree.
+		ParseWebhook(signature, payload string) (braintree.Notification, error)
 	}
 	PlanLines interface {
 		OpenLines(ctx context.Context, uid string) ([]plan.Line, error)
@@ -154,6 +177,8 @@ type (
 		ApplyDelivery(ctx context.Context, uid string, o Order, tz *time.Location) error
 		// RecordRefund: thêm refund vào đơn và trừ Spending trong một transaction.
 		RecordRefund(ctx context.Context, uid string, o Order, r Refund, tz *time.Location) error
+		// CardOrder tìm chủ đơn theo mã giao dịch Braintree (apperr.ErrNotFound).
+		CardOrder(ctx context.Context, txnID string) (uid, orderID string, err error)
 	}
 )
 
@@ -177,6 +202,7 @@ type Service struct {
 	plans     PlanLines
 	catalog   Catalog
 	payments  Payments // nil: chưa cấu hình PayPal
+	cards     Cards    // nil: chưa cấu hình Braintree
 	verifier  Verifier // nil: chỉ cho nhập tay
 	vndPerUSD int64
 	rateSrc   string
@@ -194,6 +220,15 @@ func New(store Store, plans PlanLines, catalog Catalog, payments Payments, verif
 	}
 	return &Service{store: store, plans: plans, catalog: catalog, payments: payments, verifier: verifier, vndPerUSD: vndPerUSD, log: log, now: now}, nil
 }
+
+// WithCards bật lựa chọn trả bằng thẻ qua Braintree.
+func (s *Service) WithCards(c Cards) *Service {
+	s.cards = c
+	return s
+}
+
+// CardsEnabled: app chỉ hiện nút thẻ khi server đã cấu hình Braintree.
+func (s *Service) CardsEnabled() bool { return s.cards != nil }
 
 // WithRateInfo ghi nguồn và ngày của tỷ giá vào mỗi giỏ và đơn hàng (vấn đề 44).
 func (s *Service) WithRateInfo(source, asOf string) *Service {
@@ -258,11 +293,8 @@ func (s *Service) Basket(ctx context.Context, p authz.Principal, keys []string) 
 	if err != nil {
 		return Basket{}, err
 	}
-	paid, err := s.paidOn(ctx, p, today)
-	if err != nil {
-		return Basket{}, err
-	}
-	b.Decision = Evaluate(m, b, paid)
+	b.Decision = Evaluate(m, b)
+	b.CardEnabled = s.cards != nil
 	return b, nil
 }
 
@@ -333,32 +365,54 @@ func buildBasket(c Catalog, lines []plan.Line, keys []string, today domain.Date)
 	return b
 }
 
-func (s *Service) paidOn(ctx context.Context, p authz.Principal, day domain.Date) (int64, error) {
-	orders, err := s.store.ListOrders(ctx, p.UID, 50)
-	if err != nil {
-		return 0, err
+// ---------- Checkout (PayPal) ----------
+
+// Cổng thanh toán của đơn.
+const (
+	ProviderPayPal    = "paypal"
+	ProviderBraintree = "braintree"
+)
+
+// ProviderOf trả cổng của đơn; đơn cũ chưa có ô provider là PayPal.
+func ProviderOf(o Order) string {
+	if o.Provider == "" {
+		return ProviderPayPal
 	}
-	loc := domain.Location(p.Timezone)
-	var sum int64
-	for _, o := range orders {
-		if o.PaidAt != nil && domain.Today(*o.PaidAt, loc).Equal(day) {
-			sum += o.TotalVND - o.RefundedVND
-		}
-	}
-	return sum, nil
+	return o.Provider
 }
 
-// ---------- Checkout (PayPal) ----------
+// Description là mô tả đơn gửi cổng thanh toán: tiếng Anh, chỉ ASCII, tối đa 127 ký tự
+// (giới hạn của PayPal purchase_units.description).
+func Description(items int) string {
+	unit := "items"
+	if items == 1 {
+		unit = "item"
+	}
+	return domain.ASCII(fmt.Sprintf("Mimi order - %d %s", items, unit), 127)
+}
 
 type CheckoutRequest struct {
 	Keys    []string `json:"keys"`    // dòng Kế hoạch mua online; rỗng: tất cả
 	Approve bool     `json:"approve"` // người dùng duyệt các ngoại lệ ASK
+	// Provider: paypal (mặc định) hoặc braintree (trả bằng thẻ).
+	Provider string `json:"provider,omitempty"`
 }
 
-// Checkout áp Mandate rồi tạo PayPal order. BLOCK luôn bị từ chối; ASK cần approve=true.
+// Checkout áp Mandate rồi tạo đơn chờ thanh toán. BLOCK luôn bị từ chối; ASK cần approve=true.
+// PayPal: tạo PayPal order ngay. Braintree: app lấy client token, rồi gọi PayCard với nonce.
 func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutRequest) (Order, error) {
-	if s.payments == nil {
-		return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
+	switch req.Provider {
+	case "", ProviderPayPal:
+		req.Provider = ProviderPayPal
+		if s.payments == nil {
+			return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
+		}
+	case ProviderBraintree:
+		if s.cards == nil {
+			return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình thanh toán thẻ.")
+		}
+	default:
+		return Order{}, apperr.New(apperr.CodeValidation, "Cổng thanh toán không hợp lệ.").With("field", "provider")
 	}
 	if len(req.Keys) > plan.MaxCartLines {
 		return Order{}, apperr.New(apperr.CodeValidation, "Quá nhiều món.").With("field", "keys")
@@ -385,7 +439,7 @@ func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutR
 	o := Order{
 		ID: newID(), State: StateAwaitingPayment, Merchant: b.Merchant, Lines: b.Lines,
 		TotalVND: b.TotalVND, AmountUSD: b.AmountUSD, VNDPerUSD: b.VNDPerUSD, RateSource: b.RateSource, RateAsOf: b.RateAsOf, Decision: b.Decision,
-		ApprovedByUser: b.Decision.Result == Ask, Refunds: []Refund{}, CreatedAt: now, UpdatedAt: now,
+		ApprovedByUser: b.Decision.Result == Ask, Refunds: []Refund{}, CreatedAt: now, UpdatedAt: now, PlanID: plan.IDFrom(ctx),
 		Events: []Event{{State: StateAwaitingPayment, At: now}},
 	}
 	for _, l := range o.Lines {
@@ -393,11 +447,16 @@ func (s *Service) Checkout(ctx context.Context, p authz.Principal, req CheckoutR
 			o.ETA = l.ETA
 		}
 	}
-	ppo, err := s.payments.CreateOrder(ctx, o.ID, o.AmountUSD, fmt.Sprintf("Mimi · %s · %d món", o.Merchant, len(o.Lines)))
-	if err != nil {
-		return Order{}, paymentErr(err)
+	if req.Provider == ProviderBraintree {
+		o.Provider = ProviderBraintree
+	} else {
+		ppo, err := s.payments.CreateOrder(ctx, o.ID, o.AmountUSD, Description(len(o.Lines)))
+		if err != nil {
+			return Order{}, paymentErr(err)
+		}
+		o.Provider, o.ProviderOrderID = ProviderPayPal, ppo.ID
+		o.PayPalOrderID, o.ApproveURL = ppo.ID, ppo.ApproveURL
 	}
-	o.PayPalOrderID, o.ApproveURL = ppo.ID, ppo.ApproveURL
 	if err := s.store.CreateOrder(ctx, p.UID, o); err != nil {
 		return Order{}, err
 	}
@@ -416,6 +475,9 @@ func (s *Service) Capture(ctx context.Context, p authz.Principal, id string) (Or
 		}
 		return Order{}, invalidState(o.State)
 	}
+	if ProviderOf(o) != ProviderPayPal {
+		return Order{}, invalidState(o.State)
+	}
 	if s.payments == nil {
 		return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
 	}
@@ -427,7 +489,64 @@ func (s *Service) Capture(ctx context.Context, p authz.Principal, id string) (Or
 		return Order{}, apperr.New(apperr.CodePaymentFailed, "PayPal chưa hoàn tất thanh toán.").With("paypal_status", cp.Status)
 	}
 	now := s.now()
-	o.State, o.CaptureID, o.PaidAt, o.UpdatedAt = StatePaid, cp.ID, &now, now
+	o.State, o.CaptureID, o.ProviderTxnID, o.PaidAt, o.UpdatedAt = StatePaid, cp.ID, cp.ID, &now, now
+	o.NetVND = o.TotalVND
+	o.Events = append(o.Events, Event{State: StatePaid, At: now})
+	if err := s.store.RecordPayment(ctx, p.UID, o, domain.Location(p.Timezone)); err != nil {
+		return Order{}, err
+	}
+	return o, nil
+}
+
+// CardToken trả client token cho Drop-in UI của Braintree ở app.
+func (s *Service) CardToken(ctx context.Context, p authz.Principal) (string, error) {
+	if err := authz.Can(p, authz.ActionBuyOnline); err != nil {
+		return "", err
+	}
+	if s.cards == nil {
+		return "", apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình thanh toán thẻ.")
+	}
+	tok, err := s.cards.ClientToken(ctx)
+	if err != nil {
+		return "", cardErr(err)
+	}
+	return tok, nil
+}
+
+// maxNonceLen: nonce Braintree ngắn; giới hạn để không nhận chuỗi bất kỳ.
+const maxNonceLen = 512
+
+// PayCard thu tiền đơn Braintree bằng nonce Drop-in trả về; gọi lại khi đã paid trả đơn cũ.
+func (s *Service) PayCard(ctx context.Context, p authz.Principal, id, nonce string) (Order, error) {
+	o, err := s.owned(ctx, p, id)
+	if err != nil {
+		return Order{}, err
+	}
+	if ProviderOf(o) != ProviderBraintree {
+		return Order{}, invalidState(o.State)
+	}
+	if o.State != StateAwaitingPayment {
+		if o.ProviderTxnID != "" {
+			return o, nil // đã thu: idempotent
+		}
+		return Order{}, invalidState(o.State)
+	}
+	nonce = strings.TrimSpace(nonce)
+	if nonce == "" || len(nonce) > maxNonceLen || strings.IndexFunc(nonce, func(r rune) bool { return r <= ' ' || r > '~' }) >= 0 {
+		return Order{}, apperr.New(apperr.CodeValidation, "Thiếu thông tin thẻ.").With("field", "nonce")
+	}
+	if s.cards == nil {
+		return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình thanh toán thẻ.")
+	}
+	tx, err := s.cards.Charge(ctx, nonce, o.AmountUSD, o.ID)
+	if err != nil {
+		return Order{}, cardErr(err)
+	}
+	if !braintree.Paid(tx.Status) {
+		return Order{}, apperr.New(apperr.CodePaymentFailed, "Thẻ chưa thanh toán được.").With("braintree_status", tx.Status)
+	}
+	now := s.now()
+	o.State, o.ProviderOrderID, o.ProviderTxnID, o.PaidAt, o.UpdatedAt = StatePaid, tx.ID, tx.ID, &now, now
 	o.NetVND = o.TotalVND
 	o.Events = append(o.Events, Event{State: StatePaid, At: now})
 	if err := s.store.RecordPayment(ctx, p.UID, o, domain.Location(p.Timezone)); err != nil {
@@ -551,7 +670,11 @@ func (s *Service) Refund(ctx context.Context, p authz.Principal, id string, req 
 	if err != nil {
 		return Order{}, err
 	}
-	if o.State != StateVerified || o.CaptureID == "" {
+	txn := o.ProviderTxnID
+	if txn == "" {
+		txn = o.CaptureID // đơn PayPal lưu trước khi có provider_txn_id
+	}
+	if o.State != StateVerified || txn == "" {
 		return Order{}, invalidState(o.State)
 	}
 	if !validRefundReason[req.Reason] {
@@ -568,17 +691,30 @@ func (s *Service) Refund(ctx context.Context, p authz.Principal, id string, req 
 	if amount <= 0 || amount > o.TotalVND-o.RefundedVND {
 		return Order{}, apperr.New(apperr.CodeValidation, "Số tiền hoàn không hợp lệ.").With("max_vnd", o.TotalVND-o.RefundedVND)
 	}
-	if s.payments == nil {
-		return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
-	}
 	ref := fmt.Sprintf("%s-r%d", o.ID, len(o.Refunds)+1)
 	usd := ToUSD(amount, o.VNDPerUSD)
-	pr, err := s.payments.RefundCapture(ctx, o.CaptureID, usd, ref, note)
-	if err != nil {
-		return Order{}, paymentErr(err)
+	var refID, refStatus string
+	if ProviderOf(o) == ProviderBraintree {
+		if s.cards == nil {
+			return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình thanh toán thẻ.")
+		}
+		br, err := s.cards.Refund(ctx, txn, usd, ref, amount == o.TotalVND-o.RefundedVND)
+		if err != nil {
+			return Order{}, cardErr(err)
+		}
+		refID, refStatus = br.ID, br.Status
+	} else {
+		if s.payments == nil {
+			return Order{}, apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình PayPal.")
+		}
+		pr, err := s.payments.RefundCapture(ctx, txn, usd, ref, note)
+		if err != nil {
+			return Order{}, paymentErr(err)
+		}
+		refID, refStatus = pr.ID, pr.Status
 	}
 	now := s.now()
-	r := Refund{ID: pr.ID, Ref: ref, AmountVND: amount, AmountUSD: usd, Reason: req.Reason, Status: pr.Status, At: now}
+	r := Refund{ID: refID, Ref: ref, AmountVND: amount, AmountUSD: usd, Reason: req.Reason, Status: refStatus, At: now}
 	o.Refunds = append(o.Refunds, r)
 	o.RefundedVND += amount
 	o.NetVND = o.TotalVND - o.RefundedVND
@@ -641,4 +777,74 @@ func paymentErr(err error) error {
 		return apperr.Wrap(apperr.CodePaymentFailed, "PayPal từ chối giao dịch. Kiểm tra lại rồi thử lại.", err)
 	}
 	return apperr.Wrap(apperr.CodePaymentUnavailable, "PayPal đang bận, thử lại sau ít phút.", err)
+}
+
+func cardErr(err error) error {
+	switch {
+	case errors.Is(err, braintree.ErrNotSettled):
+		return apperr.Wrap(apperr.CodePaymentFailed, "Giao dịch thẻ chưa quyết toán nên chưa hoàn một phần được. Thử lại sau vài giờ, hoặc hoàn toàn bộ.", err)
+	case errors.Is(err, braintree.ErrDeclined):
+		return apperr.Wrap(apperr.CodePaymentFailed, "Thẻ bị từ chối. Kiểm tra lại rồi thử lại.", err)
+	}
+	return apperr.Wrap(apperr.CodePaymentUnavailable, "Cổng thẻ đang bận, thử lại sau ít phút.", err)
+}
+
+// cardStatusOf: kind webhook Braintree → CardStatus; "" là kind Mimi không theo dõi.
+func cardStatusOf(kind string) string {
+	switch kind {
+	case braintree.KindTransactionSettled:
+		return "settled"
+	case braintree.KindTransactionSettlementDecl:
+		return "settlement_declined"
+	case braintree.KindDisputeOpened:
+		return "disputed"
+	case braintree.KindDisputeWon:
+		return "dispute_won"
+	case braintree.KindDisputeLost, braintree.KindDisputeAccepted, braintree.KindDisputeAutoAccepted, braintree.KindDisputeExpired:
+		return "dispute_lost"
+	}
+	return ""
+}
+
+// CardWebhook áp thông báo Braintree (đã kiểm chữ ký) vào đơn thẻ: chỉ ghi CardStatus, không
+// đổi bước giao hàng hay Spending. Thông báo không khớp đơn nào, kind không theo dõi, hoặc cũ
+// hơn tin đã ghi thì bỏ qua (trả nil để Braintree không gửi lại).
+func (s *Service) CardWebhook(ctx context.Context, signature, payload string) error {
+	if s.cards == nil {
+		return apperr.New(apperr.CodePaymentNotEnabled, "Chưa cấu hình thanh toán thẻ.")
+	}
+	n, err := s.cards.ParseWebhook(signature, payload)
+	if err != nil {
+		return apperr.Wrap(apperr.CodeBadRequest, "Webhook không hợp lệ.", err)
+	}
+	status := cardStatusOf(n.Kind)
+	if status == "" || n.TxnID == "" {
+		return nil
+	}
+	uid, oid, err := s.store.CardOrder(ctx, n.TxnID)
+	if errors.Is(err, apperr.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	o, err := s.store.GetOrder(ctx, uid, oid)
+	if errors.Is(err, apperr.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if ProviderOf(o) != ProviderBraintree || o.ProviderTxnID != n.TxnID {
+		return nil
+	}
+	at := n.Timestamp
+	if at.IsZero() {
+		at = s.now()
+	}
+	if o.CardStatusAt != nil && at.Before(*o.CardStatusAt) {
+		return nil
+	}
+	o.CardStatus, o.CardStatusAt, o.UpdatedAt = status, &at, s.now()
+	return s.store.UpdateOrder(ctx, uid, o, o.State)
 }

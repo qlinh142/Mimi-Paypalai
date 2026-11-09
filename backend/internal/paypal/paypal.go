@@ -142,9 +142,10 @@ func (c *Client) CaptureOrder(ctx context.Context, paypalOrderID, ref string) (C
 // RefundCapture hoàn một phần hoặc toàn bộ số tiền đã capture. ref phân biệt các lần
 // refund của cùng một đơn để gọi lại không hoàn hai lần.
 func (c *Client) RefundCapture(ctx context.Context, captureID, amountUSD, ref, note string) (Refund, error) {
-	body := map[string]any{
-		"amount":        map[string]any{"currency_code": Currency, "value": amountUSD},
-		"note_to_payer": truncate(note, 255),
+	body := map[string]any{"amount": map[string]any{"currency_code": Currency, "value": amountUSD}}
+	// PayPal từ chối note_to_payer rỗng (400 INVALID_REQUEST): chỉ gửi khi có ghi chú.
+	if n := strings.TrimSpace(note); n != "" {
+		body["note_to_payer"] = truncate(n, 255)
 	}
 	var out struct {
 		ID     string `json:"id"`

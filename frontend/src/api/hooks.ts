@@ -4,7 +4,7 @@ import { ApiError, UPLOAD_TIMEOUT_MS, apiGet, apiSend, apiSendQueued, apiUploadI
 import { currentPlanId, planQuery, useCurrentPlanId } from "../lib/currentPlan";
 import type {
   Assignment, HistoryReceipt, ReceiptDetail, Basket, BasketPrices, MarketPrices, MarketRefresh, Cart, Delegated, DeliveryObservation, Forecast, HomeSummary, Household, Item, ItemDetail,
-  ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
+  ItemMarketPrices, ItemPriceHistory, ItemsQuery, Mandate, Me, Notification, Occurrence, Order, PlanLinePatch, PlanMeta, PlanPrices, PlanState,
   QuickStock, ReceiptDraft, ReceiptDraftLine, Recurring, RecurringInput, RefundReason, SaveReceiptRequest, SaveReceiptResult, SettingsPatch,
   SpendingReport, TaxonomyGroup,
 } from "./types";
@@ -312,12 +312,15 @@ export function useSaveMandate() {
 }
 
 /** Giỏ online dựng từ Kế hoạch, kèm kết quả Household Mandate. Chưa tạo giao dịch. */
-export const useBasket = (keys: string[], enabled = true) =>
-  useQuery({
-    queryKey: ["basket", keys] as const,
-    queryFn: () => apiSend<Basket>("POST", "/orders/basket", { keys }),
+/** Giỏ online của Kế hoạch đang xem (Mimi mua các món chưa nhờ ai mua). */
+export function useBasket(keys: string[], enabled = true) {
+  const id = useCurrentPlanId();
+  return useQuery({
+    queryKey: ["basket", id, keys] as const,
+    queryFn: () => apiSend<Basket>("POST", `/orders/basket${planQuery(id)}`, { keys }),
     enabled,
   });
+}
 
 export const useOrders = () =>
   useQuery({ queryKey: qk.orders, queryFn: async () => (await apiGet<{ orders: Order[] }>("/orders")).orders });
@@ -344,7 +347,14 @@ function useOrderAction<V>(fn: (v: V) => Promise<Order>) {
 const orderPath = (id: string) => `/orders/${encodeURIComponent(id)}`;
 
 export const useCheckout = () =>
-  useOrderAction((v: { keys: string[]; approve: boolean }) => apiSend<Order>("POST", "/orders", v));
+  useOrderAction((v: { keys: string[]; approve: boolean; provider?: "paypal" | "braintree" }) =>
+    apiSend<Order>("POST", `/orders${planQuery(currentPlanId())}`, v));
+/** Client token cho Drop-in Braintree (trả bằng thẻ). */
+export const useCardToken = () =>
+  useMutation({ mutationFn: async () => (await apiSend<{ client_token: string }>("POST", "/orders/card-token")).client_token });
+/** Thu tiền đơn braintree bằng nonce Drop-in trả về. */
+export const usePayCard = () =>
+  useOrderAction((v: { id: string; nonce: string }) => apiSend<Order>("POST", `${orderPath(v.id)}/card`, { nonce: v.nonce }));
 export const useCaptureOrder = () => useOrderAction((id: string) => apiSend<Order>("POST", `${orderPath(id)}/capture`));
 export const useAdvanceOrder = () => useOrderAction((id: string) => apiSend<Order>("POST", `${orderPath(id)}/advance`));
 export const useVerifyOrder = () =>
@@ -467,6 +477,23 @@ export function useRefreshMarketPrices() {
     onError: () => qc.invalidateQueries({ queryKey: ["plan", "market-prices"] }),
   });
 }
+
+/** Mimi 2.2: giá đang bán của một món (bảng giá chung), cho mục So sánh giá ở Chi tiết món. */
+export const useItemMarketPrices = (key: string) =>
+  useQuery({
+    queryKey: ["item", key, "market"],
+    queryFn: () => apiGet<ItemMarketPrices>(`${itemPath(key)}/market-prices`),
+    enabled: key !== "",
+    staleTime: 30 * 60_000, // bảng giá chỉ đổi mỗi đêm
+  });
+
+/** Mimi 2.2: giá rẻ nhất của mọi món đang theo dõi, cho dòng "Rẻ nhất" trên thẻ món. */
+export const useItemsMarketPrices = () =>
+  useQuery({
+    queryKey: ["items", "market"],
+    queryFn: () => apiGet<{ items: ItemMarketPrices[] }>("/items/market-prices"),
+    staleTime: 30 * 60_000,
+  });
 
 export const useItemPriceHistory = (key: string) =>
   useQuery({

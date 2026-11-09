@@ -24,7 +24,7 @@ export function Home({ entering = false }: { entering?: boolean }) {
       to: "/spending", tone: "blue", Art: WalletArt, title: m15.home.tiles.spending,
       meta: h ? (h.spent_this_month != null ? m15.home.spentMonth(formatVnd(h.spent_this_month)) : m15.home.noSpend) : "",
     },
-    { to: "/items", tone: "green", Art: BasketArt, title: m15.home.tiles.items, meta: h ? m15.home.low(h.needs_count) : "" },
+    { to: h && h.needs_count > 0 ? "/items?f=attention" : "/items", tone: "green", Art: BasketArt, title: m15.home.tiles.items, meta: h ? m15.home.low(h.needs_count) : "" },
     { to: "/plan", tone: "orange", Art: CartArt, title: m15.home.tiles.plan, meta: h ? m15.home.toBuy(h.plan.item_count) : "" },
     { to: "/settings", tone: "purple", Art: GearArt, title: m15.home.tiles.settings, meta: m15.home.settingsMeta },
   ];

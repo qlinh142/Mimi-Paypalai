@@ -1,6 +1,9 @@
 package order
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Product là một sản phẩm của merchant Sandbox kèm Price Snapshot (Mimi 2.0 mục 11, 12).
 // Giá tính theo một gói (PackQty theo Unit). SnapshotVND là giá tốt nhất ở lần quét gần
@@ -44,17 +47,21 @@ func NewSandboxCatalog(snapshotAt time.Time) *SandboxCatalog {
 		{"sua-chua", "Sữa chua ăn (lốc 4)", "loc", 1, 26_000, 25_000, 1, CategoryGrocery},
 		{"trung", "Trứng gà (vỉ 10)", "qua", 10, 34_000, 34_000, 1, CategoryGrocery},
 		{"gao", "Gạo ST25 túi 5kg", "kg", 5, 165_000, 160_000, 2, CategoryGrocery},
-		{"mi-goi", "Mì gói (gói)", "goi", 1, 4_500, 4_500, 1, CategoryGrocery},
+		{"mi-an-lien", "Mì gói (gói)", "goi", 1, 4_500, 4_500, 1, CategoryGrocery},
 		{"dau-an", "Dầu ăn 1L", "l", 1, 55_000, 66_000, 2, CategoryGrocery},
-		{"nuoc-mam-gia-vi", "Nước mắm 500ml", "chai", 1, 42_000, 42_000, 2, CategoryGrocery},
+		{"nuoc-mam", "Nước mắm 500ml", "chai", 1, 42_000, 42_000, 2, CategoryGrocery},
 		{"nuoc-giat", "Nước giặt 3,5kg", "chai", 1, 189_000, 179_000, 2, CategoryHousehold},
 		{"nuoc-rua-chen", "Nước rửa chén 750g", "chai", 1, 38_000, 38_000, 2, CategoryHousehold},
 		{"giay-ve-sinh", "Giấy vệ sinh (lốc 10 cuộn)", "loc", 1, 98_000, 95_000, 2, CategoryHousehold},
-		{"dau-goi-sua-tam", "Sữa tắm 900g", "chai", 1, 145_000, 145_000, 2, CategoryHousehold},
-		{"rau-cu-qua", "Rau củ tươi (kg)", "kg", 1, 40_000, 42_000, 1, CategoryGrocery},
-		{"thit-ca", "Thịt bò (kg)", "kg", 1, 280_000, 280_000, 1, CategoryGrocery},
-		{"do-uong", "Nước suối 1,5L", "chai", 1, 9_000, 9_000, 1, CategoryGrocery},
-		{"banh-keo", "Bánh quy hộp", "hop", 1, 55_000, 49_000, 1, CategoryGrocery},
+		{"sua-tam", "Sữa tắm 900g", "chai", 1, 145_000, 145_000, 2, CategoryHousehold},
+		{"dau-goi", "Dầu gội 650g", "chai", 1, 135_000, 129_000, 2, CategoryHousehold},
+		{"kem-danh-rang", "Kem đánh răng 180g", "tuyp", 1, 35_000, 35_000, 2, CategoryHousehold},
+		{"kem-duong", "Kem dưỡng 50g", "cai", 1, 120_000, 115_000, 2, CategoryHousehold},
+		{"sua-hat", "Sữa hạt 1L", "hop", 1, 45_000, 45_000, 1, CategoryGrocery},
+		{"rau-cai", "Rau cải (kg)", "kg", 1, 40_000, 42_000, 1, CategoryGrocery},
+		{"thit-bo", "Thịt bò (kg)", "kg", 1, 280_000, 280_000, 1, CategoryGrocery},
+		{"nuoc-loc", "Nước suối 1,5L", "chai", 1, 9_000, 9_000, 1, CategoryGrocery},
+		{"banh-quy", "Bánh quy hộp", "hop", 1, 55_000, 49_000, 1, CategoryGrocery},
 	}
 	m := make(map[string]Product, len(ps))
 	for _, p := range ps {
@@ -65,9 +72,20 @@ func NewSandboxCatalog(snapshotAt time.Time) *SandboxCatalog {
 
 func (c *SandboxCatalog) Merchant() string { return "Mimi Mart Sandbox" }
 
+// Product tìm theo đúng mã nhóm (300 nhóm trong taxonomy); không có thì lùi về nhóm gần
+// nhất theo tiền tố: dau-goi-nam → dau-goi, trung-ga → trung, kem-duong-the → kem-duong.
 func (c *SandboxCatalog) Product(k string) (Product, bool) {
-	p, ok := c.products[k]
-	return p, ok
+	for k != "" {
+		if p, ok := c.products[k]; ok {
+			return p, true
+		}
+		i := strings.LastIndex(k, "-")
+		if i < 0 {
+			break
+		}
+		k = k[:i]
+	}
+	return Product{}, false
 }
 
 func (c *SandboxCatalog) SnapshotAt() time.Time { return c.at }
