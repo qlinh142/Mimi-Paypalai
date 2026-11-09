@@ -38,6 +38,8 @@ func TestValidate(t *testing.T) {
 		"lang":         {Lang: ptr("fr")},
 		"country":      {Country: ptr("JP")},
 		"currency":     {Currency: ptr("EUR")},
+		"budget_neg":   {MonthlyBudgetVND: ptr(int64(-1))},
+		"budget_big":   {MonthlyBudgetVND: ptr(int64(1_000_000_001))},
 		"remind_freq":  {RemindFreq: ptr("Every Day!")},
 	}
 	for name, p := range bad {
@@ -133,5 +135,22 @@ func TestRelations(t *testing.T) {
 		if err := patch.Validate(); apperr.From(err).Code != apperr.CodeValidation {
 			t.Errorf("%s: got %v", name, err)
 		}
+	}
+}
+
+func TestMonthlyBudget(t *testing.T) {
+	now := time.Date(2026, 11, 9, 3, 0, 0, 0, time.UTC)
+	p := SettingsPatch{MonthlyBudgetVND: ptr(int64(8_000_000))}
+	if err := p.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	got := p.Apply(Stored{Settings: map[string]any{"lang": "vi"}}, now)
+	if got.Settings["monthly_budget_vnd"] != int64(8_000_000) || got.Settings["lang"] != "vi" {
+		t.Fatalf("set: %+v", got.Settings)
+	}
+	// 0 là bỏ ngân sách.
+	cleared := SettingsPatch{MonthlyBudgetVND: ptr(int64(0))}.Apply(got, now)
+	if _, ok := cleared.Settings["monthly_budget_vnd"]; ok {
+		t.Fatalf("clear: %+v", cleared.Settings)
 	}
 }

@@ -98,3 +98,29 @@ func TestAssignKeepsTwoVersions(t *testing.T) {
 		t.Fatalf("after complete: %v created=%d", err, st.created)
 	}
 }
+
+// 2.2: vòng đã mua xong vào to_me_done (tab Được nhờ mua giữ cả kế hoạch đã hoàn thành); vòng
+// đang mở vẫn ở to_me như 2.1; vòng từ chối, đã hủy không hiện.
+func TestDelegatedKeepsDone(t *testing.T) {
+	st := &asgStore{list: []Assignment{
+		{ID: "a1", Status: "assigned"}, {ID: "a2", Status: "shopping"}, {ID: "a3", Status: "completed"},
+		{ID: "a4", Status: "closed_partial"}, {ID: "a5", Status: "declined"}, {ID: "a6", Status: "cancelled"},
+	}}
+	svc := New(st, runPlans{}, time.Now)
+	d, err := svc.Delegated(context.Background(), minh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := func(l []Assignment) (s string) {
+		for _, a := range l {
+			s += a.ID
+		}
+		return
+	}
+	if ids(d.ToMe) != "a1a2" || ids(d.ToMeDone) != "a3a4" {
+		t.Fatalf("to_me %s, done %s", ids(d.ToMe), ids(d.ToMeDone))
+	}
+	if d.ToMeDone[0].Trip == nil || d.ToMeDone[0].Trip.TripNote != "Bách Hóa Xanh" {
+		t.Fatalf("trip %+v", d.ToMeDone[0].Trip)
+	}
+}

@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { m15 } from "../i18n/m15";
 
 /** Bảng trượt từ dưới lên (Mimi 1.5): tiêu đề, dòng phụ, nút đóng; bấm nền hoặc Esc để đóng. */
-export function Sheet({ title, sub, onClose, children }: { title: string; sub: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({ title, sub, onClose, children }: { title: string; sub?: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -16,7 +16,7 @@ export function Sheet({ title, sub, onClose, children }: { title: string; sub: s
         <div className="sheet15__head">
           <div>
             <h2>{title}</h2>
-            <p>{sub}</p>
+            {sub && <p>{sub}</p>}
           </div>
           <button type="button" className="icon-btn" aria-label={m15.plan.close} onClick={onClose}><X size={24} aria-hidden /></button>
         </div>

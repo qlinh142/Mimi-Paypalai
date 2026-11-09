@@ -1,3 +1,5 @@
+import { setHideAmounts, useHideAmounts } from "../lib/hideAmounts";
+import { s22 } from "../i18n/s22";
 import { switchUiLang, t, uiLang } from "../i18n";
 import { displayCurrency, switchCurrency, type DisplayCurrency } from "../lib/money";
 import { useEffect, useState, type ReactNode } from "react";
@@ -90,12 +92,11 @@ export function Settings() {
   const me = useMeData();
   const auth = useAuth();
   const h = useHousehold();
-  const [soon, setSoon] = useState(false);
   const s = me?.settings;
   const name = me?.display_name || auth.session?.email || "";
   return (
     <MainFrame>
-      <TopBar title={S.title} showTitle />
+      <TopBar title={S.title} sub={s22.heads.settings} showTitle />
       <div className="page p15 set15">
         <Link to="/settings/profile" className="box15 set15__me">
           <span className="set15__avatar" aria-hidden>{initial(name)}</span>
@@ -109,20 +110,20 @@ export function Settings() {
         <SyncBox />
 
         <Group title={S.general}>
-          <Row to="/settings/notify" Icon={Bell} label={S.notify} sub={s ? S.notifySub(s.digest_time ?? "08:00", s.lead_days ?? 7, s.remind_enabled ?? true) : undefined} />
+          {/* Anh chốt 09/11 (T2, T5): ngưỡng cố định 3 và 7 ngày, chưa nhắc qua email. */}
+          <Row to="/settings/notify" Icon={Bell} label={S.notify} sub={S.notifyFixedSub} />
           <Row to="/settings/language" Icon={Globe} label={S.language} sub={S.languageSub(LANG_NAME[uiLang], (s?.timezone || "Asia/Ho_Chi_Minh").replace(/_/g, " "))} />
         </Group>
         <p className="hint hint15"><Info size={16} aria-hidden /> {S.langNote}</p>
 
         <Group title={S.family}>
           <Row to="/settings/members" Icon={UsersRound} label={S.members} sub={h.data ? S.membersSub(h.data.members.length) : undefined} />
-          <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+          {/* Anh chốt 09/11 (T1): bỏ Ủy quyền mua online khỏi Cài đặt; Mimi chỉ đề xuất so sánh giá. Backend giữ nguyên. */}
         </Group>
 
         <Group title={S.shopping}>
-          <Row Icon={Package} label={S.orders} chip={S.comingSoon} soon onSoon={() => setSoon(true)} />
+          <Row to="/orders" Icon={Package} label={S.orders} />
         </Group>
-        {soon && <p className="hint hint15" role="status"><Info size={16} aria-hidden /> {S.soonNote}</p>}
 
         <Group title={S.account}>
           <Row to="/settings/privacy" Icon={ShieldCheck} label={S.privacy} />
@@ -176,6 +177,11 @@ export function SettingsProfile() {
         }}
       >
         <span className="set15__avatar set15__avatar--lg" aria-hidden>{initial(cur || auth.session?.email || "")}</span>
+        {/* B1 (theo Redesign): email và vai trò dưới avatar. */}
+        <p className="set15__who">
+          <span>{auth.session?.email ?? ""}</span>
+          {me && <span className="tag15">{me.role === "member" ? S.member : S.owner}</span>}
+        </p>
         <label className="field15">
           <span>{S.name}</span>
           <input value={cur} maxLength={40} autoComplete="given-name" onChange={(e) => setName(e.target.value)} />
@@ -190,13 +196,27 @@ export function SettingsProfile() {
   );
 }
 
-/** Thông báo & nhắc mua: bật tắt email nhắc, giờ gửi, báo trước bao nhiêu ngày. */
+/**
+ * Thông báo & nhắc mua. Anh chốt 09/11 (T2, T5): nhắc trong app theo 2 ngưỡng cố định (Cần mua ngay
+ * ≤ 3 ngày, Sắp hết ≤ 7 ngày), chưa gửi email nên không còn công tắc, giờ gửi, số ngày báo trước.
+ * NotifyForm của 2.1 giữ lại để bật lại khi làm nhắc qua email.
+ */
 export function SettingsNotify() {
-  const me = useMeData();
-  return <Sub title={S.notify}>{me ? <NotifyForm me={me} /> : <p className="hint">{t.common.loading}</p>}</Sub>;
+  return (
+    <Sub title={S.notify}>
+      <div className="box15 set15__form">
+        <p>{S.notifyInApp}</p>
+        <ul className="set15__rules">
+          <li><span className="set15__dot set15__dot--now" aria-hidden /> {S.notifyNow}</li>
+          <li><span className="set15__dot set15__dot--soon" aria-hidden /> {S.notifySoon}</li>
+        </ul>
+        <p className="hint">{S.notifyNoEmail}</p>
+      </div>
+    </Sub>
+  );
 }
 
-function NotifyForm({ me }: { me: Me }) {
+export function NotifyForm({ me }: { me: Me }) {
   const s = me.settings;
   const start = { on: s.remind_enabled ?? true, time: s.digest_time ?? "08:00", lead: s.lead_days ?? 7 };
   const [base, setBase] = useState(start);
@@ -309,7 +329,6 @@ export function SettingsMembers() {
   const h = useHousehold();
   const act = useHouseholdActions();
   const [copied, setCopied] = useState(false);
-  const [soon, setSoon] = useState(false);
   const [code, setCode] = useState("");
   const [confirmRenew, setConfirmRenew] = useState(false);
   const { relationOf } = useRelations();
@@ -401,9 +420,8 @@ export function SettingsMembers() {
       </section>
 
       <ul className="box15 set15__list">
-        <Row Icon={Wallet} label={S.mandate} chip={S.off} soon onSoon={() => setSoon(true)} />
+        <MandateRow />
       </ul>
-      {soon && <p className="hint hint15" role="status"><Info size={16} aria-hidden /> {S.soonNote}</p>}
 
       {others.length === 0 && (
         <form
@@ -479,8 +497,19 @@ export function SettingsMember() {
 
 /** Quyền riêng tư & bảo mật: tạm là trang chữ (chốt 31/10). */
 export function SettingsPrivacy() {
+  const hidden = useHideAmounts();
   return (
     <Sub title={S.privacy}>
+      {/* B2 (theo Redesign): ẩn số tiền, lưu trên máy. */}
+      <div className="box15 set15__form">
+        <label className="switch-row">
+          <span className="set15__text">
+            <span>{S.hideAmounts}</span>
+            <small>{S.hideAmountsSub}</small>
+          </span>
+          <input type="checkbox" role="switch" {...{ switch: "" }} checked={hidden} onChange={(e) => setHideAmounts(e.target.checked)} />
+        </label>
+      </div>
       <section className="box15 set15__page">
         {S.privacyPage.map((p) => <p key={p}>{p}</p>)}
       </section>
@@ -596,6 +625,20 @@ function DeleteAccount() {
 
 const MANDATE_CATS: MandateCategory[] = ["grocery", "household"];
 
+/** Dòng Ủy quyền mua online ở Cài đặt: hiện đang bật hay tắt, bấm vào để sửa. */
+function MandateRow() {
+  const q = useMandate();
+  return <Row to="/settings/mandate" Icon={Wallet} label={S.mandate} chip={q.data ? (q.data.enabled ? S.on : S.off) : undefined} />;
+}
+
+export function SettingsMandate() {
+  return (
+    <Sub title={S.mandate}>
+      <MandateSection />
+    </Sub>
+  );
+}
+
 /** Household Mandate (Mimi 2.0 mục 13): phạm vi Mimi được tự thanh toán online. Chỉ chủ nhà sửa được. */
 export function MandateSection() {
   const q = useMandate();
@@ -644,16 +687,10 @@ function MandateForm({ initial }: { initial: Mandate }) {
         {t.mandate.tolerance}
         <input type="number" inputMode="numeric" min={0} max={50} value={m.price_tolerance_pct} onChange={(e) => setM({ ...m, price_tolerance_pct: num(e.target.value, 50) })} />
       </label>
-      <div className="plan-form__row">
-        <label>
-          {t.mandate.maxOrder}
-          <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_order_vnd} onChange={(e) => setM({ ...m, max_order_vnd: num(e.target.value, 100_000_000) })} />
-        </label>
-        <label>
-          {t.mandate.maxDay}
-          <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_day_vnd} onChange={(e) => setM({ ...m, max_day_vnd: num(e.target.value, 100_000_000) })} />
-        </label>
-      </div>
+      <label>
+        {t.mandate.maxOrder}
+        <input type="number" inputMode="numeric" min={0} step={10000} value={m.max_order_vnd} onChange={(e) => setM({ ...m, max_order_vnd: num(e.target.value, 100_000_000) })} />
+      </label>
       {save.isError && <p className="error" role="alert">{t.settings.saveFailed}</p>}
       <button type="submit" className="btn btn--quiet btn--block" aria-disabled={save.isPending || undefined}>
         {save.isPending ? t.confirm.saving : save.isSuccess ? t.mandate.saved : t.mandate.save}

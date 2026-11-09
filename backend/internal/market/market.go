@@ -5,6 +5,9 @@
 //   - Chỉ lấy từ nguồn công khai (đối tác khi có, tra Google bằng Gemini). Giá trên hóa đơn
 //     của một nhà KHÔNG vào bảng này: nó chỉ dùng cho chính nhà đó (package pricing).
 //   - Danh sách món cần giá chỉ có tên món, không kèm ai cần.
+//   - Món cần giá (anh chốt 09/11/2026): mọi món từng nằm trong tồn kho, hóa đơn đã quét hoặc
+//     kế hoạch của mọi tài khoản. Tra theo thứ tự ưu tiên: món trong kế hoạch đang mở, món sắp
+//     hết, rồi món nhiều nhà có.
 //   - Job price-sync chạy mỗi đêm: món nào đã có giá trong FreshFor thì bỏ qua; mỗi đêm tối
 //     đa Limit món để giữ chi phí cố định.
 package market
@@ -52,9 +55,12 @@ type Wanted struct {
 	Name     string
 	GroupKey string
 	Category string // category_key, để gom món cùng ngành hàng và dùng link ngành hàng trong sổ nguồn
+	// Priority: 2 món trong kế hoạch đang mở, 1 món sắp hết trong tồn kho, 0 còn lại.
+	// Trong giới hạn mỗi đêm, món ưu tiên cao được tra trước.
+	Priority int
 }
 
-// Demand liệt kê món đang nằm trong kế hoạch (dòng mở) của mọi nhà, có thể trùng nhau.
+// Demand liệt kê món cần có giá của mọi nhà (tồn kho, hóa đơn, kế hoạch), có thể trùng nhau.
 type Demand interface {
 	WantedItems(ctx context.Context) ([]Wanted, error)
 }
@@ -131,7 +137,7 @@ func Sync(ctx context.Context, d Demand, st Store, srcs []Source, o Options) (Re
 	if err != nil {
 		return res, fmt.Errorf("market: wanted items: %w", err)
 	}
-	wanted, counts := dedupe(all)
+	wanted, counts, prio := dedupe(all)
 	res.Wanted = len(wanted)
 	fresh, err := st.FreshKeys(ctx, o.Now.Add(-o.FreshFor))
 	if err != nil {
@@ -145,8 +151,11 @@ func Sync(ctx context.Context, d Demand, st Store, srcs []Source, o Options) (Re
 		}
 		todo = append(todo, w)
 	}
-	// Món nhiều nhà cần được tra trước; cùng số nhà thì theo key cho ổn định.
+	// Ưu tiên cao tra trước, rồi món nhiều nhà cần; cùng số nhà thì theo key cho ổn định.
 	sort.SliceStable(todo, func(i, j int) bool {
+		if prio[todo[i].Key] != prio[todo[j].Key] {
+			return prio[todo[i].Key] > prio[todo[j].Key]
+		}
 		if counts[todo[i].Key] != counts[todo[j].Key] {
 			return counts[todo[i].Key] > counts[todo[j].Key]
 		}
@@ -221,13 +230,21 @@ func lookupBatch(ctx context.Context, srcs []Source, items []Wanted, fx FX, day 
 	left := items
 	var firstErr error
 	failed := 0
+	var extra []Source
+	primary, primaryFailed := 0, 0
 	for _, s := range srcs {
+		if a, ok := s.(Additive); ok && a.Additive() {
+			extra = append(extra, s)
+			continue
+		}
+		primary++
 		if len(left) == 0 {
-			break
+			continue
 		}
 		got, err := s.Lookup(ctx, c, left)
 		if err != nil {
 			failed++
+			primaryFailed++
 			if firstErr == nil {
 				firstErr = fmt.Errorf("%s: %w", s.Name(), err)
 			}
@@ -247,10 +264,54 @@ func lookupBatch(ctx context.Context, srcs []Source, items []Wanted, fx FX, day 
 		}
 		left = miss
 	}
+	// Nguồn bổ sung (Channel3): hỏi mọi món, giá ghép thêm cạnh giá nguồn chính. Lỗi chỉ ghi log
+	// ở nơi gọi khi mọi nguồn đều lỗi; nguồn chính vẫn dùng được.
+	for _, s := range extra {
+		got, err := s.Lookup(ctx, c, items)
+		if err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", s.Name(), err)
+			}
+			continue
+		}
+		for _, w := range items {
+			ps, err := Normalize(ctx, got[w.Key], c, fx, s.Name(), day)
+			if err != nil {
+				return out, err
+			}
+			if len(ps) > 0 {
+				out[w.Key] = merge(out[w.Key], ps)
+			}
+		}
+	}
 	if failed == len(srcs) && firstErr != nil {
 		return out, firstErr
 	}
+	// Nguồn chính lỗi hết mà nguồn bổ sung cũng không ra giá nào: coi như lỗi để thử lại sau.
+	if primary > 0 && primaryFailed == primary && len(out) == 0 && firstErr != nil {
+		return out, firstErr
+	}
 	return out, nil
+}
+
+// Additive: nguồn bổ sung, được hỏi mọi món và ghép giá thêm, không chỉ hỏi món nguồn trước trượt.
+type Additive interface {
+	Additive() bool
+}
+
+// maxMerged: tối đa giá mỗi món khi ghép nhiều nguồn.
+const maxMerged = 8
+
+// merge ghép giá hai nguồn, sắp rẻ trước, tối đa maxMerged. Cùng cửa hàng ở hai nguồn thì giữ cả hai
+// (mỗi nguồn có link riêng), người dùng chọn ở bước So sánh giá.
+func merge(a, b []Price) []Price {
+	out := append(append([]Price{}, a...), b...)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].PriceVND < out[j].PriceVND })
+	if len(out) > maxMerged {
+		out = out[:maxMerged]
+	}
+	return out
 }
 
 // Normalize đổi giá nguồn trả về sang dạng lưu: kiểm tiền gốc theo nước, bỏ người bán lẻ
@@ -329,8 +390,8 @@ func Clean(ps []Price, source, day string) []Price {
 	return out
 }
 
-func dedupe(all []Wanted) ([]Wanted, map[string]int) {
-	counts := map[string]int{}
+func dedupe(all []Wanted) ([]Wanted, map[string]int, map[string]int) {
+	counts, prio := map[string]int{}, map[string]int{}
 	var out []Wanted
 	for _, w := range all {
 		w.Name = strings.TrimSpace(w.Name)
@@ -345,6 +406,7 @@ func dedupe(all []Wanted) ([]Wanted, map[string]int) {
 			out = append(out, w)
 		}
 		counts[w.Key]++
+		prio[w.Key] = max(prio[w.Key], w.Priority)
 	}
-	return out, counts
+	return out, counts, prio
 }

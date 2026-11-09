@@ -43,6 +43,11 @@ export const markDraft = (id: string) => {
 };
 export const clearDraft = (id: string) => write(DRAFT(id), null);
 
+/** Tên tự đặt cho Giỏ mua sắm (kế hoạch mặc định) khi còn là nháp; lưu thì thành tên kế hoạch mới. */
+const NAME = (id: string) => `mimi.planName.${id}`;
+export const draftName = (id: string): string | null => read(NAME(id));
+export const setDraftName = (id: string, name: string | null) => write(NAME(id), name && name.trim() ? name.trim() : null);
+
 /** Vẽ lại khi người mua hoặc trạng thái nháp đổi. */
 export function usePlanDraftVersion() {
   return useSyncExternalStore(

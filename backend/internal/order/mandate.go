@@ -13,19 +13,19 @@ type Mandate struct {
 	Categories        []string `json:"categories"`          // danh mục được phép: grocery, household
 	PriceTolerancePct int      `json:"price_tolerance_pct"` // 0..50: giá được cao hơn snapshot tốt nhất bao nhiêu %
 	MaxOrderVND       int64    `json:"max_order_vnd"`       // trần mỗi đơn; 0: không đặt trần
-	MaxDayVND         int64    `json:"max_day_vnd"`         // trần tổng các đơn đã thanh toán trong ngày; 0: không đặt
 }
 
-// DefaultMandate: chưa bật, chỉ cho grocery và household, dung sai giá 10%, tối đa 1 triệu/đơn.
+// DefaultMandate: bật sẵn (người dùng chốt 04/11: mua online là mặc định, không phải vào
+// Cài đặt), chỉ cho grocery và household, dung sai giá 10%, tối đa 1 triệu/đơn.
 func DefaultMandate() Mandate {
-	return Mandate{Categories: []string{CategoryGrocery, CategoryHousehold}, PriceTolerancePct: 10, MaxOrderVND: 1_000_000}
+	return Mandate{Enabled: true, Categories: []string{CategoryGrocery, CategoryHousehold}, PriceTolerancePct: 10, MaxOrderVND: 1_000_000}
 }
 
 func (m Mandate) Validate() error {
 	if m.PriceTolerancePct < 0 || m.PriceTolerancePct > 50 {
 		return fmt.Errorf("price_tolerance_pct must be 0..50")
 	}
-	if m.MaxOrderVND < 0 || m.MaxDayVND < 0 || m.MaxOrderVND > int64(domain.MaxLineVND) || m.MaxDayVND > int64(domain.MaxLineVND) {
+	if m.MaxOrderVND < 0 || m.MaxOrderVND > int64(domain.MaxLineVND) {
 		return fmt.Errorf("budget out of range")
 	}
 	for _, c := range m.Categories {
@@ -48,7 +48,7 @@ const (
 // Reason giải thích một kết quả ASK/BLOCK, kèm khóa món nếu thuộc một dòng.
 type Reason struct {
 	Key    string `json:"key,omitempty"`
-	Code   string `json:"code"` // not_in_plan | quantity_guard | category | price_guard | budget_order | budget_day | delivery_guard | mandate_off
+	Code   string `json:"code"` // not_in_plan | quantity_guard | category | price_guard | budget_order | delivery_guard | mandate_off
 	Result Result `json:"result"`
 	Detail string `json:"detail"`
 }
@@ -71,7 +71,7 @@ func MaxAuthorizedPrice(snapshot int64, tolerancePct int) int64 {
 // BLOCK: vi phạm rule cứng (món ngoài Kế hoạch, vượt số lượng, danh mục không được phép).
 // ASK: ngoại lệ cần người dùng duyệt (giá vượt dung sai, vượt ngân sách, giao không kịp,
 // mandate chưa bật). Promotion không tạo nhu cầu: giỏ chỉ gồm món đã có trong Kế hoạch.
-func Evaluate(m Mandate, b Basket, paidTodayVND int64) Decision {
+func Evaluate(m Mandate, b Basket) Decision {
 	d := Decision{Result: Allow, Reasons: []Reason{}}
 	add := func(r Reason) {
 		d.Reasons = append(d.Reasons, r)
@@ -108,9 +108,6 @@ func Evaluate(m Mandate, b Basket, paidTodayVND int64) Decision {
 	}
 	if m.MaxOrderVND > 0 && b.TotalVND > m.MaxOrderVND {
 		add(Reason{Code: "budget_order", Result: Ask, Detail: fmt.Sprintf("Tổng đơn %dđ vượt trần %dđ/đơn", b.TotalVND, m.MaxOrderVND)})
-	}
-	if m.MaxDayVND > 0 && paidTodayVND+b.TotalVND > m.MaxDayVND {
-		add(Reason{Code: "budget_day", Result: Ask, Detail: fmt.Sprintf("Vượt trần %dđ/ngày (đã chi hôm nay %dđ)", m.MaxDayVND, paidTodayVND)})
 	}
 	if !m.Enabled && d.Result == Allow {
 		add(Reason{Code: "mandate_off", Result: Ask, Detail: "Chưa bật ủy quyền mua online: cần bạn duyệt đơn này"})

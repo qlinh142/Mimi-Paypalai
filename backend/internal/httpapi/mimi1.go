@@ -10,6 +10,7 @@ import (
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/household"
+	"github.com/smartlife-lab/mimi/backend/internal/item"
 	"github.com/smartlife-lab/mimi/backend/internal/market"
 	"github.com/smartlife-lab/mimi/backend/internal/plan"
 	"github.com/smartlife-lab/mimi/backend/internal/recurring"
@@ -260,6 +261,59 @@ func today(p authz.Principal) string {
 		}
 	}
 	return domain.Today(time.Now(), loc).String()
+}
+
+// ItemMarketPrices là giá chung của một món trong Đồ dùng (Mimi 2.2, so sánh giá trong Chi
+// tiết món). UpdatedAt null: món chưa được tra lần nào (job đêm sẽ tra theo thứ tự ưu tiên).
+type ItemMarketPrices struct {
+	Key       string         `json:"key"`
+	Name      string         `json:"name"`
+	Prices    []market.Price `json:"prices"`
+	UpdatedAt *time.Time     `json:"updated_at"`
+}
+
+// getItemMarketPrices: GET /items/{key}/market-prices. Chỉ đọc bảng giá chung theo tên món và
+// nước của người dùng; quyền đọc món như GET /items/{key}.
+func (s *Server) getItemMarketPrices(w http.ResponseWriter, r *http.Request) {
+	p := principalFrom(r.Context())
+	d, err := s.items.Get(r.Context(), p, r.PathValue("key"))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	id := market.ItemID(p.Country, d.Name)
+	entries, err := s.market.Entries(r.Context(), []string{id})
+	out := ItemMarketPrices{Key: d.Key, Name: d.Name, Prices: []market.Price{}}
+	if e, ok := entries[id]; ok {
+		out.Prices = append(out.Prices, e.Prices...)
+		at := e.UpdatedAt
+		out.UpdatedAt = &at
+	}
+	s.reply(w, r, http.StatusOK, out, err)
+}
+
+// listItemMarketPrices: GET /items/market-prices. Giá chung của mọi món đang theo dõi trong
+// Đồ dùng, để thẻ món hiện "Rẻ nhất ...". Chỉ trả món đã có giá.
+func (s *Server) listItemMarketPrices(w http.ResponseWriter, r *http.Request) {
+	p := principalFrom(r.Context())
+	items, err := s.items.List(r.Context(), p, item.Query{Tab: "active", Horizon: 7})
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	ids := make([]string, len(items))
+	for i, it := range items {
+		ids[i] = market.ItemID(p.Country, it.Name)
+	}
+	entries, err := s.market.Entries(r.Context(), ids)
+	out := []ItemMarketPrices{}
+	for i, it := range items {
+		if e, ok := entries[ids[i]]; ok && len(e.Prices) > 0 {
+			at := e.UpdatedAt
+			out = append(out, ItemMarketPrices{Key: it.Key, Name: it.Name, Prices: e.Prices, UpdatedAt: &at})
+		}
+	}
+	s.reply(w, r, http.StatusOK, map[string]any{"items": out}, err)
 }
 
 func (s *Server) getItemPriceHistory(w http.ResponseWriter, r *http.Request) {

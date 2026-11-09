@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { CalendarClock, Droplet, GraduationCap, House, Pencil, Plus, Smartphone, Tv, Wifi, Zap, type LucideIcon } from "lucide-react";
 import { t } from "../i18n";
 import { m15 } from "../i18n/m15";
+import { m1 } from "../i18n/m1";
+import { s22 } from "../i18n/s22";
 import { useRecurring } from "../api/hooks";
 import { useKeysInPlans } from "./PlanPicker";
 import type { Recurring } from "../api/types";
@@ -77,7 +79,7 @@ export function RecurringList({ term }: { term: string }) {
                   <button type="button" className="card15__main" onClick={() => nav(`/items/recurring/${encodeURIComponent(r.id)}`)}>
                     <span className="card15__icon"><span className="row__icon" aria-hidden><Icon size={22} strokeWidth={1.8} /></span></span>
                     <span className="card15__text">
-                      <span className="card15__name">{r.name}</span>
+                      <span className="card15__name">{r.name}<span className="cyc22">{m1.recurring.cycles[r.cycle]}</span></span>
                       <span className="card15__sub">{formatVnd(r.amount)} · {dueText(r)}</span>
                       <span className="card15__edit"><Pencil size={14} aria-hidden /> {m15.items.edit}</span>
                     </span>
@@ -88,6 +90,7 @@ export function RecurringList({ term }: { term: string }) {
             })}
         </Group15>
       ))}
+      {groups.length > 0 && <p className="hint">{s22.items.recHint}</p>}
       <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => nav("/items/recurring/new")}>
         <Plus size={22} aria-hidden /> {m15.rec.add}
       </button>

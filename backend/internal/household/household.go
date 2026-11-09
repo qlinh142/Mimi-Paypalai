@@ -457,10 +457,13 @@ func (s *Service) Cancel(ctx context.Context, p authz.Principal, id string) (Ass
 type Delegated struct {
 	ToMe   []Assignment `json:"to_me"`
 	FromMe []Assignment `json:"from_me"`
+	// ToMeDone (2.2): vòng được nhờ đã mua xong (đủ hoặc một phần), để tab Được nhờ mua giữ cả
+	// kế hoạch đã hoàn thành. Tách khỏi ToMe để các màn 2.1 chỉ đọc vòng đang mở như cũ.
+	ToMeDone []Assignment `json:"to_me_done"`
 }
 
 func (s *Service) Delegated(ctx context.Context, p authz.Principal) (Delegated, error) {
-	out := Delegated{ToMe: []Assignment{}, FromMe: []Assignment{}}
+	out := Delegated{ToMe: []Assignment{}, FromMe: []Assignment{}, ToMeDone: []Assignment{}}
 	if err := authz.Can(p, authz.ActionReadPlan); err != nil {
 		return out, err
 	}
@@ -476,12 +479,18 @@ func (s *Service) Delegated(ctx context.Context, p authz.Principal) (Delegated, 
 		return out, err
 	}
 	for _, a := range to {
-		if a.Active() {
-			trip, err := s.plans.PlanTrip(ctx, a.OwnerUID, a.PlanID)
-			if err != nil {
-				return out, err
-			}
-			a.Trip = &trip
+		done := a.Status == "completed" || a.Status == "closed_partial"
+		if !a.Active() && !done {
+			continue
+		}
+		trip, err := s.plans.PlanTrip(ctx, a.OwnerUID, a.PlanID)
+		if err != nil {
+			return out, err
+		}
+		a.Trip = &trip
+		if done {
+			out.ToMeDone = append(out.ToMeDone, a)
+		} else {
 			out.ToMe = append(out.ToMe, a)
 		}
 	}

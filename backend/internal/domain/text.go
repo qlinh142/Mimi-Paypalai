@@ -74,3 +74,31 @@ func CleanItemName(s string) string {
 	}
 	return s
 }
+
+// ASCII đổi chữ gửi ra cổng thanh toán (PayPal, Braintree, Payouts) thành chữ Latin không
+// dấu: bỏ dấu, đ thành d, bỏ ký tự ngoài ASCII in được, gộp khoảng trắng, cắt tối đa max
+// ký tự (max <= 0: không cắt). Giữ nguyên chữ hoa, chữ thường.
+func ASCII(s string, max int) string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(s) {
+		switch {
+		case unicode.Is(unicode.Mn, r):
+			continue
+		case r == 'đ':
+			r = 'd'
+		case r == 'Đ':
+			r = 'D'
+		case unicode.IsSpace(r):
+			r = ' '
+		}
+		if r < 0x20 || r > 0x7e {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	out := strings.Join(strings.Fields(b.String()), " ")
+	if max > 0 && len(out) > max {
+		out = strings.TrimSpace(out[:max])
+	}
+	return out
+}

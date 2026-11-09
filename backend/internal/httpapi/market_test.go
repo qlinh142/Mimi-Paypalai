@@ -119,3 +119,41 @@ func TestPlanMarketPricesRefresh(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 }
+
+// Mimi 2.2: so sánh giá trong Chi tiết món đọc bảng giá chung theo tên món.
+func TestItemMarketPrices(t *testing.T) {
+	s, err := New(Deps{
+		Log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Tokens:     fakeTokens{"owner-tok": "u1"},
+		AppCheck:   fakeAppCheck{},
+		Principals: fakePrincipals{"u1": {UID: "u1", Role: authz.RoleOwner}},
+		Profiles:   fakeProfiles{}, Receipts: &fakeReceipts{}, Items: fakeItems{}, Ready: fakeReady{},
+		Home: fakeHome{}, Spending: spending.New(fakeSpendingStore{}), Settings: user.NewSettingsService(fakeSettingsStore{}, nil),
+		Plan:  plan.New(&fakePlanStore{}, fakePlanItems{}, nil),
+		Notes: fakeNotes{},
+		Market: fakeMarket{market.ItemID("VN", "Sữa"): {
+			Prices:    []market.Price{{Store: "WinMart", PriceVND: 32_000, Source: "gemini_search", URL: "https://winmart.vn/sua", On: "2026-11-08"}},
+			UpdatedAt: time.Date(2026, 11, 8, 2, 0, 0, 0, time.UTC),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, body := do(s.Handler(), "GET", "/api/items/sua/market-prices", "owner-tok", "")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	ps, _ := body["prices"].([]any)
+	if body["key"] != "sua" || len(ps) != 1 || ps[0].(map[string]any)["url"] != "https://winmart.vn/sua" || body["updated_at"] == nil {
+		t.Fatalf("%s", rec.Body)
+	}
+	if rec, _ := do(s.Handler(), "GET", "/api/items/khong-co/market-prices", "owner-tok", ""); rec.Code != 404 {
+		t.Fatalf("%d", rec.Code)
+	}
+	// Danh sách cho thẻ món: chỉ món đã có giá.
+	rec, body = do(s.Handler(), "GET", "/api/items/market-prices", "owner-tok", "")
+	items, _ := body["items"].([]any)
+	if rec.Code != 200 || len(items) != 1 || items[0].(map[string]any)["key"] != "sua" {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}

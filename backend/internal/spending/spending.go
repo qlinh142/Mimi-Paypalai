@@ -7,6 +7,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
@@ -52,19 +53,25 @@ type CategoryShare struct {
 
 // Report là phản hồi GET /spending.
 type Report struct {
-	Month             string          `json:"month"`
-	Spent             int64           `json:"spent"`
-	SpentPrevMonthPct *float64        `json:"spent_prev_month_pct"` // null khi tháng trước chưa có chi tiêu
-	Saved             int64           `json:"saved"`
-	SavedRatio        *float64        `json:"saved_ratio"` // discount / (spent + discount); null khi không có giảm giá
-	ReceiptCount      int64           `json:"receipt_count"`
-	OnlineSpent       int64           `json:"online_spent"`    // chi qua PayPal, net sau refund
-	OnlineOrders      int64           `json:"online_orders"`   // số đơn PayPal đã thanh toán
-	Refunded          int64           `json:"refunded"`        // tổng refund PayPal trong tháng
-	DelegatedSpent    int64           `json:"delegated_spent"` // người nhà mua hộ, đã nằm trong spent (B4)
-	ByCategory        []CategoryShare `json:"by_category"`
-	TopSavingReceipts []ReceiptRow    `json:"top_saving_receipts"`
-	RecentReceipts    []ReceiptRow    `json:"recent_receipts"`
+	Month             string   `json:"month"`
+	Spent             int64    `json:"spent"`
+	SpentPrevMonthPct *float64 `json:"spent_prev_month_pct"` // null khi tháng trước chưa có chi tiêu
+	// So cùng kỳ (Mimi 2.2, chốt 09/11): chỉ có ở tháng hiện tại. Cộng hóa đơn quét và phần người
+	// nhà mua hộ từ ngày 1 đến hôm nay (giờ Việt Nam) của tháng này và cùng khoảng ngày tháng trước;
+	// đơn online chưa có ngày trong months/ nên không tính ở đây. null khi tháng trước chưa có
+	// hóa đơn trong khoảng đó, hoặc không phải tháng hiện tại.
+	SpentPrevSameRangePct *float64        `json:"spent_prev_same_range_pct"`
+	SameRangeDay          int             `json:"same_range_day,omitempty"` // ngày cuối của khoảng so (1–31)
+	Saved                 int64           `json:"saved"`
+	SavedRatio            *float64        `json:"saved_ratio"` // discount / (spent + discount); null khi không có giảm giá
+	ReceiptCount          int64           `json:"receipt_count"`
+	OnlineSpent           int64           `json:"online_spent"`    // chi qua PayPal, net sau refund
+	OnlineOrders          int64           `json:"online_orders"`   // số đơn PayPal đã thanh toán
+	Refunded              int64           `json:"refunded"`        // tổng refund PayPal trong tháng
+	DelegatedSpent        int64           `json:"delegated_spent"` // người nhà mua hộ, đã nằm trong spent (B4)
+	ByCategory            []CategoryShare `json:"by_category"`
+	TopSavingReceipts     []ReceiptRow    `json:"top_saving_receipts"`
+	RecentReceipts        []ReceiptRow    `json:"recent_receipts"`
 }
 
 // receiptScanLimit: số hóa đơn tối đa đọc cho một tháng. Một hộ gia đình hiếm khi vượt
@@ -77,9 +84,15 @@ const listSize = 3
 // (nơi mua, ngày, số tiền) chứ không chỉ 3 hóa đơn gần nhất; màn Địa điểm mua hàng cũng gộp từ đây.
 const historySize = 200
 
-type Service struct{ store Store }
+type Service struct {
+	store Store
+	now   func() time.Time
+}
 
-func New(store Store) *Service { return &Service{store: store} }
+func New(store Store) *Service { return &Service{store: store, now: time.Now} }
+
+// vn: ngày "hôm nay" theo giờ Việt Nam, như màn Lịch sử mua hàng.
+var vn = time.FixedZone("ICT", 7*3600)
 
 func (s *Service) Get(ctx context.Context, p authz.Principal, month string) (Report, error) {
 	if err := authz.Can(p, authz.ActionReadSpending); err != nil {
@@ -101,8 +114,39 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, month string) (Rep
 	if err != nil {
 		return Report{}, err
 	}
-	return Build(month, cur, before, rows), nil
+	r := Build(month, cur, before, rows)
+	today := s.now().In(vn)
+	if month == today.Format("2006-01") {
+		prevRows, err := s.store.MonthReceipts(ctx, p.UID, prev, receiptScanLimit)
+		if err != nil {
+			return Report{}, err
+		}
+		r.SameRangeDay = today.Day()
+		r.SpentPrevSameRangePct = SameRange(rows, prevRows, today.Day())
+	}
+	return r, nil
 }
+
+// SameRange so tổng hóa đơn từ ngày 1 đến ngày day của tháng này với cùng khoảng tháng trước.
+func SameRange(cur, prev []ReceiptRow, day int) *float64 {
+	upTo := func(rows []ReceiptRow) int64 {
+		var t int64
+		for _, r := range rows {
+			if len(r.PurchasedOn) == 10 && dayOf(r.PurchasedOn) <= day {
+				t += r.TotalVND
+			}
+		}
+		return t
+	}
+	p := upTo(prev)
+	if p <= 0 {
+		return nil
+	}
+	v := round(float64(upTo(cur)-p)/float64(p)*100, 1)
+	return &v
+}
+
+func dayOf(ymd string) int { return int(ymd[8]-'0')*10 + int(ymd[9]-'0') }
 
 // Build là phần tính toán thuần, tách riêng để test không cần Firestore.
 func Build(month string, cur, prev Month, rows []ReceiptRow) Report {

@@ -12,6 +12,7 @@ import { useRelations } from "../lib/relation";
 import { LoadState } from "../components/LoadState";
 import { whenText } from "./PlanList";
 import { AddToCalendar } from "../components/AddToCalendar";
+import { p22 } from "../i18n/p22";
 
 /** Một dòng trên danh sách đi mua. `mine` = món khác trên hóa đơn (khối "Của tôi"). */
 type RunLine = { key: string; name: string; qty: number; unit: string; price: number | null; ticked: boolean; fixedName: boolean; mine: boolean; category: string };
@@ -81,8 +82,10 @@ export function ShoppingRun() {
   const { id = "" } = useParams();
   const d = useDelegated();
   const a = d.data?.to_me.find((x) => x.assignment_id === id);
+  const finished = d.data?.to_me_done?.find((x) => x.assignment_id === id);
   const [doneView, setDoneView] = useState<DoneInfo | null>(null);
   if (doneView) return <Done {...doneView} />;
+  if (!a && finished) return <RunSummary a={finished} />;
   // A10: lỗi tải (mất mạng, máy chủ lỗi) khác với lần nhờ mua không còn nữa.
   if (!a && (d.isPending || d.isError)) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><LoadState q={d} hasData={false} /></div></MainFrame>;
   if (!a) return <MainFrame><TopBar title={m15.plan.title} variant="sub" /><div className="page p15"><p className="hint">{m15.run.gone}</p></div></MainFrame>;
@@ -279,6 +282,51 @@ function Line({ l, open, onToggle, onSet }: { l: RunLine; open: boolean; onToggl
         </div>
       )}
     </li>
+  );
+}
+
+/** 2.2: kế hoạch được nhờ đã mua xong, mở từ mục Đã hoàn thành của tab Được nhờ mua: chỉ xem. */
+function RunSummary({ a }: { a: Assignment }) {
+  const nav = useNavigate();
+  const { relationOf } = useRelations();
+  const rel = relationOf(a.owner_uid);
+  const owner = rel ? m15.settings.relations[rel] : a.owner_display_name;
+  const planName = a.trip?.plan_name || m15.plan.main;
+  const st = a.trip ? { buy_date: a.trip.buy_date ?? "", buy_hour: a.trip.buy_hour ?? null, buy_minute: a.trip.buy_minute ?? 0, trip_note: a.trip.trip_note ?? "" } : undefined;
+  const total = a.items.reduce((s, i) => s + (i.unit_price ?? 0) * (i.qty ?? 1), 0);
+  return (
+    <MainFrame>
+      <TopBar title={planName} />
+      <div className="page p15 run15">
+        <div className="pd15__head">
+          <button type="button" className="pd15__back" aria-label={m15.detail.back} onClick={() => nav("/plan?tab=to-me")}>
+            <ChevronLeft size={28} aria-hidden />
+          </button>
+          <h1 className="run15__title">{planName}</h1>
+        </div>
+        <p className="sent15" role="status"><Check size={18} aria-hidden /> {p22.askDoneNote} {p22.askStatus[a.status] ?? ""}</p>
+        <section className="box15 run15__sum">
+          <span><ReceiptText size={18} aria-hidden /> {m15.plan.count(a.items.length)}</span>
+          <span><MapPin size={18} aria-hidden /> {st?.trip_note || m15.plan.noStore}</span>
+          <span><CalendarDays size={18} aria-hidden /> {whenText(st)}</span>
+          <span><UserRound size={18} aria-hidden /> {m15.run.sender(owner)}</span>
+        </section>
+        <ul className="box15 past22">
+          {a.items.map((i) => (
+            <li key={i.consumption_group_key}>
+              <div className="past22__row">
+                <span className="past22__text">
+                  <b>{i.name_display}</b>
+                  <small>{[i.qty ? `${i.qty}${i.unit ? ` ${i.unit}` : ""}` : "", i.status === "done" ? p22.askStatus.completed : ""].filter(Boolean).join(" · ")}</small>
+                </span>
+                {i.unit_price != null && <span className="num past22__sum">{formatVnd(i.unit_price * (i.qty ?? 1))}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {total > 0 && <p className="run15__split"><span>{m15.history.total}</span><span className="num">{formatVnd(total)}</span></p>}
+      </div>
+    </MainFrame>
   );
 }
 

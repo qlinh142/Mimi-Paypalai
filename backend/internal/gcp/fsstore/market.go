@@ -152,15 +152,20 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 	return out, nil
 }
 
-// WantedItems đọc mọi dòng Kế hoạch đang mở của mọi nhà (Plan mặc định plan_items và
-// plans/{id}/items), chỉ lấy tên, nhóm, ngành hàng và nước của chủ kế hoạch (để tra giá đúng
-// nước, mẹ chốt 02/11). Truy vấn collection group không lọc nên không cần index; số dòng lớn
-// thì đổi sang lọc status với index collection group.
+// WantedItems liệt kê món cần có giá trong bảng chung (anh chốt 09/11/2026: mọi món từng
+// nằm trong tồn kho, từng quét hóa đơn, từng đưa vào kế hoạch của mọi tài khoản):
+//   - dòng Kế hoạch mọi trạng thái (plan_items và plans/{id}/items); dòng đang mở ưu tiên 2;
+//   - món trong tồn kho users/{uid}/items (hóa đơn đã quét đều ghi vào đây), trừ món đã bỏ;
+//     món sắp hết (hết trong 7 ngày hoặc mẹ báo hết) ưu tiên 1.
+// Khoản chi định kỳ thêm vào kế hoạch ("custom-rec-...") không phải hàng hóa nên bỏ qua.
+// Chỉ lấy tên, nhóm, ngành hàng và nước của chủ (tra giá đúng nước, mẹ chốt 02/11); không
+// ghi ai cần. Truy vấn collection group không lọc nên không cần index.
 func (s *Store) WantedItems(ctx context.Context) ([]market.Wanted, error) {
 	var out []market.Wanted
 	var uids []string // uids[i] là chủ dòng out[i]
+	soon := time.Now().In(time.FixedZone("ICT", 7*3600)).AddDate(0, 0, 7).Format("2006-01-02")
 	for _, group := range []string{"plan_items", "items"} {
-		it := s.c.CollectionGroup(group).Select("name", "group_key", "status", "category_key").Documents(ctx)
+		it := s.c.CollectionGroup(group).Select("name", "group_key", "status", "category_key", "dropped", "prediction").Documents(ctx)
 		for {
 			d, err := it.Next()
 			if err == iterator.Done {
@@ -170,25 +175,34 @@ func (s *Store) WantedItems(ctx context.Context) ([]market.Wanted, error) {
 				it.Stop()
 				return nil, fmt.Errorf("market wanted %s: %w", group, err)
 			}
-			uid := planLineOwner(d.Ref, group)
-			if uid == "" {
-				continue // "items" cũng có thể là tên collection khác: chỉ nhận users/{uid}/plans/{id}/items
-			}
 			m := d.Data()
-			if st, _ := m["status"].(string); st != "open" && st != "assigned" {
-				continue
-			}
 			name, _ := m["name"].(string)
 			gk, _ := m["group_key"].(string)
 			cat, _ := m["category_key"].(string)
 			if gk == "" {
-				gk = d.Ref.ID // dòng plan_items dùng group_key làm ID
+				gk = d.Ref.ID // dòng plan_items và món tồn kho dùng group_key làm ID
 			}
-			if name == "" {
+			if name == "" || strings.HasPrefix(gk, "custom-rec-") {
 				continue
 			}
+			prio := 0
+			uid := planLineOwner(d.Ref, group)
+			if uid != "" {
+				if st, _ := m["status"].(string); st == "open" || st == "assigned" {
+					prio = 2
+				}
+			} else if uid = stockOwner(d.Ref, group); uid != "" {
+				if dropped, _ := m["dropped"].(bool); dropped {
+					continue
+				}
+				if stockRunningLow(m["prediction"], soon) {
+					prio = 1
+				}
+			} else {
+				continue // collection "items" ở chỗ khác
+			}
 			uids = append(uids, uid)
-			out = append(out, market.Wanted{Name: name, GroupKey: gk, Category: cat})
+			out = append(out, market.Wanted{Name: name, GroupKey: gk, Category: cat, Priority: prio})
 		}
 		it.Stop()
 	}
@@ -201,6 +215,28 @@ func (s *Store) WantedItems(ctx context.Context) ([]market.Wanted, error) {
 		out[i].Key = market.ItemID(out[i].Country, out[i].Name)
 	}
 	return out, nil
+}
+
+// stockOwner trả uid chủ món tồn kho users/{uid}/items/{key}.
+func stockOwner(ref *firestore.DocumentRef, group string) string {
+	if group != "items" {
+		return ""
+	}
+	coll := ref.Parent
+	if coll.Parent == nil || coll.Parent.Parent == nil || coll.Parent.Parent.ID != "users" {
+		return ""
+	}
+	return coll.Parent.ID
+}
+
+// stockRunningLow: mẹ báo hết, hoặc ngày hết dự đoán (YYYY-MM-DD) không quá soon.
+func stockRunningLow(pred any, soon string) bool {
+	p, _ := pred.(map[string]any)
+	if out, _ := p["forced_out"].(bool); out {
+		return true
+	}
+	on, _ := p["out_on"].(string)
+	return on != "" && on <= soon
 }
 
 // planLineOwner trả uid chủ dòng kế hoạch: users/{uid}/plan_items/{id} hoặc users/{uid}/plans/{p}/items/{id}.

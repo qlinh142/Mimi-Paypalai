@@ -1,17 +1,42 @@
-import { t } from "../i18n";
+import { t, uiLang } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Camera, PackageCheck, ShieldCheck, Truck } from "lucide-react";
+import { Camera, CreditCard, Package, PackageCheck, ShieldCheck, Truck } from "lucide-react";
 import { ApiError } from "../api/client";
 import {
-  useAdvanceOrder, useBasket, useCaptureOrder, useCheckout, useOrder, useOrders, useReadDelivery, useRefundOrder,
-  useVerifyOrder,
+  useAdvanceOrder, useBasket, useCaptureOrder, useCardToken, useCheckout, usePayCard, useOrder, useOrders, useReadDelivery, useRefundOrder,
+  useTaxonomyLabels, useVerifyOrder,
 } from "../api/hooks";
-import type { Basket, DeliveryObservation, Order, OrderLine, RefundReason } from "../api/types";
+import type { Basket, CardStatus, DeliveryObservation, Order, OrderLine, RefundReason } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { compressReceiptImage } from "../lib/image";
 import { loadPayPal, PAYPAL_CLIENT_ID } from "../lib/paypal";
+import { FAKE_CLIENT_TOKEN, FAKE_NONCE, loadDropin, threeDSecureRejected, type DropinInstance } from "../lib/braintree";
 import { formatDayMonth, formatVnd } from "../lib/text";
+import { displayCurrency } from "../lib/money";
+import { m15 } from "../i18n/m15";
+
+const usdFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+/**
+ * Số tiền trong giỏ online: người xem chọn USD thì quy đổi theo đúng tỷ giá của đơn
+ * (cùng tỷ giá PayPal sẽ thu), để tổng trên màn khớp số tiền thanh toán.
+ */
+const basketMoney = (vnd: number, rate: number) => (displayCurrency() === "USD" && rate > 0 ? usdFmt.format(Math.round((vnd * 100) / rate) / 100) : formatVnd(vnd));
+const unitLabel = (u: string) => m15.units[u] ?? u;
+
+/** Lý do ASK / BLOCK theo ngôn ngữ app; mã chưa biết thì dùng câu máy chủ gửi. */
+function reasonText(r: Basket["decision"]["reasons"][number], b: Basket): string {
+  const fn = t.online.reason[r.code];
+  if (!fn) return r.detail;
+  const l = b.lines.find((x) => x.key === r.key);
+  const name = l?.name ?? r.key ?? "";
+  if (r.code === "price_guard" && l) {
+    const max = Math.floor((l.snapshot_price_vnd * 110) / 100);
+    return fn(name, basketMoney(l.unit_price_vnd, b.vnd_per_usd), basketMoney(max, b.vnd_per_usd));
+  }
+  if (r.code === "delivery_guard" && l?.need_by) return fn(name, formatDayMonth(l.eta), formatDayMonth(l.need_by));
+  return fn(name, "", "");
+}
 
 /**
  * Mua online (Mimi 2.0 mục 12 đến 15): giỏ online dựng từ Kế hoạch, Household Mandate,
@@ -42,6 +67,9 @@ function BasketView({ basket }: { basket: Basket }) {
   const [approve, setApprove] = useState(false);
   const decision = basket.decision;
   const canPay = decision.result === "ALLOW" || (decision.result === "ASK" && approve);
+  const label = useTaxonomyLabels();
+  const rate = basket.vnd_per_usd;
+  const usd = displayCurrency() === "USD";
   return (
     <>
       <section className="plan-sec">
@@ -49,24 +77,24 @@ function BasketView({ basket }: { basket: Basket }) {
         <p className="hint">{t.online.snapshot(formatDayMonth(basket.snapshot_at.slice(0, 10)))}</p>
         <ul className="list">
           {basket.lines.map((l) => (
-            <li key={l.key} className="plan-row">
+            <li key={l.key} className="plan-row plan-row--online">
               <span className="plan-row__text">
                 <span className="plan-row__name">{l.product_name}</span>
                 <span className="plan-row__sub">
-                  {t.online.packs(l.qty, l.unit, l.pack_qty)} · {t.online.eta(formatDayMonth(l.eta))}
+                  {t.online.packs(l.qty, unitLabel(l.unit), l.pack_qty)} · {t.online.eta(formatDayMonth(l.eta))}
                 </span>
                 <span className="plan-row__sub">
-                  {t.online.priceVsSnapshot(formatVnd(l.unit_price_vnd), formatVnd(l.snapshot_price_vnd))}
+                  {t.online.priceVsSnapshot(basketMoney(l.unit_price_vnd, rate), basketMoney(l.snapshot_price_vnd, rate))}
                 </span>
               </span>
-              <span className="num">{formatVnd(l.total_vnd)}</span>
+              <span className="num">{basketMoney(l.total_vnd, rate)}</span>
             </li>
           ))}
         </ul>
-        {basket.missing.length > 0 && <p className="hint">{t.online.missing(basket.missing.join(", "))}</p>}
+        {basket.missing.length > 0 && <p className="hint">{t.online.missing(basket.missing.map((k) => label(k) || k).join(", "))}</p>}
         <p className="plan-total">
           <span>{t.online.total}</span>
-          <span className="num">{formatVnd(basket.total_vnd)}</span>
+          <span className="num">{usd ? usdFmt.format(Number(basket.amount_usd)) : formatVnd(basket.total_vnd)}</span>
         </p>
         <p className="hint">{t.online.usd(basket.amount_usd, basket.vnd_per_usd)}</p>
       </section>
@@ -79,7 +107,7 @@ function BasketView({ basket }: { basket: Basket }) {
           <ul className="list">
             {decision.reasons.map((r, i) => (
               <li key={`${r.code}-${r.key ?? i}`} className={`check ${r.result === "BLOCK" ? "warn" : ""}`}>
-                {r.detail}
+                {reasonText(r, basket)}
               </li>
             ))}
           </ul>
@@ -97,6 +125,7 @@ function BasketView({ basket }: { basket: Basket }) {
       </section>
 
       {canPay && <PayButton approve={decision.result === "ASK"} />}
+      {canPay && basket.card_enabled && <CardButton approve={decision.result === "ASK"} />}
     </>
   );
 }
@@ -179,6 +208,88 @@ function PayButton({ approve }: { approve: boolean }) {
   );
 }
 
+/**
+ * Trả bằng thẻ qua Braintree, nằm ngay dưới nút PayPal. Bấm lần đầu: lấy client token và
+ * mở Drop-in (ô nhập thẻ do Braintree dựng, số thẻ không qua server Mimi). Bấm lần hai:
+ * Drop-in trả nonce, app tạo đơn provider=braintree rồi gửi nonce để server thu tiền.
+ * Server chạy BRAINTREE_MODE=fake (hoặc bản thử) thì thu luôn bằng nonce thử.
+ */
+function CardButton({ approve }: { approve: boolean }) {
+  const token = useCardToken();
+  const checkout = useCheckout();
+  const pay = usePayCard();
+  const navigate = useNavigate();
+  const box = useRef<HTMLDivElement>(null);
+  const dropin = useRef<DropinInstance | null>(null);
+  // Đơn đã tạo nhưng thẻ bị từ chối: thử lại trên cùng đơn, không tạo đơn chờ mới.
+  const orderId = useRef("");
+  const amountUSD = useRef("");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const busy = token.isPending || checkout.isPending || pay.isPending;
+
+  useEffect(() => () => void dropin.current?.teardown().catch(() => undefined), []);
+
+  // Đơn tạo trước khi hỏi thẻ để 3D Secure xác minh đúng số tiền của đơn.
+  const ensureOrder = async () => {
+    if (!orderId.current) {
+      const o = await checkout.mutateAsync({ keys: [], approve, provider: "braintree" });
+      orderId.current = o.id;
+      amountUSD.current = o.amount_usd;
+    }
+  };
+
+  const charge = async (nonce: string) => {
+    const paid = await pay.mutateAsync({ id: orderId.current, nonce });
+    navigate(`/orders/${paid.id}`);
+  };
+
+  const onClick = async () => {
+    if (busy) return;
+    setError("");
+    try {
+      if (dropin.current) {
+        await ensureOrder();
+        const p = await dropin.current.requestPaymentMethod({ threeDSecure: { amount: amountUSD.current } });
+        if (threeDSecureRejected(p)) {
+          setError(t.online.card3dsFailed);
+          return;
+        }
+        await charge(p.nonce);
+        return;
+      }
+      const auth = await token.mutateAsync();
+      if (auth === FAKE_CLIENT_TOKEN) {
+        await ensureOrder();
+        await charge(FAKE_NONCE);
+        return;
+      }
+      setOpen(true);
+      const dropinNs = await loadDropin();
+      if (!box.current) return;
+      dropin.current = await dropinNs.create({
+        authorization: auth,
+        container: box.current,
+        locale: uiLang === "vi" ? "vi_VN" : "en_US",
+        threeDSecure: true,
+      });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t.online.failed);
+    }
+  };
+
+  return (
+    <section className="plan-sec">
+      <p className="hint">{t.online.cardOr}</p>
+      <div ref={box} hidden={!open} />
+      <button type="button" className="btn btn--quiet btn--block" aria-disabled={busy || undefined} onClick={onClick}>
+        <CreditCard size={18} aria-hidden /> {busy ? t.online.paying : open ? t.online.cardConfirm : t.online.payCard}
+      </button>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 // ================= Đơn online: danh sách và chi tiết =================
 
 export function Orders() {
@@ -189,7 +300,14 @@ export function Orders() {
       <div className="page plan">
         {orders.isPending && <p className="hint">{t.common.loading}</p>}
         {orders.isError && <p className="error">{t.common.genericError}</p>}
-        {orders.data && orders.data.length === 0 && <p className="hint">{t.orders.empty}</p>}
+        {orders.data && orders.data.length === 0 && (
+          // B3 (theo Redesign): trang trống có icon, tiêu đề và dòng phụ.
+          <div className="empty22" role="status">
+            <span className="empty22__ill" aria-hidden><Package size={30} /></span>
+            <strong>{m15.settings.ordersEmptyTitle}</strong>
+            <span className="hint">{m15.settings.ordersEmptySub}</span>
+          </div>
+        )}
         <ul className="list">
           {(orders.data ?? []).map((o) => (
             <li key={o.id}>
@@ -199,7 +317,7 @@ export function Orders() {
                   <span className="plan-row__name">{o.merchant} · {formatDayMonth(o.created_at.slice(0, 10))}</span>
                   <span className="plan-row__sub">{t.orders.states[o.state]}</span>
                 </span>
-                <span className="num">{formatVnd(o.state === "awaiting_payment" ? o.total_vnd : o.net_vnd)}</span>
+                <span className="num">{basketMoney(o.state === "awaiting_payment" ? o.total_vnd : o.net_vnd, o.vnd_per_usd)}</span>
               </Link>
             </li>
           ))}
@@ -225,6 +343,9 @@ export function OrderDetail() {
   );
 }
 
+/** Tin tiền thẻ cần người dùng chú ý: tiền chưa về hoặc bị khiếu nại. */
+const CARD_ALERT = new Set<CardStatus>(["settlement_declined", "disputed", "dispute_lost"]);
+
 function OrderView({ order }: { order: Order }) {
   const advance = useAdvanceOrder();
   const canAdvance = order.state === "paid" || order.state === "ordered" || order.state === "shipped";
@@ -235,15 +356,21 @@ function OrderView({ order }: { order: Order }) {
         <ol className="list">
           {order.events.map((e) => (
             <li key={`${e.state}-${e.at}`} className="plan-row__sub">
-              {t.orders.states[e.state]} · {new Date(e.at).toLocaleString()}
+              {t.orders.states[e.state]} · {new Date(e.at).toLocaleString(uiLang === "vi" ? "vi-VN" : "en-US", { dateStyle: "short", timeStyle: "short" })}
             </li>
           ))}
         </ol>
         <p className="plan-total">
-          <span>{t.orders.total(formatVnd(order.total_vnd))}</span>
+          <span>{t.orders.total(displayCurrency() === "USD" ? usdFmt.format(Number(order.amount_usd)) : formatVnd(order.total_vnd))}</span>
           <span className="num">US${order.amount_usd}</span>
         </p>
-        {order.refunded_vnd > 0 && <p className="hint">{t.orders.net(formatVnd(order.net_vnd))}</p>}
+        {order.state !== "awaiting_payment" && <p className="hint">{t.orders.paidVia[order.provider ?? "paypal"]}</p>}
+        {order.card_status && (
+          <p className={CARD_ALERT.has(order.card_status) ? "error" : "hint"} role={CARD_ALERT.has(order.card_status) ? "alert" : undefined}>
+            {t.orders.cardStatus[order.card_status]}
+          </p>
+        )}
+        {order.refunded_vnd > 0 && <p className="hint">{t.orders.net(basketMoney(order.net_vnd, order.vnd_per_usd))}</p>}
         {canAdvance && (
           <>
             <button
@@ -259,27 +386,31 @@ function OrderView({ order }: { order: Order }) {
         )}
       </section>
 
-      {order.state === "delivered" ? <VerifyForm order={order} /> : <LinesView lines={order.lines} />}
+      {order.state === "delivered" ? <VerifyForm order={order} /> : <LinesView lines={order.lines} rate={order.vnd_per_usd} />}
 
       {order.state === "verified" && (
         <>
           <p className="hint">{t.orders.reconciled}</p>
           {order.refunds.map((r) => (
-            <p key={r.ref} className="check ok">{t.orders.refunded(formatVnd(r.amount_vnd), r.amount_usd)}</p>
+            <p key={r.ref} className="check ok">{t.orders.refunded(basketMoney(r.amount_vnd, order.vnd_per_usd), r.amount_usd)}</p>
           ))}
           {order.suggested_refund_vnd > 0 && <RefundForm order={order} />}
+          {/* Đơn đã kiểm xong: một nút để rời màn đơn, món thiếu vẫn nằm trong Kế hoạch. */}
+          <Link to="/plan" className={`btn btn--block ${order.suggested_refund_vnd > 0 ? "btn--quiet" : "btn--primary"}`}>
+            {t.orders.done}
+          </Link>
         </>
       )}
     </>
   );
 }
 
-function LinesView({ lines }: { lines: OrderLine[] }) {
+function LinesView({ lines, rate }: { lines: OrderLine[]; rate: number }) {
   return (
     <section className="plan-sec">
       <ul className="list">
         {lines.map((l) => (
-          <li key={l.key} className="plan-row">
+          <li key={l.key} className="plan-row plan-row--online">
             <span className="plan-row__text">
               <span className="plan-row__name">{l.product_name}</span>
               <span className="plan-row__sub">
@@ -288,7 +419,7 @@ function LinesView({ lines }: { lines: OrderLine[] }) {
                 {l.match && ` · ${t.orders.match[l.match]}`}
               </span>
             </span>
-            <span className="num">{formatVnd(l.total_vnd)}</span>
+            <span className="num">{basketMoney(l.total_vnd, rate)}</span>
           </li>
         ))}
       </ul>
@@ -376,7 +507,7 @@ function VerifyForm({ order }: { order: Order }) {
 
 const REASONS: RefundReason[] = ["missing", "wrong", "damaged", "other"];
 
-/** Refund (Mimi 2.0 mục 18): hoàn qua PayPal Sandbox, giữ giao dịch gốc để audit. */
+/** Refund (Mimi 2.0 mục 18): hoàn qua cổng đã thu tiền (PayPal hoặc thẻ Braintree), giữ giao dịch gốc để audit. */
 function RefundForm({ order }: { order: Order }) {
   const refund = useRefundOrder();
   const [reason, setReason] = useState<RefundReason>("missing");
@@ -385,7 +516,7 @@ function RefundForm({ order }: { order: Order }) {
   return (
     <section className="plan-sec">
       <h2>{t.orders.refundTitle}</h2>
-      <p className="hint">{t.orders.refundSuggested(formatVnd(amount))}</p>
+      <p className="hint">{t.orders.refundSuggested(basketMoney(amount, order.vnd_per_usd))}</p>
       <form
         className="plan-form"
         onSubmit={(e) => {
@@ -408,7 +539,7 @@ function RefundForm({ order }: { order: Order }) {
         </label>
         {refund.isError && <p className="error" role="alert">{refund.error instanceof ApiError ? refund.error.message : t.common.genericError}</p>}
         <button type="submit" className="btn btn--primary btn--block" aria-disabled={refund.isPending || undefined}>
-          {t.orders.refund(formatVnd(amount))}
+          {t.orders.refund(basketMoney(amount, order.vnd_per_usd))}
         </button>
       </form>
     </section>

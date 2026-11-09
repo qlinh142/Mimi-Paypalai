@@ -317,3 +317,77 @@ func TestSelectableCountries(t *testing.T) {
 		t.Fatal(Countries["US"], Countries["SG"])
 	}
 }
+
+// Anh chốt 09/11: món trong kế hoạch đang mở tra trước, rồi món sắp hết, dù món khác nhiều nhà có hơn.
+func TestSyncPriority(t *testing.T) {
+	now := time.Date(2026, 11, 9, 2, 0, 0, 0, time.UTC)
+	d := fakeDemand{
+		{Country: "VN", Name: "Gạo ST25"}, {Country: "VN", Name: "Gạo ST25"}, {Country: "VN", Name: "Gạo ST25"},
+		{Country: "VN", Name: "Trứng gà", Priority: 1},
+		{Country: "VN", Name: "Sữa tươi", Priority: 2},
+		{Country: "VN", Name: "Trứng gà"}, // cùng món ở nhà khác, vẫn giữ ưu tiên cao nhất
+	}
+	src := &fakeSource{name: "gemini_search", prices: map[string][]Price{}}
+	res, err := Sync(context.Background(), d, &fakeStore{}, []Source{src}, Options{Limit: 2, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Wanted != 3 || res.Looked != 2 || res.Skipped != 1 {
+		t.Fatalf("%+v", res)
+	}
+	want := []string{ItemID("VN", "Sữa tươi"), ItemID("VN", "Trứng gà")}
+	if fmt.Sprint(src.calls) != fmt.Sprint(want) {
+		t.Fatalf("order %v, want %v", src.calls, want)
+	}
+}
+
+type fakeAdditive struct{ fakeNamed }
+
+func (fakeAdditive) Additive() bool { return true }
+
+type fakeNamed struct {
+	name string
+	ps   map[string][]Price
+	err  error
+}
+
+func (f fakeNamed) Name() string { return f.name }
+func (f fakeNamed) Lookup(_ context.Context, _ Country, items []Wanted) (map[string][]Price, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := map[string][]Price{}
+	for _, w := range items {
+		if p, ok := f.ps[w.Key]; ok {
+			out[w.Key] = p
+		}
+	}
+	return out, nil
+}
+
+func TestLookupBatchMergesAdditiveSource(t *testing.T) {
+	vn := []Wanted{{Key: "vn_omo", Country: "VN", Name: "Omo"}}
+	gem := fakeNamed{name: "gemini_search", ps: map[string][]Price{"vn_omo": {{Store: "WinMart", PriceVND: 150000}}}}
+	c3 := fakeAdditive{fakeNamed{name: "channel3", ps: map[string][]Price{"vn_omo": {{Store: "Walmart", Local: 120000}}}}}
+	got, err := lookupBatch(context.Background(), []Source{gem, c3}, vn, nil, "2026-11-09")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps := got["vn_omo"]
+	if len(ps) != 2 || ps[0].Source != "channel3" || ps[1].Source != "gemini_search" {
+		t.Fatalf("merged = %+v", ps)
+	}
+	// Nguồn bổ sung lỗi: vẫn giữ giá nguồn chính, không báo lỗi.
+	c3.err = errors.New("down")
+	got, err = lookupBatch(context.Background(), []Source{gem, c3}, vn, nil, "2026-11-09")
+	if err != nil || len(got["vn_omo"]) != 1 {
+		t.Fatalf("got %v err %v", got, err)
+	}
+	// Nguồn chính lỗi, bổ sung không ra giá: báo lỗi để thử lại sau.
+	gem.err = errors.New("down")
+	c3.err = nil
+	c3.ps = nil
+	if _, err = lookupBatch(context.Background(), []Source{gem, c3}, vn, nil, "2026-11-09"); err == nil {
+		t.Fatal("want error when primary fails and additive finds nothing")
+	}
+}

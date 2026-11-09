@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"io"
 	"mime"
@@ -34,6 +35,7 @@ type keysBody struct {
 }
 
 func (s *Server) postBasket(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r) // ?plan_id=: giỏ online của một Kế hoạch; vắng là Giỏ mua sắm chính
 	var body keysBody
 	if err := decodeJSON(w, r, &body, maxJSONBody); err != nil {
 		s.writeError(w, r, err)
@@ -44,6 +46,7 @@ func (s *Server) postBasket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postOrder(w http.ResponseWriter, r *http.Request) {
+	r = withPlan(r)
 	var req order.CheckoutRequest
 	if err := decodeJSON(w, r, &req, maxJSONBody); err != nil {
 		s.writeError(w, r, err)
@@ -66,6 +69,37 @@ func (s *Server) getOrder(w http.ResponseWriter, r *http.Request) {
 func (s *Server) captureOrder(w http.ResponseWriter, r *http.Request) {
 	o, err := s.orders.Capture(r.Context(), principalFrom(r.Context()), r.PathValue("id"))
 	s.respond(w, r, http.StatusOK, o, err)
+}
+
+func (s *Server) cardToken(w http.ResponseWriter, r *http.Request) {
+	tok, err := s.orders.CardToken(r.Context(), principalFrom(r.Context()))
+	s.respond(w, r, http.StatusOK, map[string]string{"client_token": tok}, err)
+}
+
+func (s *Server) payCard(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Nonce string `json:"nonce"`
+	}
+	if err := decodeJSON(w, r, &body, maxJSONBody); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	o, err := s.orders.PayCard(r.Context(), principalFrom(r.Context()), r.PathValue("id"), body.Nonce)
+	s.respond(w, r, http.StatusOK, o, err)
+}
+
+// braintreeWebhook nhận form bt_signature + bt_payload từ Braintree. Trả 200 cả khi thông báo
+// không khớp đơn nào để Braintree không gửi lại; chữ ký sai trả 400.
+func (s *Server) braintreeWebhook(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), s.defaultTimeout)
+	defer cancel()
+	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBody)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, r, apperr.New(apperr.CodeBadRequest, "Webhook không hợp lệ."))
+		return
+	}
+	err := s.orders.CardWebhook(ctx, r.PostForm.Get("bt_signature"), r.PostForm.Get("bt_payload"))
+	s.respond(w, r, http.StatusOK, map[string]bool{"ok": true}, err)
 }
 
 func (s *Server) advanceOrder(w http.ResponseWriter, r *http.Request) {

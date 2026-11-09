@@ -30,6 +30,8 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/__\//],
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // Màn Phân tích chi tiêu (AG Studio, ~4,7 MB) chỉ tải khi mở màn, không nằm trong app shell.
+        globIgnores: ["**/AnalyticsScreen-*.js", "**/AnalyticsScreen-*.css"],
       },
     }),
   ],

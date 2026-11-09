@@ -1,8 +1,11 @@
 import { lazy, Suspense, useEffect, useRef } from "react";
-import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 
 // Bản prototype một file (vite.proto.config.ts) dùng HashRouter vì không có máy chủ trả mọi đường dẫn về index.html.
-const Router = import.meta.env.VITE_ROUTER === "hash" ? HashRouter : BrowserRouter;
+// Mở trong khung xem bị cô lập (origin "null", ví dụ trình xem file của app Claude) thì HashRouter
+// không dựng được URL: dùng MemoryRouter, đường dẫn chỉ nằm trong bộ nhớ.
+const Router =
+  import.meta.env.VITE_ROUTER === "hash" ? (typeof window !== "undefined" && window.origin === "null" ? MemoryRouter : HashRouter) : BrowserRouter;
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { configureApi, flushQueue } from "../api/client";
 import { setQueueOwner } from "../lib/offlineQueue";
@@ -21,13 +24,17 @@ const ItemDetail = lazy(() => import("../screens/ItemDetail").then((m) => ({ def
 const Scan = lazy(() => import("../screens/Scan").then((m) => ({ default: m.Scan })));
 const PlanList = lazy(() => import("../screens/PlanList").then((m) => ({ default: m.PlanList })));
 const PlanDetail = lazy(() => import("../screens/PlanDetail").then((m) => ({ default: m.PlanDetail })));
-const PurchaseHistory = lazy(() => import("../screens/PurchaseHistory").then((m) => ({ default: m.PurchaseHistory })));
+const PlanAdd = lazy(() => import("../screens/PlanFlow22").then((m) => ({ default: m.PlanAdd })));
+const PlanCompare = lazy(() => import("../screens/PlanFlow22").then((m) => ({ default: m.PlanCompare })));
+const PlanConfirm = lazy(() => import("../screens/PlanFlow22").then((m) => ({ default: m.PlanConfirm })));
+const PlanDone = lazy(() => import("../screens/PlanFlow22").then((m) => ({ default: m.PlanDone })));
 const ReceiptDetailScreen = lazy(() => import("../screens/PurchaseHistory").then((m) => ({ default: m.ReceiptDetailScreen })));
 const RecurringDetail = lazy(() => import("../screens/RecurringDetail").then((m) => ({ default: m.RecurringDetail })));
 const ShoppingRun = lazy(() => import("../screens/ShoppingRun").then((m) => ({ default: m.ShoppingRun })));
 const Spending = lazy(() => import("../screens/Spending").then((m) => ({ default: m.Spending })));
+const Analytics = lazy(() => import("../analytics/AnalyticsScreen").then((m) => ({ default: m.Analytics })));
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
-const lazySet = (k: "SettingsProfile" | "SettingsNotify" | "SettingsLanguage" | "SettingsMembers" | "SettingsMember" | "SettingsPrivacy") =>
+const lazySet = (k: "SettingsProfile" | "SettingsNotify" | "SettingsLanguage" | "SettingsMembers" | "SettingsMember" | "SettingsPrivacy" | "SettingsMandate") =>
   lazy(() => import("../screens/Settings").then((m) => ({ default: m[k] })));
 const SettingsProfile = lazySet("SettingsProfile");
 const SettingsNotify = lazySet("SettingsNotify");
@@ -35,6 +42,7 @@ const SettingsLanguage = lazySet("SettingsLanguage");
 const SettingsMembers = lazySet("SettingsMembers");
 const SettingsMember = lazySet("SettingsMember");
 const SettingsPrivacy = lazySet("SettingsPrivacy");
+const SettingsMandate = lazySet("SettingsMandate");
 const Notifications = lazy(() => import("../screens/Notifications").then((m) => ({ default: m.Notifications })));
 const Account = lazy(() => import("../screens/Stub").then((m) => ({ default: m.Account })));
 const OnlineBuy = lazy(() => import("../screens/Online").then((m) => ({ default: m.OnlineBuy })));
@@ -85,10 +93,16 @@ function Gate() {
         <Route path="/items/:key" element={<ItemDetail />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/spending" element={<Spending />} />
-        <Route path="/spending/history" element={<PurchaseHistory />} />
+        {/* Link cũ: Lịch sử đơn hàng nay ở tab thứ ba của Kế hoạch (anh chốt 09/11). */}
+        <Route path="/spending/history" element={<Navigate to="/plan?tab=history" replace />} />
+        <Route path="/spending/analytics" element={<Analytics />} />
         <Route path="/spending/receipt/:id" element={<ReceiptDetailScreen />} />
         <Route path="/plan" element={<PlanList />} />
         <Route path="/plan/run/:id" element={<ShoppingRun />} />
+        <Route path="/plan/:id/add" element={<PlanAdd />} />
+        <Route path="/plan/:id/compare" element={<PlanCompare />} />
+        <Route path="/plan/:id/confirm" element={<PlanConfirm />} />
+        <Route path="/plan/:id/done" element={<PlanDone />} />
         <Route path="/plan/:id" element={<PlanDetail />} />
         <Route path="/plan/online" element={<OnlineBuy />} />
         <Route path="/orders" element={<Orders />} />
@@ -101,6 +115,7 @@ function Gate() {
         <Route path="/settings/members" element={<SettingsMembers />} />
         <Route path="/settings/members/:uid" element={<SettingsMember />} />
         <Route path="/settings/privacy" element={<SettingsPrivacy />} />
+        <Route path="/settings/mandate" element={<SettingsMandate />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/today" element={<TodayMeal />} />
         <Route path="*" element={<Navigate to="/" replace />} />

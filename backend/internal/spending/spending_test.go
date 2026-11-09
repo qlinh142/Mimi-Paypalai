@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/smartlife-lab/mimi/backend/internal/apperr"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
@@ -94,5 +95,40 @@ func TestService(t *testing.T) {
 	member := authz.Principal{UID: "u2", Role: authz.RoleMember}
 	if _, err := svc.Get(ctx, member, "2026-01"); err != nil {
 		t.Fatalf("member err=%v", err)
+	}
+}
+
+func TestSameRange(t *testing.T) {
+	cur := []ReceiptRow{{PurchasedOn: "2026-11-02", TotalVND: 300}, {PurchasedOn: "2026-11-08", TotalVND: 100}}
+	prev := []ReceiptRow{
+		{PurchasedOn: "2026-10-01", TotalVND: 100}, {PurchasedOn: "2026-10-08", TotalVND: 100},
+		{PurchasedOn: "2026-10-09", TotalVND: 5000}, // sau ngày 8: không tính
+		{PurchasedOn: "2026-10-30", TotalVND: 9000},
+	}
+	got := SameRange(cur, prev, 8)
+	if got == nil || *got != 100 {
+		t.Fatalf("same range = %v, want 100", got)
+	}
+	if SameRange(cur, prev[2:], 8) != nil {
+		t.Fatal("prev empty in range: want nil")
+	}
+}
+
+func TestServiceSameRangeOnlyCurrentMonth(t *testing.T) {
+	ctx := context.Background()
+	owner := authz.Principal{UID: "u1", Role: authz.RoleOwner}
+	st := &fakeStore{months: map[string]Month{}}
+	svc := New(st)
+	svc.now = func() time.Time { return time.Date(2026, 11, 8, 20, 0, 0, 0, time.UTC) } // 9/11 giờ VN
+	r, err := svc.Get(ctx, owner, "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.SameRangeDay != 9 {
+		t.Fatalf("day = %d, want 9 (giờ Việt Nam)", r.SameRangeDay)
+	}
+	r, _ = svc.Get(ctx, owner, "2026-10")
+	if r.SameRangeDay != 0 || r.SpentPrevSameRangePct != nil {
+		t.Fatalf("tháng cũ không so cùng kỳ: %+v", r)
 	}
 }

@@ -38,7 +38,7 @@ test("kịch bản demo: quét bill, Đồ dùng, Sổ chi tiêu, Kế hoạch",
   await page.getByRole("button", { name: "Về Trang chủ" }).click();
   await page.getByRole("link", { name: /^Đồ dùng/ }).first().click();
   await expect(page.getByText("CẦN MUA NGAY")).toBeVisible();
-  await expect(page.getByText("SẮP HẾT")).toBeVisible();
+  await expect(page.getByText("SẮP HẾT", { exact: true })).toBeVisible();
   await expect(page.getByText("Sữa tươi không đường").first()).toBeVisible();
   await expect(page.getByText(/Dầu gội/).first()).toBeVisible();
   await expect(page.getByText("Dự kiến còn khoảng: 5 ngày")).toBeVisible();
@@ -50,17 +50,18 @@ test("kịch bản demo: quét bill, Đồ dùng, Sổ chi tiêu, Kế hoạch",
   await expect(page.getByText("Sữa và chế phẩm sữa")).toBeVisible();
   await expect(page.getByText("Khoản chi định kỳ").first()).toBeVisible();
 
-  // Cảnh 3b và 3c: Kế hoạch có gợi ý món sắp hết, ước tính chi, ba cách mua và Mimi đang khóa.
+  // Cảnh 3b và 3c (Mimi 2.2): kế hoạch chưa lưu hiện sẵn ở đầu màn với gợi ý món sắp hết, ước tính chi;
+  // bước Mua chọn người đi mua.
   await home(page);
   await page.getByRole("link", { name: /^Kế hoạch/ }).first().click();
-  await page.getByText("Giỏ mua sắm", { exact: true }).first().click();
-  await expect(page.getByText("Gợi ý mua")).toBeVisible();
-  await expect(page.getByText(/Dự kiến chi/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Tôi", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gửi cho thành viên" })).toBeVisible();
-  const mimi = page.getByRole("button", { name: /Mimi.*Sắp ra mắt/s });
-  await expect(mimi).toBeVisible();
-  await expect(mimi).toBeDisabled();
+  await expect(page.locator(".top22").getByRole("textbox", { name: "Tên kế hoạch" })).toHaveValue("Giỏ mua sắm");
+  await page.locator(".top22").getByRole("button", { name: "Tiếp tục" }).click();
+  await page.getByRole("button", { name: "Tiếp tục" }).click();
+  await expect(page.getByRole("radio", { name: /Tôi mua/ })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Minh/ })).toBeVisible();
+  // Thanh toán online chỉ dành cho giá Channel3 (chỉ có ở Mỹ). Bản demo ở Việt Nam: giá hóa đơn và Gemini
+  // đều là mua tại cửa hàng, nên không có nhóm Thanh toán online.
+  await expect(page.getByRole("heading", { name: /Thanh toán online/ })).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });

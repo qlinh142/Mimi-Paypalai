@@ -38,6 +38,13 @@ func TestClientFlow(t *testing.T) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			_, _ = w.Write([]byte(`{"name":"UNPROCESSABLE_ENTITY","details":[{"issue":"ORDER_NOT_APPROVED"}]}`))
 		case r.URL.Path == "/v2/payments/captures/CAP1/refund":
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if n, ok := body["note_to_payer"]; ok && n == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"name":"INVALID_REQUEST","details":[{"issue":"INVALID_STRING_LENGTH"}]}`))
+				return
+			}
 			_, _ = w.Write([]byte(`{"id":"REF1","status":"COMPLETED"}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -67,6 +74,10 @@ func TestClientFlow(t *testing.T) {
 	rf, err := c.RefundCapture(ctx, "CAP1", "2.00", "o-1-r1", "missing eggs")
 	if err != nil || rf.ID != "REF1" {
 		t.Fatalf("refund: %v %+v", err, rf)
+	}
+	// Không ghi chú: không gửi note_to_payer rỗng.
+	if rf, err := c.RefundCapture(ctx, "CAP1", "2.00", "o-1-r2", "  "); err != nil || rf.ID != "REF1" {
+		t.Fatalf("refund without note: %v %+v", err, rf)
 	}
 }
 

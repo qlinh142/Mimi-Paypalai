@@ -28,6 +28,24 @@ Kế hoạch → "Để Mimi mua online" → giỏ ở cửa hàng sandbox, ki�
 
 Ủy quyền mua online nằm trong Cài đặt.
 
+## Phân tích chi tiêu (AG Studio)
+
+Sổ chi tiêu → "Phân tích chi tiêu" (`/spending/analytics`): bảng phân tích dựng bằng AG Studio 3.0
+(cùng AG Grid 36.2 của màn Lịch sử mua hàng), tải riêng khi mở màn. Mã nằm trong `src/analytics/`:
+
+- `data.ts`: gom lịch sử hóa đơn, chi tiết từng hóa đơn (60 hóa đơn gần nhất), đồ dùng và bảng giá
+  đang bán của Kế hoạch thành bốn bảng quan hệ cho Studio (Hóa đơn, Dòng hóa đơn, Đồ dùng, Giá đang bán).
+- `report.ts`: báo cáo dựng sẵn ba trang Tổng quan, So sánh giá, Hóa đơn. Người dùng chỉnh được
+  (nút Chỉnh bảng), bản chỉnh nhớ trên máy, "Về bảng gốc" xóa bản đã nhớ.
+- `widgets.tsx`: hai widget riêng của Mimi, Run-out Radar và Tiết kiệm được, lấy dữ liệu qua
+  `widgetApi.getData` nên nhận bộ lọc như widget có sẵn.
+- `theme.ts`: theme Studio theo màu Mimi (`styles/tokens.css`).
+- `askMimi.ts`, `gemini.ts`: agent "Hỏi Mimi" (Studio Agent Framework) với bốn tool riêng, giao việc
+  vẽ biểu đồ cho agent widget/page/data có sẵn của Studio. Mọi agent gọi Gemini qua `POST /api/ai/turn`
+  của máy chủ (không có khóa ở trình duyệt). Ở chế độ mock, `src/api/mockAi.ts` trả lời mẫu.
+
+Khóa AG Studio: `VITE_AG_STUDIO_LICENSE` (xem `.env.example`). Thiếu khóa thì chỉ hiện watermark.
+
 ## Ngôn ngữ giao diện
 
 Mặc định tiếng Anh (bản dự thi). Toàn bộ chữ nằm trong `src/i18n/en.ts` và `src/i18n/vi.ts`;

@@ -1016,6 +1016,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/market-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mimi 2.2: giá chung của mọi món đang theo dõi, cho dòng Rẻ nhất trên thẻ món. Chỉ món đã có giá. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["ItemMarketPrices"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{key}/market-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mimi 2.2: giá đang bán của một món (bảng giá chung, nước của người dùng), cho mục So sánh giá trong Chi tiết món
+         * @description Bảng giá lấy mọi món từng có trong tồn kho, hóa đơn, kế hoạch của mọi tài khoản (anh chốt 09/11). updated_at null khi món chưa được tra lần nào.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    key: components["parameters"]["ItemKey"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ItemMarketPrices"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/needs": {
         parameters: {
             query?: never;
@@ -1745,6 +1825,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/turn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hỏi Mimi (màn Phân tích chi tiêu, AG Studio): một lượt Gemini
+         * @description App giữ vòng lặp agent của AG Studio và tự chạy mọi tool; máy chủ chỉ gọi Gemini (Vertex AI) một lượt với hội thoại và khai báo tool app gửi lên, rồi trả lời văn bản hoặc lời đề nghị gọi tool. Dạng tin nhắn theo REST của Gemini. Giới hạn lượt mỗi người mỗi ngày (AI_DAILY_LIMIT).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AiTurnRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AiTurnResponse"];
+                    };
+                };
+                413: components["responses"]["Error"];
+                422: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+                503: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plan/delegated": {
         parameters: {
             query?: never;
@@ -1752,7 +1879,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 4.1 mục 9.2: vòng mua hộ được giao cho tôi (to_me, còn mở) và vòng tôi đã gửi (from_me) */
+        /** 4.1 mục 9.2: vòng mua hộ được giao cho tôi (to_me, còn mở; to_me_done, đã mua xong) và vòng tôi đã gửi (from_me) */
         get: {
             parameters: {
                 query?: never;
@@ -2072,7 +2199,9 @@ export interface paths {
         /** Dựng giỏ online từ các dòng Kế hoạch và đánh giá Mandate (ALLOW / ASK / BLOCK). Không tạo giao dịch. */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2137,7 +2266,9 @@ export interface paths {
          */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    plan_id?: components["parameters"]["PlanId"];
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2147,11 +2278,16 @@ export interface paths {
                     "application/json": components["schemas"]["OrderKeys"] & {
                         /** @description Người dùng duyệt các ngoại lệ ASK */
                         approve?: boolean;
+                        /**
+                         * @description Cổng thanh toán; mặc định paypal. braintree: trả bằng thẻ, thu tiền ở /orders/{id}/card
+                         * @enum {string}
+                         */
+                        provider?: "paypal" | "braintree";
                     };
                 };
             };
             responses: {
-                /** @description Đơn ở trạng thái awaiting_payment */
+                /** @description Đơn ở trạng thái awaiting_payment; PayPal kèm paypal_order_id và approve_url */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -2242,6 +2378,145 @@ export interface paths {
                 };
                 402: components["responses"]["Error"];
                 409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/card-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Client token Braintree cho Drop-in UI (trả bằng thẻ). Chế độ giả lập trả "fake-client-token". */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            client_token: string;
+                        };
+                    };
+                };
+                503: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Thu tiền đơn braintree bằng nonce Drop-in trả về. Gọi lại an toàn. Ghi Spending, không cộng tồn kho.
+         * @description Số thẻ không qua server Mimi; Drop-in gửi thẳng cho Braintree và trả nonce dùng một lần.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["OrderId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        nonce: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Đơn paid */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Order"];
+                    };
+                };
+                402: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                422: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/braintree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webhook Braintree (settle, từ chối quyết toán, khiếu nại). Tin nhờ chữ ký bt_signature, không cần token.
+         * @description Chỉ ghi card_status vào đơn thẻ; không đổi bước giao hàng hay Spending. Thông báo không khớp đơn nào vẫn trả 200.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/x-www-form-urlencoded": {
+                        bt_signature: string;
+                        bt_payload: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+                503: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -2959,6 +3234,61 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Một phần tin nhắn. Có đúng một trong text, functionCall, functionResponse. */
+        AiPart: {
+            text?: string;
+            /** @description Chữ ký Gemini 3 (base64) của lượt gọi tool, gửi trả nguyên vẹn */
+            thoughtSignature?: string;
+            functionCall?: {
+                id?: string;
+                name: string;
+                args?: {
+                    [key: string]: unknown;
+                };
+            };
+            functionResponse?: {
+                id?: string;
+                name: string;
+                response: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        AiTurnRequest: {
+            system?: string;
+            contents: {
+                /** @enum {string} */
+                role: "user" | "model";
+                parts: components["schemas"]["AiPart"][];
+            }[];
+            tools?: {
+                name: string;
+                description: string;
+                /** @description JSON Schema */
+                parameters?: {
+                    [key: string]: unknown;
+                };
+            }[];
+            /** @enum {string} */
+            tool_mode?: "AUTO" | "ANY" | "NONE";
+            allowed_tools?: string[];
+            json_schema?: {
+                [key: string]: unknown;
+            };
+            /** @description Bỏ qua: máy chủ dùng model đã cấu hình */
+            model?: string;
+        };
+        AiTurnResponse: {
+            id: string;
+            model?: string;
+            parts: components["schemas"]["AiPart"][];
+            finish_reason?: string;
+            usage?: {
+                input_tokens?: number;
+                output_tokens?: number;
+                total_tokens?: number;
+            };
+        };
         ClientId: string;
         /**
          * Format: int64
@@ -3006,6 +3336,11 @@ export interface components {
             relations?: {
                 [key: string]: "anh" | "chi" | "em" | "bo" | "me" | "con" | "ong" | "ba" | "khac" | "";
             };
+            /**
+             * Format: int64
+             * @description Ngân sách chi mỗi tháng, bằng đồng. PUT 0 là bỏ ngân sách; vắng là chưa đặt
+             */
+            monthly_budget_vnd?: number;
         };
         Profile: {
             uid?: string;
@@ -3198,6 +3533,10 @@ export interface components {
             spent?: components["schemas"]["Vnd"];
             /** @description Phần trăm so với tháng trước; null khi tháng trước chưa có chi tiêu */
             spent_prev_month_pct?: number | null;
+            /** @description Chỉ tháng hiện tại: phần trăm so với cùng khoảng ngày (1 đến same_range_day) tháng trước, tính trên hóa đơn quét và phần người nhà mua hộ. null khi tháng trước chưa có hóa đơn trong khoảng đó hoặc không phải tháng hiện tại */
+            spent_prev_same_range_pct?: number | null;
+            /** @description Ngày cuối của khoảng so cùng kỳ (hôm nay theo giờ Việt Nam). Vắng ở tháng cũ */
+            same_range_day?: number;
             saved?: components["schemas"]["Vnd"];
             /** @description discount / (spent + discount); null khi không có discount */
             saved_ratio?: number | null;
@@ -3411,6 +3750,13 @@ export interface components {
              */
             last_at?: string;
         };
+        ItemMarketPrices: {
+            key: string;
+            name: string;
+            prices: components["schemas"]["MarketPrice"][];
+            /** Format: date-time */
+            updated_at: string | null;
+        };
         MarketPrices: {
             refresh?: components["schemas"]["MarketRefreshStatus"];
             items: {
@@ -3503,6 +3849,8 @@ export interface components {
         Delegated: {
             to_me?: components["schemas"]["Assignment"][];
             from_me?: components["schemas"]["Assignment"][];
+            /** @description 2.2: vòng được nhờ đã mua xong (completed, closed_partial), cho tab Được nhờ mua */
+            to_me_done?: components["schemas"]["Assignment"][];
         };
         PlanState: {
             /** @description YYYY-MM-DD hoặc chuỗi rỗng; từ 7 ngày trước đến 1 năm tới */
@@ -3574,7 +3922,6 @@ export interface components {
             categories?: ("grocery" | "household")[];
             price_tolerance_pct?: number;
             max_order_vnd?: components["schemas"]["Vnd"];
-            max_day_vnd?: components["schemas"]["Vnd"];
         };
         OrderKeys: {
             keys: components["schemas"]["ClientId"][];
@@ -3585,7 +3932,7 @@ export interface components {
             reasons?: {
                 key?: string;
                 /** @enum {string} */
-                code?: "not_in_plan" | "quantity_guard" | "category" | "price_guard" | "budget_order" | "budget_day" | "delivery_guard" | "mandate_off";
+                code?: "not_in_plan" | "quantity_guard" | "category" | "price_guard" | "budget_order" | "delivery_guard" | "mandate_off";
                 /** @enum {string} */
                 result?: "ALLOW" | "ASK" | "BLOCK";
                 detail?: string;
@@ -3633,9 +3980,17 @@ export interface components {
             /** Format: date */
             snapshot_at?: string;
             decision?: components["schemas"]["Decision"];
+            /** @description Server đã cấu hình Braintree; app hiện thêm nút Trả bằng thẻ */
+            card_enabled?: boolean;
         };
         Order: {
             id?: string;
+            /** @description Kế hoạch của đơn; kiểm hàng trừ vào Kế hoạch này */
+            plan_id?: string;
+            /** @enum {string} */
+            provider?: "paypal" | "braintree";
+            provider_order_id?: string;
+            provider_txn_id?: string;
             /** @enum {string} */
             state?: "awaiting_payment" | "paid" | "ordered" | "shipped" | "delivered" | "verified";
             merchant?: string;
@@ -3679,6 +4034,13 @@ export interface components {
             refunded_vnd?: components["schemas"]["Vnd"];
             net_vnd?: components["schemas"]["Vnd"];
             suggested_refund_vnd?: components["schemas"]["Vnd"];
+            /**
+             * @description Chỉ đơn braintree. Trạng thái tiền thẻ Braintree báo qua webhook sau khi thu; không có là chưa có tin.
+             * @enum {string}
+             */
+            card_status?: "settled" | "settlement_declined" | "disputed" | "dispute_won" | "dispute_lost";
+            /** Format: date-time */
+            card_status_at?: string;
             /** Format: date-time */
             created_at?: string;
         };

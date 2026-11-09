@@ -1,0 +1,351 @@
+/* Mimi 2.2: các khối Sổ chi tiêu mới (ngân sách, Còn tiêu được, Mimi nhận thấy, biểu đồ vòng).
+   Dùng token của 2.0 (--m15-*, --ink, --ink-soft); giao diện mới (v2.css) đã ánh xạ các token này. */
+
+/* Thẻ tổng theo Redesign: nhãn "Đã chi tháng 11 · ngày 9/30" trên số tiền, thanh ngân sách, viên so sánh ở cuối */
+.hero22 { display: grid; gap: 12px; }
+.hero22 > * { position: relative; z-index: 1; margin: 0; }
+.hero22__label { font-size: 13px; font-weight: 500; opacity: .85; }
+.hero22 .hero15__num { line-height: 1.1; }
+/* Số tiền bên trái, đường chi cộng dồn bên phải (Redesign) */
+.hero22 > .hero22__top { margin-top: -8px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.hero22__top .hero15__num { margin: 0; min-width: 0; }
+.spark22 { width: 112px; height: 44px; flex: none; color: #fff; overflow: visible; }
+@media (max-width: 374px) { .spark22 { display: none; } }
+.hero22__note { font-size: 12.5px; opacity: .9; margin-top: -8px; }
+.hero22__pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero22 .hero22__pills .hero15__sub { margin: 0; padding: 4px 12px 4px 8px; white-space: nowrap; }
+.hero22__pills .hero15__sub svg { flex: none; }
+
+/* Thanh ngân sách: đã chi đặc, định kỳ sắp trả kẻ sọc */
+.bud22 { display: grid; gap: 8px; }
+.bud22__bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, currentColor 22%, transparent); }
+.bud22__seg { display: block; height: 100%; }
+.bud22__seg--spent { background: currentColor; }
+.bud22__seg--bills { background: repeating-linear-gradient(135deg, color-mix(in srgb, currentColor 55%, transparent) 0 4px, color-mix(in srgb, currentColor 20%, transparent) 4px 8px); }
+.bud22__row { display: flex; justify-content: space-between; align-items: center; gap: 4px 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 500; opacity: .95; }
+.bud22__edit { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: inherit; cursor: pointer; }
+.bud22__form { display: grid; gap: 12px; padding-bottom: 8px; }
+.bud22__form .field15 { display: grid; gap: 6px; font-weight: 600; }
+.bud22__form .input { min-height: 52px; padding: 0 14px; font-size: 18px; }
+
+/* Còn tiêu được: một hàng gọn, số mỗi ngày là số lớn, nút hỏi bên phải */
+.safe22 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px; min-width: 0; }
+.safe22__icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 14%, transparent); color: var(--m15-grn, #1f7a3a); }
+.safe22__body { flex: 1 1 120px; min-width: 0; display: grid; gap: 1px; }
+.safe22 h2 { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
+.safe22__num { margin: 0; overflow-wrap: anywhere; font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+.safe22__num span { white-space: nowrap; font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+.safe22__sub { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
+.safe22__sub a { color: inherit; font-weight: 600; }
+.safe22--over .safe22__icon { background: color-mix(in srgb, var(--m15-red) 12%, transparent); color: var(--m15-red); }
+.safe22--over h2, .safe22--over .safe22__num { color: var(--m15-red); }
+.safe22__ask { margin: 0; flex: none; min-height: 40px; padding: 0 12px; font-size: 13px; white-space: nowrap; }
+.safe22--invite { align-items: center; border: 0; text-align: left; }
+.safe22--invite .safe22__icon { background: color-mix(in srgb, var(--m15-blue) 12%, transparent); color: var(--m15-blue); }
+.safe22--invite > span:nth-child(2) { display: grid; gap: 2px; }
+.safe22--invite small { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+
+/* Nút viên thuốc của Redesign: cao 40, nền nhạt */
+.pill22 { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--m15-blue) 12%, transparent); color: var(--m15-blue); font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+
+/* Mimi nhận thấy: hàng thẻ cuộn ngang, rộng 250, nền nhạt theo màu từng loại. min-width 0: không kéo giãn trang */
+.noticed22wrap { min-width: 0; max-width: 100%; }
+.noticed22 { list-style: none; margin: 0 -16px; padding: 2px 16px 10px; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
+.noticed22::-webkit-scrollbar { display: none; }
+/* Nền nhạt theo màu từng loại; [data-ui] để thắng nền trắng chung của .box15 trong v2.css */
+.noticed22__card, [data-ui] .noticed22 > .noticed22__card { background: color-mix(in srgb, var(--c) 12%, var(--paper, #fff)); }
+.noticed22__card { flex: 0 0 250px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.noticed22__icon { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+.noticed22__text { margin: 0; flex: 1; font-size: 14px; line-height: 1.4; color: var(--ink); display: grid; gap: 2px; }
+.noticed22__text small { color: var(--ink-soft); font-size: 12.5px; }
+.noticed22__text b { font-weight: 700; color: var(--ink); } /* như Redesign: đậm, cùng màu chữ */
+.noticed22__cta { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--m15-blue); cursor: pointer; }
+
+/* Biểu đồ vòng bên trái, chú giải bên phải. Vòng mảnh (nét 10 trên khung 140), chữ giữa nhẹ, viên % nhỏ như Redesign */
+.donut22 { grid-template-columns: 112px 1fr; gap: 16px; align-items: center; padding: 16px; }
+.donut22__svg { width: 112px; height: 112px; }
+.donut22__svg circle { transition: stroke-width .15s, opacity .15s; }
+.donut22__k { font-size: 11px; fill: var(--ink-soft); }
+.donut22__v { font-size: 13px; font-weight: 600; fill: var(--ink); letter-spacing: -.01em; }
+.donut22__legend { list-style: none; margin: 0; padding: 0; min-width: 0; display: grid; gap: 2px; }
+.donut22__row { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 4px; border: 0; border-radius: 12px; background: none; font: inherit; color: var(--ink); text-align: left; text-decoration: none; cursor: pointer; }
+.donut22__row[aria-pressed="true"] { background: color-mix(in srgb, var(--m15-blue) 10%, transparent); }
+.donut22__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.donut22__name { flex: 1; min-width: 0; display: grid; gap: 2px; font-size: 14px; font-weight: 500; line-height: 1.2; overflow-wrap: anywhere; }
+.donut22__name small { font-size: 12px; color: var(--ink-soft); }
+.donut22__pct { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+.tr22 { font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.tr22--down { color: var(--m15-grn, #1f7a3a); background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 14%, transparent); }
+.tr22--up { color: var(--m15-red); background: color-mix(in srgb, var(--m15-red) 12%, transparent); }
+.tr22--flat { color: var(--ink-soft); background: color-mix(in srgb, var(--ink-soft) 12%, transparent); }
+@media (max-width: 360px) { .donut22 { grid-template-columns: 1fr; justify-items: center; } .donut22__legend { width: 100%; } }
+
+/* Tiêu đề ngày trong Mua hàng gần đây */
+.day22 { display: grid; gap: 8px; margin-top: 12px; }
+.day22__head { margin: 0 4px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+
+@media (prefers-reduced-motion: reduce) { .donut22__svg circle { transition: none; } }
+
+/* Đồ dùng 2.2: So sánh giá trong Chi tiết món */
+.cmp22 { display: grid; gap: 12px; }
+.cmp22__head { display: grid; gap: 4px; }
+.cmp22__head h2, .cmp22__head p { margin: 0; }
+.cmp22 > .cmp22__sub { margin: 4px 0 -4px; font-size: 13px; font-weight: 600; color: var(--mute, var(--ink-soft)); }
+.cmp22 > .hint { margin: 0; }
+.cmp22__ours { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cmp22__our { padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--m15-blue) 5%, transparent); display: grid; gap: 4px; align-content: start; min-width: 0; }
+.cmp22__our dt { font-size: 12.5px; color: var(--ink-soft); }
+.cmp22__our dd { margin: 0; display: grid; gap: 2px; }
+.cmp22__our b { font-size: 16px; font-weight: 700; color: var(--ink); }
+.cmp22__our small { font-size: 12.5px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.cmp22__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cmp22__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--m15-blue) 5%, transparent); }
+.cmp22__row--best { background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 10%, transparent); }
+.cmp22__store { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.cmp22__store b { font-size: 15px; font-weight: 600; color: var(--ink); }
+.cmp22__store small { flex-basis: 100%; font-size: 12.5px; color: var(--ink-soft); }
+.cmp22__tag { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--m15-grn, #1f7a3a); background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 16%, transparent); }
+.cmp22__src { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--m15-blue); text-decoration: none; overflow-wrap: anywhere; }
+.cmp22__price { flex: none; font-size: 16px; font-weight: 700; color: var(--ink); }
+.cmp22__row--best .cmp22__price { color: var(--m15-grn, #1f7a3a); }
+
+/* Đồ dùng 2.2: chip lọc, dòng Rẻ nhất trên thẻ món, nhãn chu kỳ, trạng thái không tìm thấy */
+.chips22 { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
+.chips22::-webkit-scrollbar { display: none; }
+.chips22 button { flex: none; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--m15-line, #e3e8f7); background: var(--paper, #fff); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.chips22 button[aria-pressed="true"] { background: var(--m15-blue); border-color: var(--m15-blue); color: #fff; }
+.cheap22 { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--m15-grn, #1f7a3a); }
+.cyc22 { margin-left: 6px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: var(--m15-blue); background: color-mix(in srgb, var(--m15-blue) 12%, transparent); vertical-align: 2px; white-space: nowrap; }
+.nomatch22 { display: grid; justify-items: center; gap: 8px; padding: 32px 16px; text-align: center; }
+.nomatch22__ill { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; color: var(--m15-blue); background: color-mix(in srgb, var(--m15-blue) 12%, transparent); }
+.nomatch22 h2 { margin: 0; font-size: 17px; }
+.nomatch22 p { margin: 0; color: var(--ink-soft); }
+.seg15 button svg { flex: none; }
+
+/* ---------- Mimi 2.2 Kế hoạch (đề xuất chốt 09/11) ---------- */
+[data-ui] .seg.seg22--3 { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 1.2fr); gap: 2px; flex-wrap: nowrap; }
+/* Tên tab dài (Lịch sử đơn hàng) xuống 2 dòng trên màn hẹp, không tràn ngang. */
+[data-ui] .seg.seg22--3 > button { flex: 1 1 0; white-space: normal; text-wrap: balance; line-height: 1.2; min-width: 0; min-height: 44px; padding-inline: 6px; font-size: 14px; }
+.sec22 { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.sec22 .h15sec { margin: 0; }
+.sec22__new { justify-self: auto; }
+
+.steps22 { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); position: relative; }
+.steps22::before { content: ""; position: absolute; top: 13px; left: 16.6%; right: 16.6%; height: 2px; background: var(--m15-line, #e3e8f7); }
+.steps22__item { position: relative; display: grid; justify-items: center; gap: 6px; text-align: center; }
+.steps22__dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--paper, #fff); border: 2px solid var(--m15-line, #d7def2); color: var(--ink-soft); }
+.steps22__item--done .steps22__dot { background: var(--m15-blue); border-color: var(--m15-blue); color: #fff; }
+.steps22__item--now .steps22__dot { border-color: var(--m15-blue); color: var(--m15-blue); box-shadow: 0 0 0 4px color-mix(in srgb, var(--m15-blue) 15%, transparent); }
+.steps22__label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.steps22__item--now .steps22__label, .steps22__item--done .steps22__label { color: var(--ink); }
+.steps22__item--done:not(:last-child)::after { content: ""; position: absolute; top: 13px; left: 50%; width: 100%; height: 2px; background: var(--m15-blue); z-index: 0; }
+.steps22__dot { position: relative; z-index: 1; }
+
+[data-ui] .draft22 { display: grid; gap: 16px; padding: 16px; }
+.draft22__head { position: relative; display: grid; gap: 4px; padding-right: 60px; }
+.draft22__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.draft22__title h2 { margin: 0; display: flex; align-items: center; gap: 4px; font-size: 20px; font-weight: 700; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.draft22__title .tag15 { flex: none; }
+.draft22__pen { min-width: 44px; min-height: 44px; color: var(--ink-soft); }
+.draft22__input { font: inherit; font-size: 18px; font-weight: 700; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--m15-line, #d7def2); width: 100%; }
+.draft22__step { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+.draft22__art { position: absolute; right: 0; top: 36px; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: color-mix(in srgb, var(--m15-blue) 12%, transparent); color: var(--m15-blue); }
+@media (max-width: 360px) { .draft22__art { display: none; } .draft22__head { padding-right: 0; } }
+.draft22__start { display: flex; gap: 12px; align-items: center; }
+.draft22__start > span:last-child { display: grid; gap: 2px; }
+.draft22__start b { font-size: 15px; color: var(--ink); }
+.draft22__start small { font-size: 13px; color: var(--ink-soft); }
+.draft22__startIcon { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: color-mix(in srgb, var(--m15-blue) 10%, transparent); color: var(--m15-blue); }
+.draft22__btns { display: grid; gap: 12px; }
+.draft22__btns .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+.sum22 { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; align-items: center; padding: 16px; border-radius: 16px; background: color-mix(in srgb, var(--m15-blue) 7%, transparent); }
+.sum22__count { display: grid; justify-items: center; padding-right: 16px; border-right: 1px solid var(--m15-line, #d7def2); }
+.sum22__count b { font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+.sum22__count small { font-size: 12.5px; color: var(--ink-soft); }
+.sum22__main { display: grid; gap: 6px; justify-items: start; }
+.sum22__main > b { font-size: 22px; font-weight: 700; color: var(--ink); }
+.sum22__tag, .sum22__save { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; color: var(--m15-grn, #1f7a3a); background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 14%, transparent); }
+.sum22__save { grid-column: 1 / -1; justify-self: end; font-size: 13.5px; padding: 6px 12px; }
+
+.pl22 { list-style: none; margin: 0; padding: 0; display: grid; }
+.pl22 li + li { border-top: 1px solid var(--m15-line, #e3e8f7); }
+.pl22__row { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.pl22__name { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.pl22__name b { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.pl22__name small { font-size: 12.5px; color: var(--ink-soft); }
+.pl22__price { display: grid; justify-items: end; }
+.pl22__price s { font-size: 12px; color: var(--ink-soft); }
+.pl22__price b { font-size: 15px; font-weight: 700; color: var(--m15-blue); }
+.pl22__pct { flex: none; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--m15-grn, #1f7a3a); background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 14%, transparent); }
+.pl22__all { justify-self: start; }
+
+.trip22 { display: grid; border-radius: 16px; background: color-mix(in srgb, var(--m15-blue) 6%, transparent); }
+.trip22__row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; border: 0; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.trip22__row + .trip22__row { border-top: 1px solid var(--m15-line, #dfe5f6); }
+.trip22__row > svg:first-child { color: var(--m15-blue); flex: none; }
+.trip22__label { flex: 1; font-size: 15px; }
+.trip22__val { font-size: 15px; font-weight: 600; color: var(--ink); text-align: right; overflow-wrap: anywhere; }
+.trip22__val--empty { color: var(--m15-blue); }
+.tsheet22 { display: grid; gap: 12px; margin-bottom: 16px; }
+.tsheet22__quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tsheet22__quick button { display: grid; gap: 2px; min-height: 56px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--m15-line, #d7def2); background: var(--paper, #fff); font: inherit; text-align: left; color: var(--ink); cursor: pointer; }
+.tsheet22__quick button span { font-weight: 600; }
+.tsheet22__quick button small { color: var(--ink-soft); font-size: 12.5px; }
+.tsheet22__quick button[aria-checked="true"] { border-color: var(--m15-blue); background: color-mix(in srgb, var(--m15-blue) 10%, transparent); }
+.tsheet22 .plan-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tsheet22 .chips22 { margin: 0; padding: 0; flex-wrap: wrap; }
+
+.sg22 { display: grid; gap: 12px; }
+.sg22__head { display: flex; align-items: center; justify-content: space-between; }
+.sg22__head .h15sec { margin: 0; }
+.sg22__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sg22__card { display: grid; gap: 8px; align-content: start; padding: 16px; border-radius: 20px; background: color-mix(in srgb, var(--m15-blue) 9%, var(--paper, #fff)); }
+.sg22__card[data-cat="dairy"], .sg22__card[data-cat="food"] { background: color-mix(in srgb, #e5487a 11%, var(--paper, #fff)); }
+.sg22__card[data-cat="household"], .sg22__card[data-cat="cleaning"] { background: color-mix(in srgb, #f08c2b 11%, var(--paper, #fff)); }
+.sg22__card b { font-size: 15px; color: var(--ink); overflow-wrap: anywhere; }
+.sg22__card small { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink-soft); }
+.sg22__add { min-height: 42px; border-radius: 999px; background: var(--paper, #fff); color: var(--m15-blue); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
+
+.past22 { list-style: none; margin: 0; padding: 4px 16px; display: grid; }
+.past22 li + li { border-top: 1px solid var(--m15-line, #e3e8f7); }
+.past22__row { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.past22__ok { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--m15-grn, #1f7a3a); background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 14%, transparent); }
+.past22__text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.past22__text b { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.past22__text small { font-size: 12.5px; color: var(--ink-soft); }
+.past22__sum { font-weight: 700; color: var(--ink); }
+.past22__end { display: grid; justify-items: end; gap: 4px; }
+.past22 .plancard15__icon { width: 40px; height: 40px; }
+
+.ord22__stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ord22__stats .box15 { display: grid; gap: 4px; padding: 16px; }
+.ord22__stats small { font-size: 12.5px; color: var(--ink-soft); }
+.ord22__stats b { font-size: 16px; font-weight: 700; color: var(--ink); }
+
+/* Luồng 3 bước */
+.flow22 { display: grid; gap: 16px; padding-bottom: 180px; }
+.flow22__head { display: flex; align-items: center; gap: 12px; }
+.flow22__head h1 { margin: 0; font-size: 24px; font-weight: 700; color: var(--ink); }
+.flow22__bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(100%, var(--frame, 480px)); padding: 12px 16px max(12px, env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--paper, #fff) 94%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--m15-line, #e3e8f7); z-index: 20; box-sizing: border-box; }
+.flow22__sum { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flow22__sum > span { display: grid; }
+.flow22__sum small { font-size: 12.5px; color: var(--ink-soft); }
+.flow22__sum b { font-size: 20px; font-weight: 700; color: var(--ink); }
+.tog22 { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--m15-blue); background: var(--paper, #fff); color: var(--m15-blue); cursor: pointer; }
+.tog22--on { background: var(--m15-blue); color: #fff; }
+.cmpi22 { display: grid; gap: 8px; }
+.cmpi22 h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--ink); }
+.cmpi22__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cmpi22__opt { display: flex; align-items: center; gap: 4px; border-radius: 12px; }
+.cmpi22__opt--on { background: color-mix(in srgb, var(--m15-blue) 9%, transparent); }
+.cmpi22__pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cmpi22__rad { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--m15-line, #c5cde6); }
+[aria-checked="true"] > .cmpi22__rad { border: 6px solid var(--m15-blue); }
+.cmpi22__text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.cmpi22__text b { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.cmpi22__text small { font-size: 12.5px; color: var(--ink-soft); }
+.cmpi22__price { flex: none; font-weight: 700; color: var(--ink); }
+.cmpi22__src { flex: none; width: 44px; height: 44px; display: grid; place-items: center; color: var(--m15-blue); }
+.conf22 { list-style: none; margin: 0; padding: 4px 16px; display: grid; }
+.conf22 li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 0; }
+.conf22 li + li { border-top: 1px solid var(--m15-line, #e3e8f7); }
+.conf22 li > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.conf22 b { font-size: 15px; font-weight: 600; color: var(--ink); }
+.conf22 small { font-size: 12.5px; color: var(--ink-soft); }
+.conf22 .num { font-weight: 700; color: var(--ink); }
+[data-ui] .who22 { display: grid; gap: 4px; padding: 8px; }
+.who22__row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border: 0; border-radius: 12px; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.who22__row > svg { flex: none; color: var(--ink-soft); }
+.who22__row--on { background: color-mix(in srgb, var(--m15-blue) 9%, transparent); }
+.who22__text { display: grid; gap: 2px; min-width: 0; }
+.who22__text b { font-size: 15px; font-weight: 600; }
+.who22__text small { font-size: 12.5px; color: var(--ink-soft); }
+.done22 { display: grid; justify-items: center; text-align: center; gap: 12px; padding-top: 64px; }
+.done22__icon { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; color: var(--m15-grn, #1f7a3a); background: color-mix(in srgb, var(--m15-grn, #1f7a3a) 14%, transparent); }
+.done22 h1 { margin: 8px 0 0; font-size: 24px; color: var(--ink); }
+.done22__name { margin: 0; font-weight: 600; color: var(--ink); }
+.done22 .hint { margin: 0; }
+.done22__btns { width: 100%; display: grid; gap: 12px; margin-top: 16px; }
+.ord22__hint { font-size: 12px !important; color: var(--m15-blue) !important; }
+.info22 { display: grid; gap: 12px; }
+.info22__name { display: flex; align-items: center; gap: 8px; }
+.info22__name .pd15__icon { flex: none; }
+.info22__name .tag15 { flex: none; }
+.menu22 { display: grid; gap: 8px; }
+.menu22__row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; border-radius: 16px; border: 1px solid var(--m15-line, #e3e8f7); background: var(--paper, #fff); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.menu22__row > svg:first-child { color: var(--m15-blue); flex: none; }
+.menu22__row > span { flex: 1; display: grid; gap: 2px; }
+.menu22__row b { font-size: 15px; }
+.menu22__row small { font-size: 12.5px; color: var(--ink-soft); }
+.lowq22 { display: grid; gap: 8px; margin-top: 16px; }
+.lowq22 .h15sec { margin: 0; }
+.flow22__two { display: grid; grid-template-columns: auto 1fr; gap: 12px; }
+.flow22__two .btn { white-space: nowrap; padding-inline: 16px; }
+.flow22__two .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.flow22__bar { display: grid; gap: 8px; }
+.conf22__sub { font-size: 12.5px; font-weight: 500; color: var(--ink-soft); margin-left: 6px; }
+.conf22 .conf22__total { min-height: 44px; }
+.pd22__more { display: grid; gap: 12px; }
+[data-ui] .top22 { display: grid; gap: 16px; margin-bottom: 24px; }
+/* Thêm sản phẩm: tên món nằm ngang, chạm tên là thêm. */
+.chips22 { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+[data-ui] .chip22 { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 16px; border-radius: 22px; border: 1px solid var(--m15-line, #d7def2); background: #fff; color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+[data-ui] .chip22 small { font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
+[data-ui] .chip22:active { background: #eef3ff; }
+[data-ui] .chip22--on { background: #e7f6ee; border-color: #bfe5cf; color: #1f7a52; cursor: default; }
+[data-ui] .chip22--new { border-style: dashed; color: var(--m15-blue); }
+[data-ui] .chip22[aria-disabled="true"]:not(.chip22--on) { opacity: .6; }
+/* Nút Chi tiết của từng giá và bảng chi tiết giá. */
+[data-ui] .cmpi22__more { flex: none; border: 0; background: transparent; padding: 0; cursor: pointer; display: grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 12px; color: var(--m15-blue); }
+.det22 { display: grid; gap: 16px; }
+.det22__src { justify-self: start; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 14px; border-radius: 18px; background: #eaf0ff; color: var(--m15-blue); font-size: 14px; font-weight: 600; }
+.det22__name { margin: 0; font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.det22__size { margin: 4px 0 0; color: var(--ink-soft); }
+.det22__card { background: #fff; border-radius: 20px; box-shadow: 0 2px 12px rgba(30, 50, 120, .08); }
+.det22__hero { display: grid; justify-items: center; gap: 8px; padding: 24px 16px; text-align: center; }
+.det22__price { margin: 0; font-size: 34px; font-weight: 700; color: var(--ink); }
+.det22__where { margin: 0; color: var(--ink-soft); font-size: 16px; }
+.det22__diff { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 16px; font-size: 14px; font-weight: 600; background: #eef1f6; color: var(--ink-soft); }
+.det22__diff--down { background: #e5f4e4; color: #1f7a52; }
+.det22__diff--up { background: #f9ece7; color: #c2410c; }
+.det22__table { margin: 0; display: grid; padding: 4px 16px; }
+.det22__table div { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; }
+.det22__table div + div { border-top: 1px solid var(--m15-line, #d7def2); }
+.det22__table dt { color: var(--ink-soft); }
+.det22__table dd { margin: 0; font-weight: 600; color: var(--ink); text-align: right; overflow-wrap: anywhere; }
+.det22__table dd a { color: var(--m15-blue); text-decoration: none; }
+.det22__open { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; color: var(--ink); text-decoration: none; }
+.det22__open b { flex: 1; font-size: 17px; }
+.det22__globe { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #eaf0ff; color: var(--m15-blue); }
+/* Nút Xong dính đáy bảng Thêm sản phẩm. */
+.done22 { position: sticky; bottom: 0; margin: 16px -4px 0; padding: 12px 4px calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(to top, #fff 75%, rgba(255,255,255,0)); }
+
+/* Cài đặt 2.2 (anh chốt 09/11): Thông báo chỉ hiện 2 ngưỡng nhắc cố định. */
+.set15__rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.set15__rules li { display: flex; align-items: center; gap: 12px; min-height: 24px; }
+.set15__dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.set15__dot--now { background: #d4538a; }
+.set15__dot--soon { background: #e8873a; }
+.buyer15 { grid-template-columns: 1fr 1fr; } /* T1: bỏ nút Mimi mua online, còn Tôi và người nhà */
+
+/* Cài đặt 2.2, B1–B4 theo Redesign */
+.set15__who { margin: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; color: var(--ink-soft); }
+.amt22--hidden { border: 0; padding: 0; background: none; font: inherit; color: inherit; cursor: pointer; filter: blur(10px); min-height: 44px; }
+.empty22 { display: grid; justify-items: center; gap: 8px; padding: 32px 16px; text-align: center; }
+.empty22__ill { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; color: var(--m15-blue); background: color-mix(in srgb, var(--m15-blue) 12%, transparent); }
+/* B4 (theo Redesign): công tắc xanh kiểu iOS cho mọi trang Cài đặt; hàng cao tối thiểu 44. */
+.set15 .switch-row { background: none; padding: 8px 0; margin: 0; min-height: 44px; font-weight: 500; }
+.set15 .switch-row .set15__text { display: grid; gap: 2px; }
+.set15 .switch-row small { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+.set15 input[role="switch"] {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 51px; height: 31px; margin: 0;
+  border-radius: 999px; background: #e3e5ec; cursor: pointer; transition: background .2s;
+}
+.set15 input[role="switch"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 4px rgb(0 0 0 / .2); transition: translate .2s;
+}
+.set15 input[role="switch"]:checked { background: #34c759; }
+.set15 input[role="switch"]:checked::after { translate: 20px 0; }
+.set15 input[role="switch"]:disabled { opacity: .5; cursor: default; }

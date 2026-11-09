@@ -221,3 +221,20 @@ func TestNFCAndFoldDecomposed(t *testing.T) {
 		t.Fatalf("clean: %q", CleanItemName("Sữa"))
 	}
 }
+
+func TestASCII(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		max  int
+		want string
+	}{
+		{"Mimi · Mimi Mart · 5 món", 0, "Mimi Mimi Mart 5 mon"},
+		{"Đồ dùng   gia đình", 0, "Do dung gia dinh"},
+		{"Trả lại Minh", 8, "Tra lai"},
+		{"Phở 🍜 bò", 0, "Pho bo"},
+	} {
+		if got := ASCII(c.in, c.max); got != c.want {
+			t.Errorf("ASCII(%q, %d) = %q want %q", c.in, c.max, got, c.want)
+		}
+	}
+}

@@ -173,7 +173,8 @@ func (s *Store) RecordPayment(ctx context.Context, uid string, o order.Order, tz
 			return err
 		}
 		return tx.Set(u.Collection("payments").Doc(o.ID), map[string]any{
-			"provider": "paypal", "paypal_order_id": o.PayPalOrderID, "paypal_capture_id": o.CaptureID,
+			"provider": order.ProviderOf(o), "provider_order_id": o.ProviderOrderID, "provider_txn_id": o.ProviderTxnID,
+			"paypal_order_id": o.PayPalOrderID, "paypal_capture_id": o.CaptureID,
 			"amount_vnd": o.TotalVND, "amount_usd": o.AmountUSD, "vnd_per_usd": o.VNDPerUSD,
 			"rate_source": o.RateSource, "rate_as_of": o.RateAsOf,
 			"merchant": o.Merchant, "paid_at": paidAt, "month": month, "refunds": []any{},
@@ -211,7 +212,7 @@ func (s *Store) ApplyDelivery(ctx context.Context, uid string, o order.Order, tz
 			if err == nil {
 				t.itemSnap = snap
 			}
-			pref := u.Collection("plan_items").Doc(l.Key)
+			pref := s.planItems(uid, o.PlanID).Doc(l.Key) // đơn cũ không có plan_id: Giỏ mua sắm chính
 			psnap, err := tx.Get(pref)
 			if err != nil && !isNotFound(err) {
 				return err
@@ -295,4 +296,24 @@ func (s *Store) RecordRefund(ctx context.Context, uid string, o order.Order, r o
 			}),
 		}})
 	})
+}
+
+// CardOrder tìm đơn theo mã giao dịch Braintree (webhook không mang uid): truy vấn
+// collection group payments theo provider_txn_id (field override trong firestore.indexes.json).
+func (s *Store) CardOrder(ctx context.Context, txnID string) (uid, orderID string, err error) {
+	docs, err := s.c.CollectionGroup("payments").Where("provider_txn_id", "==", txnID).Limit(2).Documents(ctx).GetAll()
+	if err != nil {
+		return "", "", fmt.Errorf("card order: %w", err)
+	}
+	for _, d := range docs {
+		if p, _ := d.Data()["provider"].(string); p != order.ProviderBraintree {
+			continue
+		}
+		user := d.Ref.Parent.Parent
+		if user == nil || d.Ref.Parent.ID != "payments" || user.Parent.ID != "users" {
+			continue
+		}
+		return user.ID, d.Ref.ID, nil
+	}
+	return "", "", apperr.ErrNotFound
 }

@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/firestore"
+
 	"github.com/smartlife-lab/mimi/backend/internal/market"
 )
 
@@ -105,4 +107,42 @@ func TestWantedItemsCountryEmulator(t *testing.T) {
 		}
 	}
 	t.Fatal("not found")
+}
+
+// Anh chốt 09/11: bảng giá lấy mọi món từng có trong tồn kho, hóa đơn, kế hoạch (cả kế hoạch
+// đã xong). Món đã bỏ và khoản chi định kỳ không tra; ưu tiên: kế hoạch đang mở > sắp hết > còn lại.
+func TestWantedItemsAllSourcesEmulator(t *testing.T) {
+	s, c, uid := emulator(t)
+	ctx := context.Background()
+	u := c.Collection("users").Doc(uid)
+	soon := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+	later := time.Now().AddDate(0, 0, 40).Format("2006-01-02")
+	set := func(ref interface {
+		Set(context.Context, any, ...firestore.SetOption) (*firestore.WriteResult, error)
+	}, v map[string]any) {
+		if _, err := ref.Set(ctx, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	set(u.Collection("items").Doc("trung-"+uid), map[string]any{"name": "Trứng " + uid, "prediction": map[string]any{"out_on": soon}})
+	set(u.Collection("items").Doc("gao-"+uid), map[string]any{"name": "Gạo " + uid, "prediction": map[string]any{"out_on": later}})
+	set(u.Collection("items").Doc("bo-"+uid), map[string]any{"name": "Đã bỏ " + uid, "dropped": true})
+	set(u.Collection("plans").Doc("p1").Collection("items").Doc("sua-"+uid), map[string]any{"name": "Sữa " + uid, "status": "open"})
+	set(u.Collection("plans").Doc("p0").Collection("items").Doc("muoi-"+uid), map[string]any{"name": "Muối " + uid, "status": "bought"})
+	set(u.Collection("plans").Doc("p1").Collection("items").Doc("custom-rec-"+uid), map[string]any{"name": "Internet " + uid, "status": "open"})
+
+	ws, err := s.WantedItems(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int{}
+	for _, w := range ws {
+		got[w.Name] = w.Priority + 1 // 0 = không có
+	}
+	want := map[string]int{"Trứng " + uid: 2, "Gạo " + uid: 1, "Sữa " + uid: 3, "Muối " + uid: 1, "Đã bỏ " + uid: 0, "Internet " + uid: 0}
+	for n, p := range want {
+		if got[n] != p {
+			t.Errorf("%s: got %d want %d", n, got[n], p)
+		}
+	}
 }

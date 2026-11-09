@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartlife-lab/mimi/backend/internal/assistant"
 	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/fx"
@@ -143,12 +144,19 @@ type (
 		Basket(ctx context.Context, p authz.Principal, keys []string) (order.Basket, error)
 		Checkout(ctx context.Context, p authz.Principal, req order.CheckoutRequest) (order.Order, error)
 		Capture(ctx context.Context, p authz.Principal, id string) (order.Order, error)
+		CardToken(ctx context.Context, p authz.Principal) (string, error)
+		PayCard(ctx context.Context, p authz.Principal, id, nonce string) (order.Order, error)
+		CardWebhook(ctx context.Context, signature, payload string) error
 		Advance(ctx context.Context, p authz.Principal, id string) (order.Order, error)
 		ReadDelivery(ctx context.Context, p authz.Principal, id string, imgs []receipt.Image) ([]order.Observed, error)
 		Verify(ctx context.Context, p authz.Principal, id string, req order.VerifyRequest) (order.Order, error)
 		Refund(ctx context.Context, p authz.Principal, id string, req order.RefundRequest) (order.Order, error)
 		Get(ctx context.Context, p authz.Principal, id string) (order.Order, error)
 		List(ctx context.Context, p authz.Principal) ([]order.Order, error)
+	}
+	// Assistant chạy một lượt Hỏi Mimi cho người dùng (POST /ai/turn).
+	Assistant interface {
+		Turn(ctx context.Context, uid string, req assistant.Request) (assistant.Response, error)
 	}
 	ReadinessChecker interface {
 		Ready(ctx context.Context) error
@@ -182,6 +190,7 @@ type Deps struct {
 	History      History   // nil: lịch sử mua hàng trả 404
 	FX           FXHistory // nil: không có GET /fx/rates (app chỉ hiện VND)
 	Accounts     Accounts  // nil: DELETE /me trả 501
+	Assistant    Assistant // nil: không có POST /ai/turn (ẩn Hỏi Mimi)
 	SignIn       SignInChecker
 	Ready        ReadinessChecker
 	Metrics      Metrics // nil: không ghi metric
@@ -210,6 +219,7 @@ type Server struct {
 	priceRefresh PriceRefresh
 	history      History
 	fx           FXHistory
+	assistant    Assistant
 	ready        ReadinessChecker
 	metrics      Metrics
 	limiter      *windowLimiter
@@ -241,7 +251,7 @@ func New(d Deps, opts ...Option) (*Server, error) {
 		log: d.Log, tokens: d.Tokens, accounts: d.Accounts, signIn: d.SignIn, appCheck: d.AppCheck, principals: d.Principals,
 		profiles: d.Profiles, receipts: d.Receipts, items: d.Items, ready: d.Ready, metrics: d.Metrics,
 		home: d.Home, spending: d.Spending, settings: d.Settings, plan: d.Plan, notes: d.Notes, orders: d.Orders,
-		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, priceRefresh: d.PriceRefresh, history: d.History, fx: d.FX,
+		recurring: d.Recurring, households: d.Households, pricing: d.Pricing, market: d.Market, priceRefresh: d.PriceRefresh, history: d.History, fx: d.FX, assistant: d.Assistant,
 		limiter: newWindowLimiter(60), readTimeout: 55 * time.Second, defaultTimeout: 10 * time.Second,
 	}
 	if s.metrics == nil {
@@ -341,6 +351,8 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.market != nil {
 		private("GET /plan/market-prices", s.defaultTimeout, s.getPlanMarketPrices)
+		private("GET /items/{key}/market-prices", s.defaultTimeout, s.getItemMarketPrices)
+		private("GET /items/market-prices", s.defaultTimeout, s.listItemMarketPrices)
 		if s.priceRefresh != nil {
 			private("POST /plan/market-prices/refresh", s.readTimeout, s.refreshPlanMarketPrices)
 		}
@@ -354,10 +366,18 @@ func (s *Server) Handler() http.Handler {
 		private("GET /orders", s.defaultTimeout, s.listOrders)
 		private("GET /orders/{id}", s.defaultTimeout, s.getOrder)
 		private("POST /orders/{id}/capture", s.readTimeout, s.captureOrder)
+		private("POST /orders/card-token", s.defaultTimeout, s.cardToken)
+		private("POST /orders/{id}/card", s.readTimeout, s.payCard)
 		private("POST /orders/{id}/advance", s.defaultTimeout, s.advanceOrder)
 		private("POST /orders/{id}/delivery/read", s.readTimeout, s.readDelivery)
 		private("POST /orders/{id}/verify", s.defaultTimeout, s.verifyOrder)
 		private("POST /orders/{id}/refund", s.readTimeout, s.refundOrder)
+		// Braintree gọi thẳng, không có token người dùng: tin nhờ chữ ký bt_signature.
+		public("POST /webhooks/braintree", s.braintreeWebhook)
+	}
+
+	if s.assistant != nil {
+		private("POST /ai/turn", s.readTimeout, s.aiTurn)
 	}
 
 	if s.accounts != nil && s.signIn != nil {

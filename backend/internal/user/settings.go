@@ -34,7 +34,13 @@ type SettingsPatch struct {
 	// Relations: tên gọi người nhà mà người này đặt, theo uid (Anh, Chị, Bố...). Chỉ gửi
 	// phần thay đổi; giá trị "" xóa tên gọi của uid đó. Mỗi tài khoản giữ bản riêng.
 	Relations map[string]string `json:"relations"`
+	// MonthlyBudgetVND: ngân sách chi mỗi tháng của người này, lưu bằng đồng (Mimi 2.2, chốt 09/11).
+	// 0 là bỏ ngân sách. Hiển thị theo tiền tệ đã chọn.
+	MonthlyBudgetVND *int64 `json:"monthly_budget_vnd"`
 }
+
+// maxBudgetVND: trần ngân sách tháng (1 tỷ đồng), chặn số gõ nhầm.
+const maxBudgetVND = 1_000_000_000
 
 // Relations là bộ tên gọi người nhà chung của app; app hiển thị theo ngôn ngữ đang dùng.
 var Relations = []string{"anh", "chi", "em", "bo", "me", "con", "ong", "ba", "khac"}
@@ -120,6 +126,9 @@ func (p SettingsPatch) Validate() error {
 	if p.Lang != nil && *p.Lang != "vi" && *p.Lang != "en" {
 		return bad("lang", "Ngôn ngữ chỉ là vi hoặc en.")
 	}
+	if p.MonthlyBudgetVND != nil && (*p.MonthlyBudgetVND < 0 || *p.MonthlyBudgetVND > maxBudgetVND) {
+		return bad("monthly_budget_vnd", "Ngân sách tháng từ 0 đến 1 tỷ đồng.")
+	}
 	if len(p.Relations) > maxRelations {
 		return bad("relations", "Tối đa 50 tên gọi người nhà.")
 	}
@@ -134,7 +143,8 @@ func (p SettingsPatch) Validate() error {
 func (p SettingsPatch) empty() bool {
 	return p.DisplayName == nil && p.LeadDays == nil && p.RemindEnabled == nil && p.RemindFreq == nil &&
 		p.DigestTime == nil && p.Timezone == nil && p.Channels == nil && p.ReplacementEnabled == nil &&
-		p.SaleEnabled == nil && p.Lang == nil && p.Country == nil && p.Currency == nil && len(p.Relations) == 0
+		p.SaleEnabled == nil && p.Lang == nil && p.Country == nil && p.Currency == nil && len(p.Relations) == 0 &&
+		p.MonthlyBudgetVND == nil
 }
 
 // Apply gộp bản vá vào cài đặt hiện tại và tính lại lịch gửi bản tin khi cần.
@@ -184,6 +194,13 @@ func (p SettingsPatch) Apply(cur Stored, now time.Time) Stored {
 	}
 	if p.Currency != nil {
 		set("currency", *p.Currency)
+	}
+	if p.MonthlyBudgetVND != nil {
+		if *p.MonthlyBudgetVND == 0 {
+			delete(next.Settings, "monthly_budget_vnd")
+		} else {
+			set("monthly_budget_vnd", *p.MonthlyBudgetVND)
+		}
 	}
 	if len(p.Relations) > 0 {
 		rels := map[string]any{}

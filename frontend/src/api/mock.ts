@@ -1,5 +1,6 @@
 import { uiLang } from "../i18n";
 import taxonomyGroups from "./taxonomy-groups.json";
+import { mockAiTurn } from "./mockAi";
 /**
  * Backend giả cho chế độ VITE_API_MODE=mock. Dữ liệu mẫu, không phải dữ liệu thật.
  * Quy tắc trạng thái ở đây chỉ mô phỏng; bản thật do API Go tính (internal/domain).
@@ -63,6 +64,7 @@ let receiptCount = 5;
 let defaultPlanIcon = "bag";
 let mockSettings: Me["settings"] & { display_name?: string } = {
   lead_days: 7, lang: uiLang, timezone: "Asia/Ho_Chi_Minh", remind_enabled: true, digest_time: "08:00",
+  monthly_budget_vnd: 6_000_000, // Mimi 2.2: ngân sách mẫu
 };
 /** Bản trước lần sửa tồn gần nhất của từng món, để Hoàn tác trả lại đúng trạng thái cũ. */
 const beforeOverride = new Map<string, Item>();
@@ -203,9 +205,10 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
   const url = new URL(path, "http://mock");
   const method = (init.method ?? "GET").toUpperCase();
   const p = url.pathname;
+  if (method === "POST" && p === "/ai/turn") return json(mockAiTurn(JSON.parse(String(init.body ?? "{}"))));
   const extra = mockM1(method, url, init);
   if (extra) return extra;
-  if (p.startsWith("/plan")) return inPlan(url.searchParams.get("plan_id"), () => mockCore(method, url, init));
+  if (p.startsWith("/plan") || p === "/orders" || p === "/orders/basket") return inPlan(url.searchParams.get("plan_id"), () => mockCore(method, url, init));
   return mockCore(method, url, init);
 }
 
@@ -230,6 +233,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       settings: { lead_days: mockSettings.lead_days, lang: mockSettings.lang, timezone: mockSettings.timezone,
         remind_enabled: mockSettings.remind_enabled, digest_time: mockSettings.digest_time, relations: mockSettings.relations ?? {},
         ...(mockSettings.country ? { country: mockSettings.country } : {}),
+        ...(mockSettings.monthly_budget_vnd ? { monthly_budget_vnd: mockSettings.monthly_budget_vnd } : {}),
         // Bản thử không có máy chủ: tiền tệ hiển thị nhớ theo máy.
         currency: mockSettings.currency ?? (localStorage.getItem("mimi.currency") === "USD" ? "USD" : "VND") },
     };
@@ -417,6 +421,7 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       else delete rels[uid];
     }
     mockSettings = { ...mockSettings, ...body, relations: rels };
+    if (body.monthly_budget_vnd === 0) delete mockSettings.monthly_budget_vnd; // 0 là bỏ ngân sách
     return json({
       ...mockSettings, display_name: mockSettings.display_name ?? "Lan",
       currency: mockSettings.currency ?? (localStorage.getItem("mimi.currency") === "USD" ? "USD" : "VND"),
@@ -433,13 +438,16 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       month, spent: 0, spent_prev_month_pct: null, saved: 0, saved_ratio: null, receipt_count: 0,
       by_category: [], top_saving_receipts: [], recent_receipts: [],
     };
-    if (prevOfMock) return json({ ...base, spent: 1_070_000, receipt_count: 4 });
+    if (prevOfMock) return json({ ...base, spent: 1_070_000, receipt_count: 4, by_category: [
+      { key: "hoa-pham", amount: 380_000, pct: 35.5 }, { key: "sua", amount: 190_000, pct: 17.8 },
+      { key: "tuoi-song", amount: 300_000, pct: 28 }, { key: "do-kho", amount: 200_000, pct: 18.7 },
+    ] });
     if (!sameAsMock) return json(base);
     const r = (id: string, store: string, d: number, total: number, discount: number) => ({
       receipt_id: id, store, purchased_on: `${month}-${String(d).padStart(2, "0")}`, total_vnd: total, discount_vnd: discount,
     });
     return json({
-      ...base, spent: 1_284_000, spent_prev_month_pct: 20, saved: 96_000, saved_ratio: 0.07, receipt_count: receiptCount,
+      ...base, spent: 1_284_000, spent_prev_month_pct: 20, spent_prev_same_range_pct: 34, same_range_day: today.getDate(), saved: 96_000, saved_ratio: 0.07, receipt_count: receiptCount,
       by_category: [
         { key: "hoa-don-dinh-ky", amount: 354_499, pct: 27.6 },
         { key: "hoa-pham", amount: 412_000, pct: 32.1 }, { key: "sua", amount: 318_000, pct: 24.8 },
@@ -536,10 +544,33 @@ const CATALOG: Record<string, Product> = {
   "bot-giat": { name: "Bột giặt 3kg", unit: "túi", pack: 1, snapshot: 155_000, offer: 149_000, eta: 2, category: "household" },
 };
 const VND_PER_USD = 25_000;
-let mandate: Mandate = { enabled: false, categories: ["grocery", "household"], price_tolerance_pct: 10, max_order_vnd: 1_000_000, max_day_vnd: 0 };
+let mandate: Mandate = { enabled: true, categories: ["grocery", "household"], price_tolerance_pct: 10, max_order_vnd: 1_000_000 };
 const orders = new Map<string, Order>();
 const addDays = (n: number) => iso(new Date(today.getTime() + n * 86_400_000));
 const usd = (vnd: number) => (Math.round((vnd / VND_PER_USD) * 100) / 100).toFixed(2);
+
+// 2.2: một đơn online đã nhận đủ hàng tuần trước, để Lịch sử đơn hàng có cả đơn online lẫn hóa đơn.
+let seeded = false;
+function seedOrder() {
+  if (seeded) return;
+  seeded = true;
+  const lines: OrderLine[] = (["giay-ve-sinh", "nuoc-rua-chen"] as const).map((k) => {
+    const pr = CATALOG[k];
+    const name = k === "giay-ve-sinh" ? (L ? "Toilet paper" : "Giấy vệ sinh") : (L ? "Dish soap" : "Nước rửa chén");
+    return { key: k, name, product_name: pr.name, category_key: "hoa-pham", category: pr.category, qty: 1, unit: pr.unit, pack_qty: pr.pack, plan_qty: 1,
+      unit_price_vnd: pr.offer, snapshot_price_vnd: pr.snapshot, total_vnd: pr.offer, eta: addDays(pr.eta) };
+  });
+  const total = lines.reduce((a, l) => a + l.total_vnd, 0);
+  const b = { merchant: "Mimi Mart Sandbox", lines, total_vnd: total, amount_usd: usd(total), decision: { result: "ALLOW" as const, reasons: [] } };
+  const paid = new Date(today.getTime() - 4 * 86_400_000).toISOString();
+  const got = new Date(today.getTime() - 2 * 86_400_000).toISOString();
+  orders.set("o-mau", {
+    id: "o-mau", state: "verified", merchant: b.merchant, lines: b.lines, total_vnd: b.total_vnd, amount_usd: b.amount_usd, vnd_per_usd: VND_PER_USD,
+    decision: b.decision, approved_by_user: true, provider: "paypal", paypal_order_id: `FAKE-${b.amount_usd}-mock`, paypal_capture_id: "FAKECAP-mau",
+    paid_at: paid, eta: got, events: [{ state: "awaiting_payment", at: paid }, { state: "paid", at: paid }, { state: "verified", at: got }],
+    refunds: [], refunded_vnd: 0, net_vnd: b.total_vnd, suggested_refund_vnd: 0, created_at: paid,
+  });
+}
 
 function buildBasket(keys: string[]): Basket {
   const c = mockCart();
@@ -548,7 +579,7 @@ function buildBasket(keys: string[]): Basket {
   for (const k of keys) {
     const ci = c.items.find((x) => x.key === k);
     const pr = CATALOG[k];
-    if (!ci) continue;
+    if (!ci || planLines.get(k)?.line_status === "assigned") continue; // đang nhờ người khác mua
     if (!pr) {
       missing.push(ci.name);
       continue;
@@ -579,7 +610,7 @@ function buildBasket(keys: string[]): Basket {
   if (!mandate.enabled && result === "ALLOW") add({ code: "mandate_off", result: "ASK", detail: "Chưa bật ủy quyền mua online: cần bạn duyệt đơn này" });
   return {
     merchant: "Mimi Mart Sandbox", lines, missing, total_vnd: total, amount_usd: usd(total), vnd_per_usd: VND_PER_USD,
-    snapshot_at: iso(today), decision: { result, reasons },
+    snapshot_at: iso(today), decision: { result, reasons }, card_enabled: true,
   };
 }
 
@@ -595,11 +626,19 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
       return json(mandate);
     }
   }
-  if (method === "POST" && p === "/orders/basket") return json(buildBasket((body().keys as string[]) ?? [...cart]));
-  if (method === "GET" && p === "/orders") return json({ orders: [...orders.values()].reverse() });
+  if (method === "POST" && p === "/orders/basket") {
+    const k = body().keys as string[] | undefined;
+    return json(buildBasket(k?.length ? k : [...cart])); // rỗng: mọi món, như backend
+  }
+  if (method === "GET" && p === "/orders") {
+    seedOrder();
+    return json({ orders: [...orders.values()].reverse() });
+  }
+  if (method === "POST" && p === "/orders/card-token") return json({ client_token: "fake-client-token" });
   if (method === "POST" && p === "/orders") {
-    const b = body() as { keys?: string[]; approve?: boolean };
-    const basket = buildBasket(b.keys ?? [...cart]);
+    const b = body() as { keys?: string[]; approve?: boolean; provider?: string };
+    const card = b.provider === "braintree";
+    const basket = buildBasket(b.keys?.length ? b.keys : [...cart]);
     if (!basket.lines.length) return json({ code: "validation_failed", message: "empty" }, 422);
     if (basket.decision.result === "BLOCK") return json({ code: "mandate_blocked", message: "Blocked" }, 403);
     if (basket.decision.result === "ASK" && !b.approve) return json({ code: "approval_required", message: "Approve" }, 409);
@@ -607,14 +646,15 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
     const o: Order = {
       id, state: "awaiting_payment", merchant: basket.merchant, lines: basket.lines, total_vnd: basket.total_vnd,
       amount_usd: basket.amount_usd, vnd_per_usd: VND_PER_USD, decision: basket.decision, approved_by_user: !!b.approve,
-      paypal_order_id: `FAKE-${basket.amount_usd}-mock`, eta: basket.lines.reduce((a, l) => (l.eta > a ? l.eta : a), ""),
+      provider: card ? "braintree" : "paypal",
+      paypal_order_id: card ? "" : `FAKE-${basket.amount_usd}-mock`, eta: basket.lines.reduce((a, l) => (l.eta > a ? l.eta : a), ""),
       events: [{ state: "awaiting_payment", at: now() }], refunds: [], refunded_vnd: 0, net_vnd: basket.total_vnd,
       suggested_refund_vnd: 0, created_at: now(),
     };
     orders.set(id, o);
     return json(o, 201);
   }
-  const m = p.match(/^\/orders\/(o-[0-9a-f]{16})(\/capture|\/advance|\/delivery\/read|\/verify|\/refund)?$/);
+  const m = p.match(/^\/orders\/(o-[0-9a-f]{16})(\/capture|\/card|\/advance|\/delivery\/read|\/verify|\/refund)?$/);
   if (!m) return null;
   const o = orders.get(m[1]);
   if (!o) return json({ code: "not_found", message: "Order not found" }, 404);
@@ -627,8 +667,14 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
     case "GET":
       return json(o);
     case "POST/capture":
+      if (o.provider === "braintree") return bad();
       if (o.state !== "awaiting_payment") return o.state === "paid" ? json(o) : bad();
       return set({ ...o, state: "paid", paypal_capture_id: "FAKECAP-mock", paid_at: now(), events: [...o.events, { state: "paid", at: now() }] });
+    case "POST/card":
+      if (o.provider !== "braintree") return bad();
+      if (o.state !== "awaiting_payment") return o.state === "paid" ? json(o) : bad();
+      if (body().nonce !== "fake-valid-nonce") return json({ code: "payment_failed", message: "Thẻ bị từ chối." }, 402);
+      return set({ ...o, state: "paid", provider_txn_id: "FAKEBT-mock", paid_at: now(), events: [...o.events, { state: "paid", at: now() }] });
     case "POST/advance": {
       const next = NEXT[o.state];
       if (!next) return bad();
@@ -753,6 +799,16 @@ const assignments: MockAssignment[] = [{
     { consumption_group_key: "nuoc-mam", name_display: L ? "Fish sauce" : "Nước mắm", status: "assigned" },
   ],
 }];
+// 2.2: một lời nhờ đã mua xong tuần trước, để tab Được nhờ mua có mục Đã hoàn thành.
+const doneForMinh: MockAssignment = {
+  assignment_id: "trip-xong", owner_uid: "mock-minh", owner_display_name: "Minh", buyer_uid: ME, buyer_display_name: "Lan", plan_id: "p-minh-cu",
+  status: "completed", created_at: iso(new Date(today.getTime() - 6 * 86_400_000)), updated_at: iso(new Date(today.getTime() - 5 * 86_400_000)),
+  items: [
+    { consumption_group_key: "gao", name_display: L ? "Rice 5kg" : "Gạo 5kg", status: "done", qty: 1, unit: L ? "bag" : "bao", unit_price: 120_000, category_key: "do-kho" },
+    { consumption_group_key: "nuoc-mam", name_display: L ? "Fish sauce" : "Nước mắm", status: "done", qty: 1, unit: L ? "bottle" : "chai", unit_price: 45_000, category_key: "gia-vi" },
+  ],
+  trip: { plan_name: L ? "Groceries for Minh" : "Đồ cho Minh", buy_date: iso(new Date(today.getTime() - 5 * 86_400_000)) },
+};
 // Một lời nhờ mẫu từ người nhà, để thấy luồng Buyer.
 const incoming: MockAssignment = {
   assignment_id: "trip-mau", owner_uid: "mock-minh", owner_display_name: "Minh", buyer_uid: ME, buyer_display_name: "Lan", plan_id: "default",
@@ -826,6 +882,18 @@ function histDetail(id: string): ReceiptDetail | null {
 /** Bản thử: nút Cập nhật giá 3 lần mỗi ngày như máy chủ. */
 let mockRefresh: { daily: number; left: number; last_at?: string } = { daily: 3, left: 3 };
 
+type MockPrice = { store: string; price_vnd: number; local?: number; currency: string; source: string; on: string; url?: string; size?: string };
+
+/** Bản thử: Channel3 chỉ ở Mỹ, chỉ đồ dùng nhà, thuốc, đồ trẻ em (như backend), giá Walmart qua link mua Channel3. */
+const C3_CATS = new Set(["me-be", "thuoc", "hoa-pham", "ve-sinh", "giay", "giat-say", "my-pham", "nha-cua", "do-dung-bep", "thu-cung"]);
+function mockChannel3(i: { key: string; name: string; category_key?: string }, abroad: { currency: string; rate: number } | undefined): MockPrice[] {
+  if (!abroad || (mockSettings.country ?? "VN") !== "US" || !C3_CATS.has(i.category_key ?? "")) return [];
+  const base = Object.values(MOCK_PRICES[i.key] ?? {});
+  if (!base.length) return [];
+  const local = Math.round((Math.min(...base) * 0.92 / abroad.rate) * 100) / 100;
+  return [{ store: "Walmart", price_vnd: Math.round(local * abroad.rate), local, currency: abroad.currency, source: "channel3", on: new Date().toISOString().slice(0, 10), url: `https://buy.trychannel3.com/demo/${i.key}` }];
+}
+
 function mockMarketItems() {
   // Bản thử: nước ngoài Việt Nam thì giả giá tiền gốc ở cửa hàng nước đó, quy ra VND theo tỷ giá mẫu.
   const abroad = ({
@@ -840,12 +908,25 @@ function mockMarketItems() {
     prices: Object.entries(MOCK_PRICES[i.key])
       .map(([store, v]) => {
         const vnd = Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100;
-        if (!abroad) return { store, price_vnd: vnd, currency: "VND", source: "gemini_search", on };
+        if (!abroad) return { store, price_vnd: vnd, currency: "VND", source: "gemini_search", on } as MockPrice;
         const local = Math.round((vnd / abroad.rate) * 100) / 100;
-        return { store: abroad.stores[store] ?? store, price_vnd: Math.round(local * abroad.rate), local, currency: abroad.currency, source: "gemini_search", on };
+        return { store: abroad.stores[store] ?? store, price_vnd: Math.round(local * abroad.rate), local, currency: abroad.currency, source: "gemini_search", on } as MockPrice;
       })
+      .concat(mockChannel3(i, abroad))
       .sort((a, b) => a.price_vnd - b.price_vnd),
   }));
+}
+
+/** Bản thử: giá chung của một món, có link nguồn giả tới trang tìm kiếm của cửa hàng. Cà phê: chưa tra lần nào. */
+const STORE_SITE: Record<string, string> = { "Co.opmart": "https://cooponline.vn/search?q=", "Bách Hóa Xanh": "https://www.bachhoaxanh.com/tim-kiem?key=", WinMart: "https://winmart.vn/search?q=" };
+function mockItemMarket(key: string, name: string) {
+  if (key === "ca-phe") return { key, name, prices: [], updated_at: null };
+  const on = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const base = MOCK_PRICES[key] ?? (key === "kem-danh-rang" ? { WinMart: 34_000, "Co.opmart": 36_500 } : {});
+  const prices = Object.entries(base)
+    .map(([store, v]) => ({ store, price_vnd: Math.round((v * 0.97) / 100) * 100, currency: "VND", source: "gemini_search", url: `${STORE_SITE[store] ?? "https://www.google.com/search?q="}${encodeURIComponent(name)}`, on }))
+    .sort((a, b) => a.price_vnd - b.price_vnd);
+  return { key, name, prices, updated_at: new Date(Date.now() - 6 * 3_600_000).toISOString() };
 }
 
 function mockM1(method: string, url: URL, init: RequestInit): Response | null {
@@ -907,6 +988,16 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
       namedPlans.delete(planM[1]);
       return json(undefined, 204);
     }
+  }
+
+  // Mimi 2.2: giá chung theo món (bảng giá lấy mọi món từng có trong tồn kho, hóa đơn, kế hoạch).
+  if (p === "/items/market-prices" && method === "GET") {
+    return json({ items: items.map((i) => mockItemMarket(i.key, i.name)).filter((m) => m.prices.length > 0) });
+  }
+  const imp = p.match(/^\/items\/([^/]+)\/market-prices$/);
+  if (imp && method === "GET") {
+    const it = items.find((i) => i.key === decodeURIComponent(imp[1]));
+    return it ? json(mockItemMarket(it.key, it.name)) : notFound();
   }
 
   // Lịch sử giá
@@ -1080,7 +1171,8 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
     return json(incoming);
   }
   if (p === "/plan/delegated" && method === "GET") {
-    return json({ to_me: incoming.status === "assigned" ? [incoming] : [], from_me: assignments });
+    const done = incoming.status === "completed" || incoming.status === "closed_partial";
+    return json({ to_me: incoming.status === "assigned" ? [incoming] : [], to_me_done: [...(done ? [incoming] : []), doneForMinh], from_me: assignments });
   }
   if (method === "POST" && p === "/receipts") {
     const b = body() as { assignment_id?: string };
