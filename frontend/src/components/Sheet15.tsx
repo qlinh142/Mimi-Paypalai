@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { m15 } from "../i18n/m15";
 
@@ -9,7 +10,8 @@ export function Sheet({ title, sub, onClose, children }: { title: string; sub?: 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
+  // Gắn thẳng vào body: thẻ cha có animation (translate) làm position: fixed bám theo thẻ cha thay vì màn hình.
+  return createPortal(
     <div className="sheet15" role="presentation" onClick={onClose}>
       <div className="sheet15__panel" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <span className="sheet15__grip" aria-hidden />
@@ -22,6 +24,7 @@ export function Sheet({ title, sub, onClose, children }: { title: string; sub?: 
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

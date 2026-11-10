@@ -32,6 +32,7 @@ test("Sổ chi tiêu 2.2: ngân sách, Còn tiêu được, Mimi nhận thấy, 
   // Bỏ ngân sách thì hiện lời mời; đặt ngân sách nhỏ thì thẻ chuyển sang vượt ngân sách.
   await page.getByRole("button", { name: "Sửa ngân sách" }).click();
   await page.getByRole("button", { name: "Bỏ ngân sách" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0); // bảng nằm trên cả màn, đóng xong mới bấm được lời mời
   await page.getByText("Đặt ngân sách tháng").click();
   await page.locator(".bud22__form input").fill("1000000");
   await page.getByRole("button", { name: "Lưu ngân sách" }).click();

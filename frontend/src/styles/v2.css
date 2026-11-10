@@ -97,7 +97,7 @@
 
 /* Vào màn: các khối trượt lên 10 px, cách nhau 0.04 s, tối đa 5 khối */
 @keyframes v2-in { from { opacity: 0; translate: 0 10px; } }
-[data-ui="v2"] :is(.p15, .ph15, .pd15, .set15, .rd15) > * { animation: v2-in .34s cubic-bezier(.2, .7, .3, 1) both; }
+[data-ui="v2"] :is(.p15, .ph15, .pd15, .set15, .rd15) > * { animation: v2-in .34s cubic-bezier(.2, .7, .3, 1) backwards; /* backwards: hết hiệu ứng thì bỏ translate, để bảng trượt (fixed) bám màn hình */ }
 [data-ui="v2"] :is(.p15, .ph15, .pd15, .set15, .rd15) > :nth-child(2) { animation-delay: .04s; }
 [data-ui="v2"] :is(.p15, .ph15, .pd15, .set15, .rd15) > :nth-child(3) { animation-delay: .08s; }
 [data-ui="v2"] :is(.p15, .ph15, .pd15, .set15, .rd15) > :nth-child(4) { animation-delay: .12s; }
