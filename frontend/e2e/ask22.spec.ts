@@ -44,6 +44,9 @@ test("Hỏi Mimi: chạm từng gợi ý đều ra câu trả lời đúng chủ
     if (i < expected.length - 1) await expect(more.filter({ hasText: label })).toHaveCount(0);
   }
   await expect(page.getByText("Chỉnh bảng")).toHaveCount(0);
+  // Góp ý 10/11: chạm gợi ý không được làm iPhone phóng to (không focus ô nhập; chữ ô nhập 16px).
+  expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("TEXTAREA");
+  expect(await page.locator("textarea").evaluate((e) => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(16);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(393);
   expect(errors).toEqual([]);
 });

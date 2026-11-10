@@ -1,5 +1,5 @@
 /* Màn Phân tích chi tiêu: chiếm cả màn hình (không bó trong khung 430px của app) để bảng có chỗ. */
-.ana { position: fixed; inset: 0; display: flex; flex-direction: column; background: #f5f8ff; color: var(--ink); font-family: var(--font); z-index: 1; }
+.ana { position: fixed; inset: 0; overflow: hidden; display: flex; flex-direction: column; background: #f5f8ff; color: var(--ink); font-family: var(--font); z-index: 1; }
 .ana__top { display: flex; align-items: center; gap: var(--s2); padding: calc(var(--s2) + var(--safe-t)) var(--s4) var(--s2); background: var(--paper); border-bottom: 1px solid var(--sky-line); }
 .ana__top h1 { margin: 0; font-size: var(--fs-lg); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ana__spacer { flex: 1; }
@@ -9,7 +9,7 @@
 .ana__tabs button[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
 .ana__tabs button:focus-visible, .ana__btn:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
 .ana__note { margin-left: auto; font-size: var(--fs-xs); color: var(--ink-soft); white-space: nowrap; }
-.ana__studio { flex: 1; min-height: 0; }
+.ana__studio { flex: 1; min-height: 0; min-width: 0; overflow: hidden; } /* Studio rộng tối thiểu 600px: cắt phần thừa để điện thoại không bị cuộn ngang, phóng to */
 .ana__state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s4); padding: var(--s8); text-align: center; color: var(--ink-soft); }
 .ana__spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--sky-line); border-top-color: var(--blue); animation: ana-spin 0.9s linear infinite; }
 @keyframes ana-spin { to { transform: rotate(360deg); } }
@@ -205,3 +205,6 @@
 .ana__more { display: flex; flex-wrap: wrap; gap: var(--s2); padding-top: var(--s3); border-top: 1px dashed var(--sky-line); }
 .ana__more p { flex-basis: 100%; margin: 0; font-size: var(--fs-xs); font-weight: 700; color: var(--ink-soft); }
 .ana__more button { min-height: 44px; padding: 0 var(--s4); border-radius: 999px; border: 1.5px dashed var(--blue); background: #f5f8ff; color: var(--blue); font: inherit; font-size: var(--fs-sm); font-weight: 600; text-align: left; cursor: pointer; }
+/* iPhone (Safari) tự phóng to trang khi chạm ô nhập có chữ nhỏ hơn 16px, rồi không thu lại:
+   ô chat của Hỏi Mimi để chữ 16px (góp ý 10/11). */
+.ana textarea, .ana input { font-size: 16px !important; }

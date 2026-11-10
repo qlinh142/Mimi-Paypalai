@@ -273,8 +273,8 @@ function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows
       if (!box) return;
       if (box.value !== text) {
         Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, text);
+        // Không focus ô nhập: trên iPhone focus làm bật bàn phím và phóng to màn (góp ý 10/11).
         box.dispatchEvent(new Event("input", { bubbles: true }));
-        box.focus();
         return; // để React nhận giá trị mới rồi lần sau mới Enter
       }
       box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
