@@ -44,6 +44,10 @@ const SEED_STOCK: Record<string, [number, "pc" | "g" | "ml"]> = {
   "giay-ve-sinh": [4, "pc"], "bot-giat": [1500, "g"], "kem-danh-rang": [2, "pc"], "nuoc-mam": [1, "pc"],
 };
 
+const SEED_INTERVAL: Record<string, number> = {
+  "sua-tuoi": 5, "nuoc-rua-chen": 30, "trung-ga": 7, "dau-goi": 35, gao: 30,
+  "giay-ve-sinh": 21, "bot-giat": 30, "kem-danh-rang": 45, "nuoc-mam": 60,
+};
 let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase_count]) => ({
   key,
   name: names[L],
@@ -52,6 +56,8 @@ let items: Item[] = seeds.map(([key, names, category_key, labels, days, purchase
   days_left: purchase_count < 2 ? null : days,
   purchase_count,
   status: statusFor(days, purchase_count, key === "nuoc-rua-chen"),
+  // Chu kỳ mua (ngày) như API trả khi có từ 2 lần mua; Sắp chi dùng để tính mức dùng mỗi ngày.
+  ...(purchase_count >= 2 && SEED_INTERVAL[key] ? { interval_days: SEED_INTERVAL[key] } : {}),
   confidence: purchase_count >= 4 ? "high" : purchase_count === 3 ? "mid" : purchase_count === 2 ? "low" : null,
   source: "predicted",
   predicted_out_on: days === null ? null : iso(new Date(today.getTime() + days * 86_400_000)),

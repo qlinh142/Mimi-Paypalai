@@ -6,7 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CalendarDays, ChartPie, ChevronDown, ChevronLeft, ChevronRight, Clock, Minus, ScanLine, ShoppingCart, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { at as ana } from "../analytics/text";
 import { ApiError } from "../api/client";
-import { useForecast, useItems, useReceiptHistory, useRecurring, useSpending } from "../api/hooks";
+import { useForecast, useItems, useItemsMarketPrices, useReceiptHistory, useRecurring, useSpending } from "../api/hooks";
 import { ReceiptRow } from "./PurchaseHistory";
 import type { ReceiptSummary, SpendingReport } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
@@ -222,14 +222,35 @@ function Upcoming() {
     () => (rec.data?.items ?? []).filter((r) => recurringTier(r) !== "later").map((r) => ({ key: r.id, name: r.name, sub: `${formatDayMonth(r.next_due_at)} · ${s22.due(daysUntil(r.next_due_at))}`, amount: r.amount as number | null })),
     [rec.data],
   );
+  const market = useItemsMarketPrices();
+  // Giá mỗi món: hóa đơn gần nhất (Dự báo của API), chưa có thì giá rẻ nhất trong bảng giá chung.
   const goodsRows = useMemo(() => {
-    const price = new Map((fc.data?.shopping ?? []).map((s) => [s.key, s.amount]));
-    return (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").map((i) => ({ key: i.key, name: i.name, sub: "", amount: price.get(i.key) ?? null }));
-  }, [items.data, fc.data]);
+    const paid = new Map((fc.data?.shopping ?? []).map((s) => [s.key, s.amount]));
+    const cheapest = new Map<string, { price: number; store: string }>();
+    for (const m of market.data?.items ?? []) {
+      const best = m.prices.reduce<{ price: number; store: string } | null>((a, x) => (a && a.price <= x.price_vnd ? a : { price: x.price_vnd, store: x.store }), null);
+      if (best) cheapest.set(m.key, best);
+    }
+    // Anh chốt 10/11: số tiền mỗi món = mức dùng trung bình mỗi ngày × 7 ngày,
+    // mức dùng mỗi ngày = giá một lần mua ÷ số ngày giữa hai lần mua (chu kỳ mua).
+    return (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").map((i) => {
+      const own = paid.get(i.key);
+      const m = own == null ? cheapest.get(i.key) : undefined;
+      const price = own ?? m?.price ?? null;
+      const from = m ? m15.spending.marketPrice(m.store) : "";
+      if (price == null) return { key: i.key, name: i.name, sub: "", amount: null };
+      const interval = i.interval_days && i.interval_days > 0 ? i.interval_days : null;
+      if (!interval) return { key: i.key, name: i.name, sub: [m15.spending.oneBuy, from].filter(Boolean).join(" · "), amount: price as number | null };
+      // Làm tròn mức dùng mỗi ngày tới 100đ rồi mới nhân 7, để số trên dòng phụ nhân ra đúng số tiền.
+      const perDay = Math.round(price / interval / 100) * 100;
+      return { key: i.key, name: i.name, sub: [m15.spending.perDay(formatVnd(perDay)), from].filter(Boolean).join(" · "), amount: (perDay * 7) as number | null };
+    });
+  }, [items.data, fc.data, market.data]);
 
   const sum = (rows: { amount: number | null }[]) => rows.reduce((a, x) => a + (x.amount ?? 0), 0);
   const recTotal = sum(recRows);
   const goodsTotal = sum(goodsRows);
+  const missing = [...recRows, ...goodsRows].filter((x) => x.amount == null).length;
 
   // A10: một trong hai nguồn lỗi thì báo kèm Thử lại, không hiện 0đ như thể chưa có khoản nào.
   if (rec.isError && !rec.data) return <LoadState q={rec} hasData={false} />;
@@ -237,8 +258,8 @@ function Upcoming() {
   if (rec.isPending || items.isPending) return <p className="hint">{t.common.loading}</p>;
 
   const lines = [
-    { id: "rec" as const, Icon: CalendarDays, label: m15.spending.recurring, total: recTotal, rows: recRows },
-    { id: "goods" as const, Icon: ShoppingCart, label: m15.spending.goods, total: goodsTotal, rows: goodsRows },
+    { id: "rec" as const, Icon: CalendarDays, label: m15.spending.recurring, how: m15.spending.recurringHow, total: recTotal, rows: recRows },
+    { id: "goods" as const, Icon: ShoppingCart, label: m15.spending.goods, how: m15.spending.goodsHow, total: goodsTotal, rows: goodsRows },
   ];
 
   return (
@@ -246,7 +267,7 @@ function Upcoming() {
       <p id="fc15" className="fc15__label">{m15.spending.forecast}</p>
       <p className="hero15__num num">{formatVnd(recTotal + goodsTotal)}</p>
       <ul className="fc15__lines">
-        {lines.map(({ id, Icon, label, total, rows }) => (
+        {lines.map(({ id, Icon, label, how, total, rows }) => (
           <li key={id}>
             <button type="button" className="fc15__line" aria-expanded={open === id} onClick={() => setOpen(open === id ? null : id)}>
               <Icon size={22} aria-hidden />
@@ -254,6 +275,7 @@ function Upcoming() {
               <span className="num">{formatVnd(total)}</span>
               {open === id ? <ChevronDown size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
             </button>
+            <p className="fc15__how">{how}</p>
             {open === id && (
               <ul className="fc15__rows">
                 {rows.map((x) => (
@@ -267,7 +289,8 @@ function Upcoming() {
           </li>
         ))}
       </ul>
-      <p className="hint">{m15.spending.forecastNote}</p>
+      {recRows.length + goodsRows.length === 0 && <p className="fc15__empty">{m15.spending.forecastEmpty}</p>}
+      {missing > 0 && <p className="fc15__empty">{m15.spending.missingPrices(missing)}</p>}
     </section>
   );
 }

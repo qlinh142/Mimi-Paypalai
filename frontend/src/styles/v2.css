@@ -180,6 +180,8 @@
   content: ""; position: absolute; right: -50px; top: -60px; width: 180px; height: 180px;
   border-radius: 50%; background: rgb(255 255 255 / .10); pointer-events: none;
 }
+/* Chữ phụ trên nền xanh: trắng mờ, đủ tương phản (lỗi 10/11: dòng ghi chú Sắp chi gần như không đọc được) */
+[data-ui="v2"] .hero15 .hint, [data-ui="v2"] .fc15__empty, [data-ui="v2"] .fc15__how, [data-ui="v2"] .fc15__rows small { color: rgb(255 255 255 / .88); }
 [data-ui="v2"] .hero15__num { color: #fff; font-size: 34px; font-weight: 700; letter-spacing: -.03em; }
 [data-ui="v2"] .hero15__sub {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;

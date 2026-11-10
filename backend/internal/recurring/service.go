@@ -357,7 +357,9 @@ func (s *Service) Forecast(ctx context.Context, p authz.Principal) (Forecast, er
 	var groups []string
 	due := map[string]item.Record{}
 	for _, r := range recs {
-		if r.Dropped || r.Prediction.OutOn.IsZero() || r.Prediction.OutOn.After(end) {
+		// Món mẹ bấm "Đã hết" luôn cần mua, kể cả khi chưa có ngày dự kiến hết.
+		need := r.Prediction.ForcedOut || (!r.Prediction.OutOn.IsZero() && !r.Prediction.OutOn.After(end))
+		if r.Dropped || !need {
 			continue
 		}
 		groups = append(groups, r.GroupKey)
