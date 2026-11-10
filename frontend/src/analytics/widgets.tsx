@@ -166,27 +166,38 @@ export function SpendingCalendar(params: AnyParams) {
   const amount = dm.amount?.[0];
   const detail = dm.detail?.[0];
   const rows = useWidgetRows(params, date && amount ? [date, ...(detail ? [detail] : []), amount] : [], "calendar");
+  if (!rows || !date || !amount) return null;
+  const entries: CalEntry[] = [];
+  for (const r of rows) {
+    const k = dayKey(r[date.key]);
+    const v = num(r[amount.key]);
+    if (k && v != null) entries.push({ date: k, name: detail ? String(r[detail.key] ?? "") : "", amount: v });
+  }
+  return <CalendarView entries={entries} />;
+}
+
+export type CalEntry = { date: string; name: string; amount: number };
+
+/** Lịch chi tiêu theo ngày: dùng trong bảng AG Studio (máy tính) và trang Hóa đơn bản điện thoại. */
+/** fixedMonth (YYYY-MM): trang tự chọn tháng ở trên, lịch chỉ hiện tháng đó, không có nút đổi tháng. */
+export function CalendarView({ entries, fixedMonth }: { entries: CalEntry[]; fixedMonth?: string }) {
   const byDay = new Map<string, { total: number; parts: { name: string; amount: number }[] }>();
-  for (const r of rows ?? []) {
-    const k = date ? dayKey(r[date.key]) : null;
-    const v = amount ? num(r[amount.key]) : null;
-    if (!k || v == null) continue;
-    const e = byDay.get(k) ?? { total: 0, parts: [] };
-    e.total += v;
-    e.parts.push({ name: detail ? String(r[detail.key] ?? "") : "", amount: v });
-    byDay.set(k, e);
+  for (const x of entries) {
+    const e = byDay.get(x.date) ?? { total: 0, parts: [] };
+    e.total += x.amount;
+    e.parts.push({ name: x.name, amount: x.amount });
+    byDay.set(x.date, e);
   }
   const days = [...byDay.keys()].sort();
   const latest = days.at(-1);
   const [month, setMonth] = useState<string | null>(null); // YYYY-MM đang xem
   const [picked, setPicked] = useState<string | null>(null);
-  const ym = month ?? latest?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
+  const ym = fixedMonth ?? month ?? latest?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
   // Dữ liệu đổi (lọc tháng khác) mà tháng đang xem không còn ngày nào thì về tháng mới nhất.
   useEffect(() => {
     if (month && latest && !days.some((d) => d.startsWith(month))) setMonth(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest, days.length]);
-  if (!rows || !date || !amount) return null;
 
   const [y, m] = ym.split("-").map(Number);
   const first = new Date(y, m - 1, 1);
@@ -211,10 +222,10 @@ export function SpendingCalendar(params: AnyParams) {
     <div className="cal">
       <div className="cal__main">
         <div className="cal__head">
-          <button type="button" className="cal__nav" onClick={() => shift(-1)} aria-label={at.cal.prev}>‹</button>
-          <strong>{at.cal.month(y, m)}</strong>
-          <button type="button" className="cal__nav" onClick={() => shift(1)} aria-label={at.cal.next}>›</button>
-          <span className="cal__total">{at.cal.total}: <b>-{formatVnd(Math.round(monthTotal))}</b></span>
+          {!fixedMonth && <button type="button" className="cal__nav" onClick={() => shift(-1)} aria-label={at.cal.prev}>‹</button>}
+          {!fixedMonth && <strong>{at.cal.month(y, m)}</strong>}
+          {!fixedMonth && <button type="button" className="cal__nav" onClick={() => shift(1)} aria-label={at.cal.next}>›</button>}
+          <span className="cal__total">{at.cal.total}: <b>{formatVnd(Math.round(monthTotal))}</b></span>
         </div>
         <div className="cal__grid" role="grid" aria-label={at.cal.month(y, m)}>
           {at.cal.week.map((w, i) => (

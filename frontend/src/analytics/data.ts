@@ -18,6 +18,8 @@ export const DETAIL_LIMIT = 60;
 
 export type ReceiptRow = {
   id: string; store: string; date: string; month: string; kind: string; buyer: string;
+  /** Loại hóa đơn dạng mã (own | delegated | recurring), để tách khoản định kỳ khỏi cửa hàng. */
+  kindKey: "own" | "delegated" | "recurring";
   total: number; discount: number; itemCount: number;
   /** Bằng total nếu hóa đơn thuộc tháng hiện tại, ngược lại 0 (thẻ "Tháng này" trên điện thoại). */
   thisMonth: number;
@@ -57,6 +59,7 @@ function receiptRow(h: HistoryReceipt, d: ReceiptDetail | undefined): ReceiptRow
     date: day,
     month: day.slice(0, 7),
     kind: at.kinds[h.kind ?? "own"],
+    kindKey: h.kind ?? "own",
     buyer: h.buyer_name ?? "",
     total: h.total_vnd,
     thisMonth: day.slice(0, 7) === currentMonth() ? h.total_vnd : 0,
