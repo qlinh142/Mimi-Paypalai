@@ -5,6 +5,7 @@
  * Bảng người dùng tự chỉnh được nhớ trên máy (localStorage), nút "Về bảng gốc" xóa bản đã nhớ.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Pencil, RotateCcw, Check, Sparkles } from "lucide-react";
 import { AgStudioAiModule, type AgReportState, type AgStudioApi, type AgStudioMode } from "ag-studio";
@@ -282,6 +283,44 @@ function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows
     askTimer.current = timer;
     attempt();
   };
+  /**
+   * Anh chốt 10/11: chạm một câu gợi ý thì Mimi trả lời, ngay dưới câu trả lời vẫn hiện các câu
+   * chưa hỏi để chạm tiếp. Khung chat là của Studio nên gắn danh sách vào cuối vùng cuộn của nó
+   * (portal); câu đã hỏi nhận ra nhờ có trong khung chat. Chat còn trống thì Studio tự hiện đủ gợi ý.
+   */
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [moreHost, setMoreHost] = useState<HTMLElement | null>(null);
+  const [askedKey, setAskedKey] = useState("");
+  useEffect(() => {
+    const root = studioRef.current;
+    if (!root || mode !== "edit") return;
+    const host = (hostRef.current ??= Object.assign(document.createElement("div"), { className: "ana__morehost" }));
+    const sync = () => {
+      const scroll = root.querySelector<HTMLElement>(".ag-studio-ai-scroll-content");
+      const msgs = scroll?.querySelector<HTMLElement>(".ag-studio-ai-message-container");
+      const text = msgs?.textContent ?? "";
+      if (!scroll || !text.trim()) {
+        setMoreHost(null);
+        return;
+      }
+      // Đặt ngay sau các tin nhắn, trước mốc cuộn của Studio: Studio tự cuộn tới mốc đó khi có tin
+      // mới nên danh sách gợi ý luôn hiện ngay dưới câu trả lời.
+      if (host.previousElementSibling !== msgs) msgs!.after(host);
+      setMoreHost(host);
+      const key = at.ai.starters.map((st) => (text.includes(st.prompt) ? "1" : "0")).join("");
+      setAskedKey(key);
+    };
+    // Studio tự cuộn câu hỏi mới lên đầu khung chat; danh sách gợi ý nằm ngay dưới câu trả lời.
+    const mo = new MutationObserver(() => window.requestAnimationFrame(sync));
+    mo.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+    sync();
+    return () => {
+      mo.disconnect();
+      host.remove();
+      setMoreHost(null);
+    };
+  }, [mode]);
+  const remaining = at.ai.starters.filter((_, i) => askedKey[i] !== "1");
   // Điện thoại: vào thẳng khung Hỏi Mimi (câu hỏi ?ask=… đã có effect riêng ở trên).
   useEffect(() => {
     if (autoAsk && ready && !ask) askMimi();
@@ -320,13 +359,16 @@ function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows
         ))}
         {note && <span className="ana__note">{note}</span>}
       </nav>}
-      {onExit && (
-        <nav className="ana__asks" aria-label={at.ph.suggest}>
-          {at.ai.starters.map((st) => (
-            <button key={st.label} type="button" onClick={() => sendAsk(st.prompt)}>{st.label}</button>
-          ))}
-        </nav>
-      )}
+      {moreHost && remaining.length > 0 &&
+        createPortal(
+          <nav className="ana__more" aria-label={at.ph.more}>
+            <p>{at.ph.more}</p>
+            {remaining.map((st) => (
+              <button key={st.label} type="button" onClick={() => sendAsk(st.prompt)}>{st.label}</button>
+            ))}
+          </nav>,
+          moreHost,
+        )}
       {detail != null && cardIds[detail] && (
         <CardDetail rows={rows} ids={cardIds} index={detail} onMove={setDetail} onClose={() => setDetail(null)} />
       )}

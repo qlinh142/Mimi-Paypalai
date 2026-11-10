@@ -16,8 +16,8 @@ test("Hỏi Mimi: chạm từng gợi ý đều ra câu trả lời đúng chủ
   await page.goto("/spending/analytics?ui=vi&uiv2=1");
   await page.getByRole("button", { name: "Hỏi Mimi", exact: true }).click();
 
-  const asks = page.locator(".ana__asks button");
-  await expect(asks).toHaveCount(11);
+  // Chat còn trống: Studio hiện đủ 11 gợi ý.
+  await expect(page.locator(".ag-studio-ai-prompt-starter")).toHaveCount(11);
   const expected: [string, RegExp][] = [
     ["Tháng này chi bao nhiêu?", /nhà mình đã chi .* qua \d+ hóa đơn/],
     ["Chi nhiều nhất cho nhóm nào?", /Nhiều nhất là/],
@@ -32,11 +32,16 @@ test("Hỏi Mimi: chạm từng gợi ý đều ra câu trả lời đúng chủ
     ["Mimi giúp tiết kiệm bao nhiêu?", /đã tiết kiệm/],
   ];
   const chat = page.locator(".ana__studio");
-  for (const [label, answer] of expected) {
+  const more = page.locator(".ana__more button");
+  for (const [i, [label, answer]] of expected.entries()) {
     // Câu trả lời mới: số đoạn khớp chủ đề tăng thêm một (vài chủ đề có chữ giống câu trước).
     const before = await chat.getByText(answer).count();
-    await page.locator(".ana__asks button", { hasText: label }).click();
+    const pick = i === 0 ? page.locator(".ag-studio-ai-prompt-starter", { hasText: label }) : more.filter({ hasText: label });
+    await pick.click();
     await expect.poll(() => chat.getByText(answer).count(), { timeout: 20_000, message: label }).toBeGreaterThan(before);
+    // Dưới câu trả lời vẫn hiện các câu chưa hỏi, câu vừa hỏi thì không.
+    await expect(more).toHaveCount(expected.length - i - 1);
+    if (i < expected.length - 1) await expect(more.filter({ hasText: label })).toHaveCount(0);
   }
   await expect(page.getByText("Chỉnh bảng")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(393);

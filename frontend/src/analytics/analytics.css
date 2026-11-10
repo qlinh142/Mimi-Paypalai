@@ -199,7 +199,9 @@
 .pa__cal .cal__cell { min-height: 44px; }
 .pa .chatchart { width: 100%; }
 .pa .seg15 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: column; }
-/* Hỏi Mimi trên điện thoại: hàng gợi ý luôn hiện trên khung chat, chạm là hỏi (anh chốt 10/11). */
-.ana__asks { display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none; padding: var(--s2) var(--s4); background: var(--paper); border-bottom: 1px solid var(--sky-line); flex: none; }
-.ana__asks::-webkit-scrollbar { display: none; }
-.ana__asks button { flex: none; min-height: 44px; padding: 0 var(--s4); border-radius: 999px; border: 1.5px dashed var(--blue); background: #f5f8ff; color: var(--blue); font: inherit; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer; }
+/* Hỏi Mimi: các câu chưa hỏi hiện ngay dưới câu trả lời, chạm là hỏi tiếp (anh chốt 10/11). */
+.ana__morehost { position: relative; z-index: 2; padding: 0 var(--s3) var(--s4); background: var(--paper, #fff); }
+.ana .chatchart { overflow: hidden; }
+.ana__more { display: flex; flex-wrap: wrap; gap: var(--s2); padding-top: var(--s3); border-top: 1px dashed var(--sky-line); }
+.ana__more p { flex-basis: 100%; margin: 0; font-size: var(--fs-xs); font-weight: 700; color: var(--ink-soft); }
+.ana__more button { min-height: 44px; padding: 0 var(--s4); border-radius: 999px; border: 1.5px dashed var(--blue); background: #f5f8ff; color: var(--blue); font: inherit; font-size: var(--fs-sm); font-weight: 600; text-align: left; cursor: pointer; }

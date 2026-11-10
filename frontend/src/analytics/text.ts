@@ -176,7 +176,7 @@ const vi = {
   ph: {
     ask: "Hỏi Mimi",
     closeAsk: "Xong",
-    suggest: "Mẹ muốn hỏi gì?",
+    more: "Mẹ hỏi tiếp nhé",
     spentIn: (m: number) => `Tháng ${m} đã chi`,
     receipts: (n: number) => `${n} hóa đơn`,
     avgBill: (v: string) => `Trung bình ${v} mỗi hóa đơn`,
@@ -398,7 +398,7 @@ const en: AnalyticsText = {
   ph: {
     ask: "Ask Mimi",
     closeAsk: "Done",
-    suggest: "What would you like to know?",
+    more: "Ask next",
     spentIn: (m: number) => `Spent in ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1]}`,
     receipts: (n: number) => `${n} receipt${n === 1 ? "" : "s"}`,
     avgBill: (v: string) => `${v} per receipt on average`,
