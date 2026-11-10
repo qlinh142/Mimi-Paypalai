@@ -171,6 +171,7 @@
 .rowlink15 span { flex: 1; font-weight: 600; }
 .fc15 { display: grid; gap: var(--s2); }
 .fc15__label { margin: 0; font-weight: 700; }
+.fc15__empty { margin: 0; font-size: var(--fs-sm); line-height: 1.45; }
 .fc15__lines { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); }
 .fc15__line { width: 100%; display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border: 0; border-radius: 10px; background: rgb(255 255 255 / .75); font: inherit; color: var(--ink); cursor: pointer; text-align: left; }
 .fc15__line svg:first-child { color: var(--m15-blue); }

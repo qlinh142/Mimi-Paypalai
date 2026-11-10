@@ -6,7 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CalendarDays, ChartPie, ChevronDown, ChevronLeft, ChevronRight, Clock, Minus, ScanLine, ShoppingCart, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { at as ana } from "../analytics/text";
 import { ApiError } from "../api/client";
-import { useForecast, useItems, useReceiptHistory, useRecurring, useSpending } from "../api/hooks";
+import { useForecast, useItems, useItemsMarketPrices, useReceiptHistory, useRecurring, useSpending } from "../api/hooks";
 import { ReceiptRow } from "./PurchaseHistory";
 import type { ReceiptSummary, SpendingReport } from "../api/types";
 import { MainFrame, TopBar } from "../components/AppShell";
@@ -222,14 +222,27 @@ function Upcoming() {
     () => (rec.data?.items ?? []).filter((r) => recurringTier(r) !== "later").map((r) => ({ key: r.id, name: r.name, sub: `${formatDayMonth(r.next_due_at)} · ${s22.due(daysUntil(r.next_due_at))}`, amount: r.amount as number | null })),
     [rec.data],
   );
+  const market = useItemsMarketPrices();
+  // Giá mỗi món: hóa đơn gần nhất (Dự báo của API), chưa có thì giá rẻ nhất trong bảng giá chung.
   const goodsRows = useMemo(() => {
-    const price = new Map((fc.data?.shopping ?? []).map((s) => [s.key, s.amount]));
-    return (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").map((i) => ({ key: i.key, name: i.name, sub: "", amount: price.get(i.key) ?? null }));
-  }, [items.data, fc.data]);
+    const paid = new Map((fc.data?.shopping ?? []).map((s) => [s.key, s.amount]));
+    const cheapest = new Map<string, { price: number; store: string }>();
+    for (const m of market.data?.items ?? []) {
+      const best = m.prices.reduce<{ price: number; store: string } | null>((a, x) => (a && a.price <= x.price_vnd ? a : { price: x.price_vnd, store: x.store }), null);
+      if (best) cheapest.set(m.key, best);
+    }
+    return (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").map((i) => {
+      const own = paid.get(i.key);
+      if (own != null) return { key: i.key, name: i.name, sub: "", amount: own as number | null };
+      const m = cheapest.get(i.key);
+      return { key: i.key, name: i.name, sub: m ? m15.spending.marketPrice(m.store) : "", amount: m ? m.price : null };
+    });
+  }, [items.data, fc.data, market.data]);
 
   const sum = (rows: { amount: number | null }[]) => rows.reduce((a, x) => a + (x.amount ?? 0), 0);
   const recTotal = sum(recRows);
   const goodsTotal = sum(goodsRows);
+  const missing = [...recRows, ...goodsRows].filter((x) => x.amount == null).length;
 
   // A10: một trong hai nguồn lỗi thì báo kèm Thử lại, không hiện 0đ như thể chưa có khoản nào.
   if (rec.isError && !rec.data) return <LoadState q={rec} hasData={false} />;
@@ -267,6 +280,8 @@ function Upcoming() {
           </li>
         ))}
       </ul>
+      {recRows.length + goodsRows.length === 0 && <p className="fc15__empty">{m15.spending.forecastEmpty}</p>}
+      {missing > 0 && <p className="fc15__empty">{m15.spending.missingPrices(missing)}</p>}
       <p className="hint">{m15.spending.forecastNote}</p>
     </section>
   );
