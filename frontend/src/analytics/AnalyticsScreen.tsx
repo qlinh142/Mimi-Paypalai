@@ -252,6 +252,36 @@ function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ask, ready]);
+  /** Gợi ý trên điện thoại: chạm là điền câu hỏi vào ô chat rồi gửi luôn. */
+  const askTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearInterval(askTimer.current), []);
+  const sendAsk = (text: string) => {
+    const root = studioRef.current;
+    if (!root) return;
+    // Chạm gợi ý khác khi câu trước chưa gửi xong thì bỏ câu trước, không để hai câu giành ô nhập.
+    window.clearInterval(askTimer.current);
+    // Đã gửi = trong khung chat có thêm một tin đúng câu hỏi này.
+    const sent = () => [...root.querySelectorAll("p")].filter((p) => p.textContent === text).length;
+    const before = sent();
+    // Mimi còn đang trả lời câu trước thì Studio chưa nhận (và xóa ô nhập khi trả lời xong): cứ điền
+    // lại rồi Enter như khi gõ, tới khi câu hỏi hiện trong khung chat, tối đa 30 giây.
+    let tries = 0;
+    const attempt = () => {
+      if (sent() > before || ++tries > 75) return window.clearInterval(timer);
+      const box = root.querySelector<HTMLTextAreaElement>("textarea");
+      if (!box) return;
+      if (box.value !== text) {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, text);
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+        box.focus();
+        return; // để React nhận giá trị mới rồi lần sau mới Enter
+      }
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    };
+    const timer = window.setInterval(attempt, 250);
+    askTimer.current = timer;
+    attempt();
+  };
   // Điện thoại: vào thẳng khung Hỏi Mimi (câu hỏi ?ask=… đã có effect riêng ở trên).
   useEffect(() => {
     if (autoAsk && ready && !ask) askMimi();
@@ -290,6 +320,13 @@ function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows
         ))}
         {note && <span className="ana__note">{note}</span>}
       </nav>}
+      {onExit && (
+        <nav className="ana__asks" aria-label={at.ph.suggest}>
+          {at.ai.starters.map((st) => (
+            <button key={st.label} type="button" onClick={() => sendAsk(st.prompt)}>{st.label}</button>
+          ))}
+        </nav>
+      )}
       {detail != null && cardIds[detail] && (
         <CardDetail rows={rows} ids={cardIds} index={detail} onMove={setDetail} onClose={() => setDetail(null)} />
       )}

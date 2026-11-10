@@ -103,11 +103,11 @@ export function buildAskMimi(getRows: () => AnalyticsRows | undefined, adapter: 
         api.defineAiTool({
           name: "mimi_chart",
           description:
-            "Show a chart in the chat and return its numbers: spending_by_month (last 6 months), spending_by_store, top_items (items the family spent most on), price_compare (what the family paid vs the cheapest online price per item). Use it to answer with a picture, not to change the dashboard.",
+            "Show a chart in the chat and return its numbers: spending_by_month (last 6 months), spending_by_store, top_items (items the family spent most on), price_compare (what the family paid vs the cheapest online price per item), avg_bill (average receipt per month), spending_by_day (spending per day in a month), upcoming_bills (recurring bills due in the next 7 days, overdue included). Use it to answer with a picture, not to change the dashboard.",
           params: (s) =>
             s.object({
               topic: s.enum(CHART_TOPICS),
-              month: s.string({ description: "Month as YYYY-MM for spending_by_store and top_items; empty string for all months." }),
+              month: s.string({ description: "Month as YYYY-MM for spending_by_store, top_items and spending_by_day; empty string for all months." }),
             }),
           execute: (args: { topic: ChartTopic; month?: string }, ctx) => ctx.success(JSON.stringify(buildChart(need(), args.topic, args.month || undefined))),
         }),
