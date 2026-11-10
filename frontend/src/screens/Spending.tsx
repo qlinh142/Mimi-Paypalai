@@ -231,11 +231,19 @@ function Upcoming() {
       const best = m.prices.reduce<{ price: number; store: string } | null>((a, x) => (a && a.price <= x.price_vnd ? a : { price: x.price_vnd, store: x.store }), null);
       if (best) cheapest.set(m.key, best);
     }
+    // Anh chốt 10/11: số tiền mỗi món = mức dùng trung bình mỗi ngày × 7 ngày,
+    // mức dùng mỗi ngày = giá một lần mua ÷ số ngày giữa hai lần mua (chu kỳ mua).
     return (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").map((i) => {
       const own = paid.get(i.key);
-      if (own != null) return { key: i.key, name: i.name, sub: "", amount: own as number | null };
-      const m = cheapest.get(i.key);
-      return { key: i.key, name: i.name, sub: m ? m15.spending.marketPrice(m.store) : "", amount: m ? m.price : null };
+      const m = own == null ? cheapest.get(i.key) : undefined;
+      const price = own ?? m?.price ?? null;
+      const from = m ? m15.spending.marketPrice(m.store) : "";
+      if (price == null) return { key: i.key, name: i.name, sub: "", amount: null };
+      const interval = i.interval_days && i.interval_days > 0 ? i.interval_days : null;
+      if (!interval) return { key: i.key, name: i.name, sub: [m15.spending.oneBuy, from].filter(Boolean).join(" · "), amount: price as number | null };
+      // Làm tròn mức dùng mỗi ngày tới 100đ rồi mới nhân 7, để số trên dòng phụ nhân ra đúng số tiền.
+      const perDay = Math.round(price / interval / 100) * 100;
+      return { key: i.key, name: i.name, sub: [m15.spending.perDay(formatVnd(perDay)), from].filter(Boolean).join(" · "), amount: (perDay * 7) as number | null };
     });
   }, [items.data, fc.data, market.data]);
 
@@ -250,8 +258,8 @@ function Upcoming() {
   if (rec.isPending || items.isPending) return <p className="hint">{t.common.loading}</p>;
 
   const lines = [
-    { id: "rec" as const, Icon: CalendarDays, label: m15.spending.recurring, total: recTotal, rows: recRows },
-    { id: "goods" as const, Icon: ShoppingCart, label: m15.spending.goods, total: goodsTotal, rows: goodsRows },
+    { id: "rec" as const, Icon: CalendarDays, label: m15.spending.recurring, how: m15.spending.recurringHow, total: recTotal, rows: recRows },
+    { id: "goods" as const, Icon: ShoppingCart, label: m15.spending.goods, how: m15.spending.goodsHow, total: goodsTotal, rows: goodsRows },
   ];
 
   return (
@@ -259,7 +267,7 @@ function Upcoming() {
       <p id="fc15" className="fc15__label">{m15.spending.forecast}</p>
       <p className="hero15__num num">{formatVnd(recTotal + goodsTotal)}</p>
       <ul className="fc15__lines">
-        {lines.map(({ id, Icon, label, total, rows }) => (
+        {lines.map(({ id, Icon, label, how, total, rows }) => (
           <li key={id}>
             <button type="button" className="fc15__line" aria-expanded={open === id} onClick={() => setOpen(open === id ? null : id)}>
               <Icon size={22} aria-hidden />
@@ -267,6 +275,7 @@ function Upcoming() {
               <span className="num">{formatVnd(total)}</span>
               {open === id ? <ChevronDown size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
             </button>
+            <p className="fc15__how">{how}</p>
             {open === id && (
               <ul className="fc15__rows">
                 {rows.map((x) => (
@@ -282,7 +291,6 @@ function Upcoming() {
       </ul>
       {recRows.length + goodsRows.length === 0 && <p className="fc15__empty">{m15.spending.forecastEmpty}</p>}
       {missing > 0 && <p className="fc15__empty">{m15.spending.missingPrices(missing)}</p>}
-      <p className="hint">{m15.spending.forecastNote}</p>
     </section>
   );
 }
