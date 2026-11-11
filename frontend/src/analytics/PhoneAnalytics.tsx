@@ -218,6 +218,7 @@ function Prices({ rows }: { rows: AnalyticsRows }) {
         ) : <p className="pa__heroSub">{p.noPrices}</p>}
       </section>
       <p className="pa__hint">{p.pricesHow}</p>
+      {rows.prices.some((x) => x.listPrice) && <p className="pa__hint">{p.listNote}</p>}
       {groups.map((list) => {
         const first = list[0];
         return (
@@ -232,6 +233,12 @@ function Prices({ rows }: { rows: AnalyticsRows }) {
                     <small>{[x.size, x.source, x.on ? at.cal.day(x.on).replace(/^\S+ /, "") : ""].filter(Boolean).join(" · ")}</small>
                   </span>
                   <span className="pa__price">
+                    {x.listPrice ? (
+                      <span className="pa__list-was">
+                        <s className="num" aria-label={p.listWas(formatVnd(x.listPrice))}>{formatVnd(x.listPrice)}</s>
+                        <span className="pa__off">{p.off(x.offPct)}</span>
+                      </span>
+                    ) : null}
                     <b className="num">{formatVnd(x.onlinePrice)}</b>
                     {x.cheapest ? <span className="tag15 pa__tag">{p.cheapest}</span> : null}
                     {x.saving > 0 && <small className="pa__save">{p.cheaper(formatVnd(x.saving))}</small>}

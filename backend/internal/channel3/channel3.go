@@ -79,8 +79,9 @@ type offer struct {
 	URL    string `json:"url"`
 	Domain string `json:"domain"`
 	Price  struct {
-		Price    float64 `json:"price"`
-		Currency string  `json:"currency"`
+		Price          float64 `json:"price"`
+		CompareAtPrice float64 `json:"compare_at_price"` // giá gốc khi đang giảm, 0 khi không
+		Currency       string  `json:"currency"`
 	} `json:"price"`
 	Availability string `json:"availability"`
 }
@@ -173,7 +174,7 @@ func Pick(ps []product, name, currency string) []market.Price {
 			if a := strings.ToLower(o.Availability); a == "soldout" || a == "outofstock" {
 				continue
 			}
-			out = append(out, market.Price{Store: store, Local: o.Price.Price, Currency: currency, Size: sizeOf(p.Title), URL: o.URL})
+			out = append(out, market.Price{Store: store, Local: o.Price.Price, ListLocal: o.Price.CompareAtPrice, Currency: currency, Size: sizeOf(p.Title), URL: o.URL})
 		}
 	}
 	return out

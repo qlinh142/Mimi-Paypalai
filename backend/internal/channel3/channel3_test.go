@@ -12,7 +12,7 @@ import (
 
 const sample = `{"products":[
  {"title":"Tide Original Liquid Laundry Detergent, 92 fl oz","offers":[
-   {"url":"https://buy.trychannel3.com/a","domain":"www.walmart.com","price":{"price":12.97,"currency":"USD"},"availability":"InStock"},
+   {"url":"https://buy.trychannel3.com/a","domain":"www.walmart.com","price":{"price":12.97,"compare_at_price":15.99,"currency":"USD"},"availability":"InStock"},
    {"url":"https://buy.trychannel3.com/b","domain":"target.com","price":{"price":13.49,"currency":"USD"}},
    {"url":"https://buy.trychannel3.com/c","domain":"randomshop.com","price":{"price":9.99,"currency":"USD"}},
    {"url":"https://buy.trychannel3.com/d","domain":"cvs.com","price":{"price":11.00,"currency":"USD"},"availability":"OutOfStock"}]},
@@ -52,7 +52,7 @@ func TestLookupFollowsRules(t *testing.T) {
 	if len(ps) != 2 || ps[0].Store != "Walmart" || ps[1].Store != "Target" {
 		t.Fatalf("prices = %+v", ps)
 	}
-	if ps[0].Local != 12.97 || ps[0].URL == "" || ps[0].Size != "92 fl oz" {
+	if ps[0].Local != 12.97 || ps[0].ListLocal != 15.99 || ps[0].URL == "" || ps[0].Size != "92 fl oz" {
 		t.Errorf("price = %+v", ps[0])
 	}
 	if _, ok := got["us_milk"]; ok {

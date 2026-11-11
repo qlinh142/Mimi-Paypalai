@@ -1368,6 +1368,8 @@ components:
         price_vnd: { type: integer, format: int64, description: Quy ra VND để so với giá trên hóa đơn }
         local: { type: number, description: "Số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5)" }
         currency: { type: string, description: "Tiền gốc: VND, USD, SGD" }
+        list_local: { type: number, description: "Giá gốc (giá gạch ngang) theo tiền gốc, chỉ khi đang giảm và ngoài Việt Nam" }
+        list_vnd: { type: integer, format: int64, description: "Giá gốc quy ra VND khi nơi bán đang giảm giá; không gồm voucher lúc thanh toán" }
         size: { type: string, description: Quy cách nguồn ghi (1L, 900g...) }
         source: { type: string, description: "gemini_search hoặc partner_..." }
         url: { type: string }

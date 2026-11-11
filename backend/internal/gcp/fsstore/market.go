@@ -48,14 +48,16 @@ func (s *Store) FreshKeys(ctx context.Context, since time.Time) (map[string]bool
 // tag json, và Firestore khớp tên trường không phân biệt hoa thường nên "store" vẫn đọc
 // được nhưng "price_vnd" không khớp PriceVND, giá ra 0đ (lỗi mẹ thấy 02/11).
 type priceDoc struct {
-	Store    string  `firestore:"store"`
-	PriceVND int64   `firestore:"price_vnd"`
-	Local    float64 `firestore:"local"`
-	Currency string  `firestore:"currency"`
-	Size     string  `firestore:"size"`
-	Source   string  `firestore:"source"`
-	URL      string  `firestore:"url"`
-	On       string  `firestore:"on"`
+	Store     string  `firestore:"store"`
+	PriceVND  int64   `firestore:"price_vnd"`
+	Local     float64 `firestore:"local"`
+	Currency  string  `firestore:"currency"`
+	ListLocal float64 `firestore:"list_local"`
+	ListVND   int64   `firestore:"list_vnd"`
+	Size      string  `firestore:"size"`
+	Source    string  `firestore:"source"`
+	URL       string  `firestore:"url"`
+	On        string  `firestore:"on"`
 }
 
 func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
@@ -63,6 +65,7 @@ func (s *Store) SaveEntry(ctx context.Context, e market.Entry) error {
 	for _, p := range e.Prices {
 		prices = append(prices, map[string]any{
 			"store": p.Store, "price_vnd": p.PriceVND, "local": p.Local, "currency": p.Currency,
+			"list_local": p.ListLocal, "list_vnd": p.ListVND,
 			"size": p.Size, "source": p.Source, "url": p.URL, "on": p.On,
 		})
 	}
@@ -157,6 +160,7 @@ func (s *Store) Entries(ctx context.Context, keys []string) (map[string]market.E
 //   - dòng Kế hoạch mọi trạng thái (plan_items và plans/{id}/items); dòng đang mở ưu tiên 2;
 //   - món trong tồn kho users/{uid}/items (hóa đơn đã quét đều ghi vào đây), trừ món đã bỏ;
 //     món sắp hết (hết trong 7 ngày hoặc mẹ báo hết) ưu tiên 1.
+//
 // Khoản chi định kỳ thêm vào kế hoạch ("custom-rec-...") không phải hàng hóa nên bỏ qua.
 // Chỉ lấy tên, nhóm, ngành hàng và nước của chủ (tra giá đúng nước, mẹ chốt 02/11); không
 // ghi ai cần. Truy vấn collection group không lọc nên không cần index.

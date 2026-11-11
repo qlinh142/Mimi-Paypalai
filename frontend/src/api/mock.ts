@@ -888,7 +888,7 @@ function histDetail(id: string): ReceiptDetail | null {
 /** Bản thử: nút Cập nhật giá 3 lần mỗi ngày như máy chủ. */
 let mockRefresh: { daily: number; left: number; last_at?: string } = { daily: 3, left: 3 };
 
-type MockPrice = { store: string; price_vnd: number; local?: number; currency: string; source: string; on: string; url?: string; size?: string };
+type MockPrice = { store: string; price_vnd: number; local?: number; list_vnd?: number; currency: string; source: string; on: string; url?: string; size?: string };
 
 /** Bản thử: Channel3 chỉ ở Mỹ, chỉ đồ dùng nhà, thuốc, đồ trẻ em (như backend), giá Walmart qua link mua Channel3. */
 const C3_CATS = new Set(["me-be", "thuoc", "hoa-pham", "ve-sinh", "giay", "giat-say", "my-pham", "nha-cua", "do-dung-bep", "thu-cung"]);
@@ -897,7 +897,7 @@ function mockChannel3(i: { key: string; name: string; category_key?: string }, a
   const base = Object.values(MOCK_PRICES[i.key] ?? {});
   if (!base.length) return [];
   const local = Math.round((Math.min(...base) * 0.92 / abroad.rate) * 100) / 100;
-  return [{ store: "Walmart", price_vnd: Math.round(local * abroad.rate), local, currency: abroad.currency, source: "channel3", on: new Date().toISOString().slice(0, 10), url: `https://buy.trychannel3.com/demo/${i.key}` }];
+  return [{ store: "Walmart", price_vnd: Math.round(local * abroad.rate), local, list_vnd: Math.round(local * 1.18 * abroad.rate), currency: abroad.currency, source: "channel3", on: new Date().toISOString().slice(0, 10), url: `https://buy.trychannel3.com/demo/${i.key}` }];
 }
 
 function mockMarketItems() {
@@ -914,7 +914,9 @@ function mockMarketItems() {
     prices: Object.entries(MOCK_PRICES[i.key])
       .map(([store, v]) => {
         const vnd = Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100;
-        if (!abroad) return { store, price_vnd: vnd, currency: "VND", source: "gemini_search", on } as MockPrice;
+        // Bản thử: sữa và gạo ở Co.opmart đang giảm giá (có giá gạch ngang) để màn So sánh giá hiện giá trước giảm và % giảm.
+        const list_vnd = store === "Co.opmart" && (i.key === "sua-tuoi" || i.key === "gao") ? Math.round((vnd * 1.2) / 1000) * 1000 : undefined;
+        if (!abroad) return { store, price_vnd: vnd, list_vnd, currency: "VND", source: "gemini_search", on } as MockPrice;
         const local = Math.round((vnd / abroad.rate) * 100) / 100;
         return { store: abroad.stores[store] ?? store, price_vnd: Math.round(local * abroad.rate), local, currency: abroad.currency, source: "gemini_search", on } as MockPrice;
       })

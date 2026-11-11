@@ -27,8 +27,23 @@ export default defineConfig({
       workbox: {
         // Chỉ cache app shell. Dữ liệu API được TanStack Query lưu vào IndexedDB,
         // service worker không bao giờ cache /api và trang xử lý đăng nhập của Firebase.
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/__\//],
+        // Trang (điều hướng) luôn lấy từ mạng trước; chỉ khi mất mạng mới dùng index.html đã cache.
+        // Trước đây dùng navigateFallback (chỉ đọc cache): nếu Chrome dọn mất cache mà service worker
+        // vẫn còn, trang báo ERR_FAILED dù web vẫn chạy.
+        navigateFallback: null,
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" && !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/__/"),
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "mimi-pages",
+              networkTimeoutSeconds: 5,
+              precacheFallback: { fallbackURL: "/index.html" },
+            },
+          },
+        ],
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         // Màn Phân tích chi tiêu (AG Studio, ~4,7 MB) chỉ tải khi mở màn, không nằm trong app shell.
         globIgnores: ["**/AnalyticsScreen-*.js", "**/AnalyticsScreen-*.css"],

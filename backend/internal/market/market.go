@@ -32,10 +32,15 @@ type Price struct {
 	// Local, Currency: số tiền gốc nơi bán ghi (ví dụ 4.5 USD). Ở Việt Nam Local = PriceVND.
 	Local    float64 `json:"local,omitempty"`
 	Currency string  `json:"currency,omitempty"`
-	Size     string  `json:"size,omitempty"` // quy cách nguồn ghi (1L, 900g...), để người dùng tự so
-	Source   string  `json:"source"`         // gemini_search | partner_...
-	URL      string  `json:"url,omitempty"`
-	On       string  `json:"on"` // YYYY-MM-DD ngày lấy giá
+	// ListLocal, ListVND: giá gốc (giá gạch ngang) khi nơi bán đang giảm giá; 0 khi không giảm.
+	// Nguồn chỉ điền ListLocal; Normalize quy ra ListVND. Chỉ là giảm giá ghi trên trang,
+	// không gồm voucher hay mã giảm lúc thanh toán.
+	ListLocal float64 `json:"list_local,omitempty"`
+	ListVND   int64   `json:"list_vnd,omitempty"`
+	Size      string  `json:"size,omitempty"` // quy cách nguồn ghi (1L, 900g...), để người dùng tự so
+	Source    string  `json:"source"`         // gemini_search | partner_...
+	URL       string  `json:"url,omitempty"`
+	On        string  `json:"on"` // YYYY-MM-DD ngày lấy giá
 }
 
 // Entry là một dòng bảng giá chung: các giá hiện có của một món ở một nước.
@@ -347,8 +352,15 @@ func Normalize(ctx context.Context, ps []Price, c Country, fx FX, source, day st
 		}
 		p.Currency = c.Currency
 		p.PriceVND = int64(math.Round(p.Local * rate))
+		p.ListVND = 0
+		if p.ListLocal > p.Local && p.ListLocal < p.Local*5 && !math.IsNaN(p.ListLocal) {
+			p.ListVND = int64(math.Round(p.ListLocal * rate))
+		} else {
+			p.ListLocal = 0
+		}
 		if c.Currency == "VND" {
 			p.Local = 0 // ở Việt Nam không cần lưu hai lần
+			p.ListLocal = 0
 		}
 		keep = append(keep, p)
 	}

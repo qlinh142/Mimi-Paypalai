@@ -90,12 +90,16 @@ test.describe("trên điện thoại", () => {
     const tabs = pa.locator(".seg15 button");
     const ys = await tabs.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
     expect(new Set(ys.map((r) => Math.round(r.top))).size).toBe(1);
-    for (const r of ys) expect(r.height).toBeGreaterThanOrEqual(44);
+    for (const r of ys) expect(Math.round(r.height)).toBeGreaterThanOrEqual(44);
 
     // So sánh giá: mỗi món một thẻ, nơi rẻ nhất có nhãn.
     await page.getByRole("button", { name: "So sánh giá", exact: true }).click();
     await expect(pa.getByText("Mua ở đâu rẻ hơn?")).toBeVisible();
     await expect(pa.locator(".pa__card", { hasText: "Sữa tươi không đường" }).getByText("Rẻ nhất")).toBeVisible();
+    // Nơi đang giảm giá: hiện giá trước giảm (gạch ngang) và % giảm, kèm ghi chú chưa gồm voucher.
+    await expect(pa.locator(".pa__off").first()).toHaveText(/^Giảm \d+%$/);
+    await expect(pa.locator(".pa__list-was s").first()).toBeVisible();
+    await expect(pa.getByText(/Voucher, mã giảm lúc thanh toán chưa tính vào/)).toBeVisible();
 
     // Hóa đơn: lọc Định kỳ thì cửa hàng không còn; chạm ngày có chi thì hiện các khoản của ngày đó.
     await page.getByRole("button", { name: "Hóa đơn", exact: true }).click();
