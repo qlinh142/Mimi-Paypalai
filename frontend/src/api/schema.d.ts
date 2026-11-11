@@ -3723,6 +3723,13 @@ export interface components {
             local?: number;
             /** @description Tiền gốc: VND, USD, SGD */
             currency?: string;
+            /** @description Giá gốc (giá gạch ngang) theo tiền gốc, chỉ khi đang giảm và ngoài Việt Nam */
+            list_local?: number;
+            /**
+             * Format: int64
+             * @description Giá gốc quy ra VND khi nơi bán đang giảm giá; không gồm voucher lúc thanh toán
+             */
+            list_vnd?: number;
             /** @description Quy cách nguồn ghi (1L */
             size?: string;
             /** @description gemini_search hoặc partner_... */
