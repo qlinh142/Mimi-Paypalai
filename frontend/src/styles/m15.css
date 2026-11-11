@@ -25,6 +25,9 @@
 .h15::before { width: 260px; height: 260px; right: -90px; top: -70px; background: #e3ebff; }
 .h15::after { width: 220px; height: 220px; left: -120px; bottom: 40px; background: #e8f0ff; }
 .h15 > * { position: relative; z-index: 1; }
+/* Màn cao hơn điện thoại (cửa sổ máy tính, iPad, khung xem bản thử): nút Quét đi ngay sau các thẻ,
+   không bị đẩy xuống đáy để lại khoảng trống lớn (góp ý 11/11). Điện thoại ≤ 932pt giữ nút ở đáy. */
+@media (min-height: 960px) { .h15__scan { margin-top: var(--s8, 32px) !important; } }
 .h15__top { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; }
 .h15__brand { display: inline-flex; justify-content: center; align-items: center; gap: 6px; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
 .h15__brand svg:first-of-type { align-self: center; }

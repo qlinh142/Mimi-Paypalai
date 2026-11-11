@@ -29,6 +29,8 @@ export type ChatChart = {
   labels: string[];
   series: { name: string; values: number[] }[];
   unit: "vnd" | "days";
+  /** Chủ đề của mimi_chart (để câu trả lời mẫu nói đúng ý); biểu đồ không dùng. */
+  topic?: string;
 };
 
 // AG Charts 14 chỉ nạp phần được đăng ký: thanh, đường, hai trục và chú thích là đủ cho khung chat.
@@ -93,7 +95,7 @@ export function chartFor(name: string, response: string): ChatChart | null {
 
 // ---------------- Tool mimi_chart: các biểu đồ còn lại của bảng ----------------
 
-export const CHART_TOPICS = ["spending_by_month", "spending_by_store", "top_items", "price_compare"] as const;
+export const CHART_TOPICS = ["spending_by_month", "spending_by_store", "top_items", "price_compare", "avg_bill", "spending_by_day", "upcoming_bills"] as const;
 export type ChartTopic = (typeof CHART_TOPICS)[number];
 
 const sumBy = <T,>(rows: T[], key: (r: T) => string, value: (r: T) => number) => {
@@ -109,15 +111,37 @@ export function buildChart(rows: AnalyticsRows, topic: ChartTopic, month?: strin
   const ids = new Set(receipts.map((r) => r.id));
   if (topic === "spending_by_month") {
     const m = sumBy(rows.receipts, (r) => r.month, (r) => r.total).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-    return { title: t.byMonth, kind: "column", labels: m.map(([k]) => k), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
+    return { topic, title: t.byMonth, kind: "column", labels: m.map(([k]) => k), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
   }
   if (topic === "spending_by_store") {
     const m = sumBy(receipts, (r) => r.store, (r) => r.total).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    return { title: t.byStore(month), kind: "bar", labels: m.map(([k]) => k), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
+    return { topic, title: t.byStore(month), kind: "bar", labels: m.map(([k]) => k), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
   }
   if (topic === "top_items") {
     const m = sumBy(rows.lines.filter((l) => ids.has(l.receiptId)), (l) => l.name, (l) => l.amount ?? 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    return { title: t.topItems(month), kind: "bar", labels: m.map(([k]) => k), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
+    return { topic, title: t.topItems(month), kind: "bar", labels: m.map(([k]) => k), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
+  }
+  if (topic === "avg_bill") {
+    const by = new Map<string, { t: number; n: number }>();
+    for (const r of rows.receipts) {
+      const e = by.get(r.month) ?? { t: 0, n: 0 };
+      e.t += r.total;
+      e.n += 1;
+      by.set(r.month, e);
+    }
+    const m = [...by.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+    return { topic, title: t.avgBill, kind: "column", labels: m.map(([k]) => k), series: [{ name: t.avgBill, values: m.map(([, v]) => Math.round(v.t / v.n)) }], unit: "vnd" };
+  }
+  if (topic === "spending_by_day") {
+    const mm = month ?? new Date().toISOString().slice(0, 7);
+    const m = sumBy(rows.receipts.filter((r) => r.month === mm), (r) => r.date, (r) => r.total).sort(([a], [b]) => a.localeCompare(b));
+    return { topic, title: t.byDay(mm), kind: "column", labels: m.map(([k]) => `${k.slice(8)}/${k.slice(5, 7)}`), series: [{ name: t.spent, values: m.map(([, v]) => Math.round(v)) }], unit: "vnd" };
+  }
+  if (topic === "upcoming_bills") {
+    // Cùng cửa sổ 7 ngày với tab Sắp chi (kể cả kỳ quá hạn).
+    const until = new Date(Date.now() + 7 * 86_400_000 + 7 * 3_600_000).toISOString().slice(0, 10);
+    const b = rows.upcoming.filter((x) => x.due <= until);
+    return { topic, title: t.upcoming, kind: "bar", labels: b.map((x) => `${x.name} · ${x.due.slice(8)}/${x.due.slice(5, 7)}`), series: [{ name: at.cal.amount, values: b.map((x) => Math.round(x.amount)) }], unit: "vnd" };
   }
   // price_compare: mỗi món, giá nhà mình đã mua so với giá online rẻ nhất.
   const best = new Map<string, { name: string; online: number; own: number }>();
@@ -128,6 +152,7 @@ export function buildChart(rows: AnalyticsRows, topic: ChartTopic, month?: strin
   }
   const items = [...best.values()].sort((a, b) => b.own - b.online - (a.own - a.online)).slice(0, 8);
   return {
+    topic,
     title: t.priceCompare,
     kind: "bar",
     labels: items.map((i) => i.name),

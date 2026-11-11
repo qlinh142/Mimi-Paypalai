@@ -52,42 +52,69 @@ test("Phân tích chi tiêu: bảng, widget Mimi, Hỏi Mimi", async ({ page }) 
 });
 
 test.describe("trên điện thoại", () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  test.use({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
 
-  test("Phân tích chi tiêu: thẻ hai cột, không cuộn ngang, Hỏi Mimi chiếm cả màn", async ({ page }) => {
+  // Anh chốt 10/11: bản điện thoại là một cột thẻ như Sổ chi tiêu, số khớp Sổ chi tiêu, không có lưới AG Studio.
+  test("Phân tích chi tiêu: một cột, số khớp Sổ chi tiêu, không tràn ngang, Hỏi Mimi chiếm cả màn", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await signIn(page);
-    await page.goto("/spending/analytics");
-    await expect(page.locator(".radar")).toBeVisible({ timeout: 20_000 });
+    const vnd = (s: string) => Number(s.replace(/[^\d]/g, ""));
 
-    // Câu gợi ý: bấm "Mua ở đâu rẻ hơn?" là sang trang So sánh giá.
-    await page.getByRole("button", { name: "Mua ở đâu rẻ hơn?" }).click();
-    await expect(page.getByText("Giá đang bán của từng món, rẻ nhất trước")).toBeVisible();
-    // Lịch chi tiêu: chạm vào ngày có chi thì hiện các khoản của ngày đó.
-    await page.getByRole("button", { name: "Lịch chi tiêu theo ngày" }).click();
+    // Số của Sổ chi tiêu: đã chi tháng này và Sắp chi 7 ngày tới.
+    await page.goto("/spending?ui=vi&uiv2=1");
+    await expect(page.locator(".hero22 .hero15__num")).toContainText("đ");
+    const spent = vnd(await page.locator(".hero22 .hero15__num").innerText());
+    await page.getByRole("button", { name: "Sắp chi", exact: true }).click();
+    await expect(page.locator(".fc15__line").first()).toBeVisible();
+    await page.waitForTimeout(800);
+    const upcoming = vnd(await page.locator(".fc15 .hero15__num").innerText());
+
+    await page.goto("/spending/analytics?ui=vi&uiv2=1");
+    const pa = page.locator(".pa");
+    await expect(pa.getByText("Sắp chi 7 ngày tới")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".ag-studio-layout-widget")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Chỉnh bảng" })).toHaveCount(0);
+    expect(vnd(await pa.locator(".pa__hero .hero15__num").innerText())).toBe(spent);
+    await expect.poll(async () => vnd(await pa.locator(".pa__big").first().innerText())).toBe(upcoming);
+
+    // Món tốn tiền nhất không có khoản định kỳ; các thẻ nằm gọn trong màn.
+    await expect(pa.locator("#pa-top + p + ol")).not.toContainText("Tiền điện");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(393);
+    for (const box of await pa.locator(".pa__card").all()) {
+      const b = await box.boundingBox();
+      expect(b && b.x + b.width).toBeLessThanOrEqual(393);
+    }
+
+    // Ba nút trang nằm trên một hàng, cao ít nhất 44px.
+    const tabs = pa.locator(".seg15 button");
+    const ys = await tabs.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+    expect(new Set(ys.map((r) => Math.round(r.top))).size).toBe(1);
+    for (const r of ys) expect(Math.round(r.height)).toBeGreaterThanOrEqual(44);
+
+    // So sánh giá: mỗi món một thẻ, nơi rẻ nhất có nhãn.
+    await page.getByRole("button", { name: "So sánh giá", exact: true }).click();
+    await expect(pa.getByText("Mua ở đâu rẻ hơn?")).toBeVisible();
+    await expect(pa.locator(".pa__card", { hasText: "Sữa tươi không đường" }).getByText("Rẻ nhất")).toBeVisible();
+    // Nơi đang giảm giá: hiện giá trước giảm (gạch ngang) và % giảm, kèm ghi chú chưa gồm voucher.
+    await expect(pa.locator(".pa__off").first()).toHaveText(/^Giảm \d+%$/);
+    await expect(pa.locator(".pa__list-was s").first()).toBeVisible();
+    await expect(pa.getByText(/Voucher, mã giảm lúc thanh toán chưa tính vào/)).toBeVisible();
+
+    // Hóa đơn: lọc Định kỳ thì cửa hàng không còn; chạm ngày có chi thì hiện các khoản của ngày đó.
+    await page.getByRole("button", { name: "Hóa đơn", exact: true }).click();
     await page.locator(".cal__cell:has(.cal__amt)").first().click();
     await expect(page.locator(".cal__list li").first()).toBeVisible();
-    await page.getByRole("button", { name: "Tổng quan" }).click();
+    await expect(pa.locator(".ph15__list li").first()).toBeVisible();
 
-    // Thẻ hai cột: chạm thẻ "Sắp phải trả" thì mở trang chi tiết, qua thẻ sau được, Esc để đóng.
-    await page.locator(".ag-studio-layout-widget", { hasText: "Sắp phải trả" }).click({ position: { x: 40, y: 40 } });
-    const sheet = page.getByRole("dialog", { name: "Sắp phải trả" });
-    await expect(sheet.getByText("Đây là gì?")).toBeVisible();
-    await sheet.getByRole("button", { name: "Thẻ sau" }).click();
-    await expect(page.getByRole("dialog", { name: "Sắp hết" })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-
-    // Widget nằm gọn trong bề ngang màn hình.
-    const box = await page.locator(".radar").boundingBox();
-    expect(box && box.x + box.width).toBeLessThanOrEqual(390);
-
+    // Hỏi Mimi: khung chat chiếm cả màn, Xong thì về màn một cột.
     await page.getByRole("button", { name: "Hỏi Mimi", exact: true }).click();
     await page.getByText("Tuần này cần mua gì?").click();
     await expect(page.getByText("Các món sắp hết trong 7 ngày:")).toBeVisible({ timeout: 20_000 });
     const chat = await page.getByText("Các món sắp hết trong 7 ngày:").boundingBox();
-    expect(chat && chat.x + chat.width).toBeLessThanOrEqual(390);
+    expect(chat && chat.x + chat.width).toBeLessThanOrEqual(393);
+    await page.getByRole("button", { name: "Xong", exact: true }).click();
+    await expect(pa.getByText("Sắp chi 7 ngày tới")).toBeVisible();
 
     expect(errors).toEqual([]);
   });

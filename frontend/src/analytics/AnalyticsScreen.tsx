@@ -5,6 +5,7 @@
  * Bảng người dùng tự chỉnh được nhớ trên máy (localStorage), nút "Về bảng gốc" xóa bản đã nhớ.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Pencil, RotateCcw, Check, Sparkles } from "lucide-react";
 import { AgStudioAiModule, type AgReportState, type AgStudioApi, type AgStudioMode } from "ag-studio";
@@ -16,6 +17,7 @@ import { buildAskMimi } from "./askMimi";
 import { CHART_TOOLS, chartFor, ToolChart, useAutoOpenCharts } from "./chatCharts";
 import { initialPhoneReport, initialReport, PAGE, pageTitles, PHONE_CARDS, PHONE_MAX_WIDTH } from "./report";
 import { CardDetail } from "./CardDetail";
+import { PhoneAnalytics } from "./PhoneAnalytics";
 import { mimiStudioTheme } from "./theme";
 import { mimiWidgets } from "./widgets";
 import { at } from "./text";
@@ -80,7 +82,11 @@ export function Analytics() {
         q.rows.receipts.length === 0 ? (
           <Shell><div className="ana__state"><p>{at.empty}</p><Link className="btn btn--primary" to="/scan">{at.scan}</Link></div></Shell>
         ) : (
-          <Dashboard key={phone ? "phone" : "desktop"} phone={phone} rows={q.rows} note={q.total > q.analysed ? at.partial(q.analysed, q.total) : undefined} />
+          phone ? (
+            <PhoneScreen rows={q.rows} note={q.total > q.analysed ? at.partial(q.analysed, q.total) : undefined} />
+          ) : (
+            <Dashboard key="desktop" phone={false} rows={q.rows} note={q.total > q.analysed ? at.partial(q.analysed, q.total) : undefined} />
+          )
         )
       ) : q.error && !q.isPending ? (
         <Shell><div className="ana__state"><p>{at.failed}</p><button className="btn btn--quiet" onClick={() => q.refetch()}>{at.retry}</button></div></Shell>
@@ -88,6 +94,20 @@ export function Analytics() {
         <Shell><div className="ana__state" role="status"><span className="ana__spinner" aria-hidden />{at.loading}</div></Shell>
       )}
     </div>
+  );
+}
+
+/**
+ * Điện thoại: màn một cột (PhoneAnalytics). "Hỏi Mimi" mở khung chat của AG Studio chiếm cả màn,
+ * nút Xong quay về màn một cột. Sổ chi tiêu mở kèm ?ask=… thì vào thẳng khung chat.
+ */
+function PhoneScreen({ rows, note }: { rows: AnalyticsRows; note?: string }) {
+  const [params] = useSearchParams();
+  const [asking, setAsking] = useState(() => !!params.get("ask"));
+  return asking ? (
+    <Dashboard key="phone" phone rows={rows} autoAsk onExit={() => setAsking(false)} />
+  ) : (
+    <PhoneAnalytics rows={rows} note={note} onAsk={() => setAsking(true)} />
   );
 }
 
@@ -105,7 +125,7 @@ function Shell({ children, bar }: { children: React.ReactNode; bar?: React.React
   );
 }
 
-function Dashboard({ rows, note, phone }: { rows: AnalyticsRows; note?: string; phone: boolean }) {
+function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows; note?: string; phone: boolean; autoAsk?: boolean; onExit?: () => void }) {
   const base = phone ? initialPhoneReport : initialReport;
   const apiRef = useRef<AgStudioApi | null>(null);
   const rowsRef = useRef(rows);
@@ -233,6 +253,79 @@ function Dashboard({ rows, note, phone }: { rows: AnalyticsRows; note?: string; 
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ask, ready]);
+  /** Gợi ý trên điện thoại: chạm là điền câu hỏi vào ô chat rồi gửi luôn. */
+  const askTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearInterval(askTimer.current), []);
+  const sendAsk = (text: string) => {
+    const root = studioRef.current;
+    if (!root) return;
+    // Chạm gợi ý khác khi câu trước chưa gửi xong thì bỏ câu trước, không để hai câu giành ô nhập.
+    window.clearInterval(askTimer.current);
+    // Đã gửi = trong khung chat có thêm một tin đúng câu hỏi này.
+    const sent = () => [...root.querySelectorAll("p")].filter((p) => p.textContent === text).length;
+    const before = sent();
+    // Mimi còn đang trả lời câu trước thì Studio chưa nhận (và xóa ô nhập khi trả lời xong): cứ điền
+    // lại rồi Enter như khi gõ, tới khi câu hỏi hiện trong khung chat, tối đa 30 giây.
+    let tries = 0;
+    const attempt = () => {
+      if (sent() > before || ++tries > 75) return window.clearInterval(timer);
+      const box = root.querySelector<HTMLTextAreaElement>("textarea");
+      if (!box) return;
+      if (box.value !== text) {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, text);
+        // Không focus ô nhập: trên iPhone focus làm bật bàn phím và phóng to màn (góp ý 10/11).
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+        return; // để React nhận giá trị mới rồi lần sau mới Enter
+      }
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    };
+    const timer = window.setInterval(attempt, 250);
+    askTimer.current = timer;
+    attempt();
+  };
+  /**
+   * Anh chốt 10/11: chạm một câu gợi ý thì Mimi trả lời, ngay dưới câu trả lời vẫn hiện các câu
+   * chưa hỏi để chạm tiếp. Khung chat là của Studio nên gắn danh sách vào cuối vùng cuộn của nó
+   * (portal); câu đã hỏi nhận ra nhờ có trong khung chat. Chat còn trống thì Studio tự hiện đủ gợi ý.
+   */
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [moreHost, setMoreHost] = useState<HTMLElement | null>(null);
+  const [askedKey, setAskedKey] = useState("");
+  useEffect(() => {
+    const root = studioRef.current;
+    if (!root || mode !== "edit") return;
+    const host = (hostRef.current ??= Object.assign(document.createElement("div"), { className: "ana__morehost" }));
+    const sync = () => {
+      const scroll = root.querySelector<HTMLElement>(".ag-studio-ai-scroll-content");
+      const msgs = scroll?.querySelector<HTMLElement>(".ag-studio-ai-message-container");
+      const text = msgs?.textContent ?? "";
+      if (!scroll || !text.trim()) {
+        setMoreHost(null);
+        return;
+      }
+      // Đặt ngay sau các tin nhắn, trước mốc cuộn của Studio: Studio tự cuộn tới mốc đó khi có tin
+      // mới nên danh sách gợi ý luôn hiện ngay dưới câu trả lời.
+      if (host.previousElementSibling !== msgs) msgs!.after(host);
+      setMoreHost(host);
+      const key = at.ai.starters.map((st) => (text.includes(st.prompt) ? "1" : "0")).join("");
+      setAskedKey(key);
+    };
+    // Studio tự cuộn câu hỏi mới lên đầu khung chat; danh sách gợi ý nằm ngay dưới câu trả lời.
+    const mo = new MutationObserver(() => window.requestAnimationFrame(sync));
+    mo.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+    sync();
+    return () => {
+      mo.disconnect();
+      host.remove();
+      setMoreHost(null);
+    };
+  }, [mode]);
+  const remaining = at.ai.starters.filter((_, i) => askedKey[i] !== "1");
+  // Điện thoại: vào thẳng khung Hỏi Mimi (câu hỏi ?ask=… đã có effect riêng ở trên).
+  useEffect(() => {
+    if (autoAsk && ready && !ask) askMimi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAsk, ready]);
   const reset = () => {
     save(phone, null);
     const api = apiRef.current;
@@ -243,7 +336,9 @@ function Dashboard({ rows, note, phone }: { rows: AnalyticsRows; note?: string; 
     setAsking(false);
   };
 
-  const bar = (
+  const bar = onExit ? (
+    <button type="button" className="btn btn--primary ana__btn ana__btn--done" onClick={onExit}><Check size={18} aria-hidden /> <span>{at.ph.closeAsk}</span></button>
+  ) : (
     <>
       <button type="button" className="btn btn--outline ana__btn" onClick={askMimi} aria-label={at.ai.agent}><Sparkles size={18} aria-hidden /> <span>{at.ai.agent}</span></button>
       <button type="button" className="btn btn--quiet ana__btn" onClick={reset} aria-label={at.reset}><RotateCcw size={18} aria-hidden /> <span>{at.reset}</span></button>
@@ -258,12 +353,22 @@ function Dashboard({ rows, note, phone }: { rows: AnalyticsRows; note?: string; 
 
   return (
     <Shell bar={bar}>
-      <nav className="ana__tabs" aria-label={at.title}>
+      {!onExit && <nav className="ana__tabs" aria-label={at.title}>
         {pages.map((id) => (
           <button key={id} type="button" aria-pressed={id === pageId} onClick={() => go(id)}>{pageTitles[id] ?? id}</button>
         ))}
         {note && <span className="ana__note">{note}</span>}
-      </nav>
+      </nav>}
+      {moreHost && remaining.length > 0 &&
+        createPortal(
+          <nav className="ana__more" aria-label={at.ph.more}>
+            <p>{at.ph.more}</p>
+            {remaining.map((st) => (
+              <button key={st.label} type="button" onClick={() => sendAsk(st.prompt)}>{st.label}</button>
+            ))}
+          </nav>,
+          moreHost,
+        )}
       {detail != null && cardIds[detail] && (
         <CardDetail rows={rows} ids={cardIds} index={detail} onMove={setDetail} onClose={() => setDetail(null)} />
       )}

@@ -18,6 +18,8 @@ export const DETAIL_LIMIT = 60;
 
 export type ReceiptRow = {
   id: string; store: string; date: string; month: string; kind: string; buyer: string;
+  /** Loại hóa đơn dạng mã (own | delegated | recurring), để tách khoản định kỳ khỏi cửa hàng. */
+  kindKey: "own" | "delegated" | "recurring";
   total: number; discount: number; itemCount: number;
   /** Bằng total nếu hóa đơn thuộc tháng hiện tại, ngược lại 0 (thẻ "Tháng này" trên điện thoại). */
   thisMonth: number;
@@ -36,6 +38,8 @@ export type PriceRow = {
   /** 1 ở dòng rẻ nhất của món khi giá đó rẻ hơn giá nhà mình: cộng lại ra số món có giá rẻ hơn. */
   cheaperItem: number;
   currency: string; local: number | null; size: string; on: string; url: string;
+  /** Giá gốc (giá gạch ngang) khi nơi bán đang giảm; null khi không giảm. Không gồm voucher. */
+  listPrice: number | null; offPct: number;
 };
 /** Khoản định kỳ (điện, nước, internet…) sắp đến hạn, từ màn Hóa đơn định kỳ. */
 export type UpcomingRow = { id: string; name: string; due: string; amount: number; category: string };
@@ -57,6 +61,7 @@ function receiptRow(h: HistoryReceipt, d: ReceiptDetail | undefined): ReceiptRow
     date: day,
     month: day.slice(0, 7),
     kind: at.kinds[h.kind ?? "own"],
+    kindKey: h.kind ?? "own",
     buyer: h.buyer_name ?? "",
     total: h.total_vnd,
     thisMonth: day.slice(0, 7) === currentMonth() ? h.total_vnd : 0,
@@ -132,6 +137,8 @@ export function priceRows(mp: MarketPrices | undefined, cart: Cart | undefined):
       cheaperItem: ownPrice != null && n === firstMin && p.price_vnd < ownPrice ? 1 : 0,
       currency: p.currency ?? "VND",
       local: p.local ?? null,
+      listPrice: p.list_vnd && p.list_vnd > p.price_vnd ? p.list_vnd : null,
+      offPct: p.list_vnd && p.list_vnd > p.price_vnd ? Math.round((1 - p.price_vnd / p.list_vnd) * 100) : 0,
       size: p.size ?? "",
       on: p.on,
       url: p.url ?? "",
@@ -292,7 +299,8 @@ export function studioData(rows: AnalyticsRows): AgDataSourcesDefinition {
         name: at.tables.prices,
         description:
           "Prices currently on sale at each store for the items in the shopping plan, next to the unit price the family last paid. " +
-          "Cheaper by is how much less the online price is than our price (0 when it is not cheaper). Cheapest marks the lowest price for that item.",
+          "Cheaper by is how much less the online price is than our price (0 when it is not cheaper). Cheapest marks the lowest price for that item. " +
+          "List price is the shop's own pre-sale (struck-through) price when the item is on sale, empty otherwise; Off % is the discount from it. Vouchers are not included.",
         data: rows.prices,
         fields: fields([
           ["id", f.priceId, "textFormat", true],
@@ -301,6 +309,8 @@ export function studioData(rows: AnalyticsRows): AgDataSourcesDefinition {
           ["store", f.store, "textFormat"],
           ["source", f.source, "textFormat"],
           ["onlinePrice", f.onlinePrice, "currencyFormat"],
+          ["listPrice", f.listPrice, "currencyFormat"],
+          ["offPct", f.offPct, "integerFormat"],
           ["ownPrice", f.ownPrice, "currencyFormat"],
           ["ownStore", f.ownStore, "textFormat"],
           ["saving", f.saving, "currencyFormat"],

@@ -391,3 +391,26 @@ func TestLookupBatchMergesAdditiveSource(t *testing.T) {
 		t.Fatal("want error when primary fails and additive finds nothing")
 	}
 }
+
+func TestNormalizeKeepsListPriceOnlyWhenHigher(t *testing.T) {
+	ps := []Price{
+		{Store: "FairPrice", Local: 4.5, ListLocal: 6},
+		{Store: "Cold Storage", Local: 5, ListLocal: 4}, // giá gốc thấp hơn giá bán: bỏ
+		{Store: "Giant", Local: 5.2, ListLocal: 90},     // gấp hơn 5 lần: vô lý, bỏ
+	}
+	got, err := Normalize(context.Background(), ps, Countries["SG"], fakeFX{"SGD": 20_000}, "partner_channel3", "2026-11-11")
+	if err != nil || len(got) != 3 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	list := map[string]int64{}
+	for _, p := range got {
+		list[p.Store] = p.ListVND
+	}
+	if list["FairPrice"] != 120_000 || list["Cold Storage"] != 0 || list["Giant"] != 0 {
+		t.Fatalf("%+v", list)
+	}
+	vn, _ := Normalize(context.Background(), []Price{{Store: "WinMart", PriceVND: 32_000, ListLocal: 38_000}}, Countries["VN"], nil, "gemini_search", "2026-11-11")
+	if len(vn) != 1 || vn[0].ListVND != 38_000 || vn[0].ListLocal != 0 {
+		t.Fatalf("%+v", vn)
+	}
+}

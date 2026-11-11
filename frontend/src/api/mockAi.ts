@@ -63,11 +63,51 @@ function answer(name: string, r: Json): string {
   }
   if (name === "mimi_chart") {
     const labels = (r.labels as string[]) ?? [];
-    const first = (r.series as { values: number[] }[] | undefined)?.[0]?.values ?? [];
-    if (!labels.length) return vi ? "Chưa có số liệu để vẽ, mẹ quét thêm hóa đơn nhé." : "Nothing to chart yet. Scan a few more receipts.";
+    const vals = (r.series as { values: number[] }[] | undefined)?.[0]?.values ?? [];
+    const own = (r.series as { values: number[] }[] | undefined)?.[1]?.values ?? [];
+    const topic = String(r.topic ?? "");
+    if (!labels.length) {
+      if (topic === "upcoming_bills") return vi ? "7 ngày tới chưa có khoản định kỳ nào đến hạn." : "No recurring bills are due in the next 7 days.";
+      return vi ? "Chưa có số liệu để vẽ, mẹ quét thêm hóa đơn nhé." : "Nothing to chart yet. Scan a few more receipts.";
+    }
+    const total = vals.reduce((a, x) => a + x, 0);
+    const maxI = vals.indexOf(Math.max(...vals));
+    if (topic === "spending_by_month") {
+      const last = vals.at(-1) ?? 0;
+      const prev = vals.at(-2) ?? 0;
+      return vi
+        ? `Mimi vẽ chi tiêu ${labels.length} tháng gần đây ở trên. Tháng cao nhất là **${labels[maxI]}** (${vnd(vals[maxI])}). Tháng này ${vnd(last)}${prev ? `, tháng trước ${vnd(prev)}` : ""}.`
+        : `Here are the last ${labels.length} months. The highest was **${labels[maxI]}** (${vnd(vals[maxI])}). This month: ${vnd(last)}${prev ? `, last month: ${vnd(prev)}` : ""}.`;
+    }
+    if (topic === "avg_bill") {
+      return vi
+        ? `Tháng này trung bình mỗi hóa đơn ${vnd(vals.at(-1))}. Cao nhất là tháng **${labels[maxI]}** với ${vnd(vals[maxI])} mỗi hóa đơn.`
+        : `This month the average receipt is ${vnd(vals.at(-1))}. The highest was **${labels[maxI]}** at ${vnd(vals[maxI])}.`;
+    }
+    if (topic === "spending_by_day") {
+      return vi
+        ? `Tháng này nhà mình chi vào ${labels.length} ngày, tổng ${vnd(total)}. Ngày chi nhiều nhất là **${labels[maxI]}**: ${vnd(vals[maxI])}.`
+        : `This month there was spending on ${labels.length} days, ${vnd(total)} in total. The biggest day was **${labels[maxI]}**: ${vnd(vals[maxI])}.`;
+    }
+    if (topic === "upcoming_bills") {
+      return vi
+        ? `7 ngày tới có ${labels.length} khoản định kỳ đến hạn, tổng ${vnd(total)}. Sớm nhất là **${labels[0]}** (${vnd(vals[0])}).`
+        : `${labels.length} recurring bills are due in the next 7 days, ${vnd(total)} in total. First up: **${labels[0]}** (${vnd(vals[0])}).`;
+    }
+    if (topic === "price_compare") {
+      const gaps = labels.map((l, i) => ({ l, d: (vals[i] ?? 0) - (own[i] ?? 0) })).sort((a, b) => b.d - a.d);
+      const g = gaps[0];
+      return vi
+        ? g && g.d > 0
+          ? `Mimi so giá ${labels.length} món ở trên. **${g.l}** đang rẻ hơn ${vnd(g.d)} nếu mua online ở nơi rẻ nhất.`
+          : `Mimi so giá ${labels.length} món ở trên. Nhà mình đang mua rẻ bằng hoặc hơn giá online rồi.`
+        : g && g.d > 0
+          ? `Compared ${labels.length} items above. **${g.l}** is ${vnd(g.d)} cheaper at the cheapest online store.`
+          : `Compared ${labels.length} items above. We already pay the online price or less.`;
+    }
     return vi
-      ? `Mimi vẽ biểu đồ **${r.title}** ở trên rồi. Đứng đầu là **${labels[0]}**${first[0] != null ? ` với ${vnd(first[0])}` : ""}.`
-      : `Here is **${r.title}** above. **${labels[0]}** leads${first[0] != null ? ` at ${vnd(first[0])}` : ""}.`;
+      ? `Mimi vẽ biểu đồ **${r.title}** ở trên rồi. Đứng đầu là **${labels[0]}**${vals[0] != null ? ` với ${vnd(vals[0])}` : ""}.`
+      : `Here is **${r.title}** above. **${labels[0]}** leads${vals[0] != null ? ` at ${vnd(vals[0])}` : ""}.`;
   }
   return vi ? "Mimi đã làm xong." : "Done.";
 }
@@ -83,19 +123,26 @@ export function mockAiTurn(body: Body): Json {
   if (!tools.has("mimi_spending_summary")) {
     return { id, model: "mock", parts: [{ text: vi ? "Bản thử chưa nối Gemini nên agent này chỉ trả lời mẫu." : "This demo has no Gemini connection, so this agent only gives a sample answer." }] };
   }
-  if (/(them|add|widget)/.test(q)) {
-    return { id, model: "mock", parts: [{ text: vi ? "Bản thử chưa nối Gemini nên Mimi chưa sửa bảng được. Mẹ bấm **Chỉnh bảng** rồi kéo trường Cửa hàng vào trang nhé." : "Without Gemini this demo can't edit the dashboard yet. Tap **Edit dashboard** and drag the Store field onto the page." }] };
+  // Chỉ coi là "sửa bảng" khi hỏi thêm/sửa biểu đồ, widget; "tiết kiệm thêm" không phải.
+  if (/(them (bieu do|widget|bang)|add (a )?(chart|widget)|widget)/.test(q)) {
+    return { id, model: "mock", parts: [{ text: vi ? "Bản thử chưa nối Gemini nên Mimi chưa vẽ thêm vào bảng được. Mẹ chọn một câu gợi ý ở trên, Mimi trả lời kèm biểu đồ nhé." : "Without Gemini this demo can't add to the dashboard yet. Pick one of the suggestions above and Mimi will answer with a chart." }] };
   }
   const month = new Date().toISOString().slice(0, 7);
   const chart = /(cua hang|store|shop)/.test(q)
     ? { topic: "spending_by_store", month }
-    : /(theo thang|by month|month by month|xu huong|trend)/.test(q)
+    : /(theo thang|6 thang|by month|month by month|xu huong|trend|6 months)/.test(q)
       ? { topic: "spending_by_month", month: "" }
-      : /(gia online|online price|so sanh gia|price)/.test(q)
-        ? { topic: "price_compare", month: "" }
-        : /(mon nao chi|top item|mua nhieu)/.test(q)
-          ? { topic: "top_items", month }
-          : null;
+      : /(trung binh|average)/.test(q)
+        ? { topic: "avg_bill", month: "" }
+        : /(ngay nao|by day|which day|spending day)/.test(q)
+          ? { topic: "spending_by_day", month }
+          : /(dinh ky|phai tra|bills? due|recurring)/.test(q)
+            ? { topic: "upcoming_bills", month: "" }
+            : /(gia online|online price|so sanh gia|re hon|cheapest online|where is it cheaper)/.test(q) && !/(tiet kiem|saved)/.test(q)
+              ? { topic: "price_compare", month: "" }
+              : /(top item|mua nhieu|ton tien|cost us the most|most expensive)/.test(q)
+                ? { topic: "top_items", month }
+                : null;
   if (chart && tools.has("mimi_chart")) return { id, model: "mock", parts: [{ functionCall: { id: `${id}_call`, name: "mimi_chart", args: chart } }] };
   const call = /(het|run out|running|need|can mua|tuan nay|this week)/.test(q)
     ? { name: "mimi_running_out", args: { days: 7 } }

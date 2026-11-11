@@ -473,7 +473,7 @@ export type ItemPriceHistory = {
 };
 /** ADR-004: giá đang bán từ bảng giá chung (chỉ nguồn công khai). */
 /** local, currency: số tiền gốc nơi bán ghi, chỉ có ngoài Việt Nam (ví dụ 4.5 USD). */
-export type MarketPrice = { store: string; price_vnd: number; local?: number; currency?: string; size?: string; source: string; url?: string; on: string };
+export type MarketPrice = { store: string; price_vnd: number; local?: number; list_local?: number; list_vnd?: number; currency?: string; size?: string; source: string; url?: string; on: string };
 /** Nút "Cập nhật giá": còn mấy lần hôm nay, lần bấm gần nhất. */
 export type MarketRefreshStatus = { daily: number; left: number; last_at?: string };
 /** Mimi 2.2: giá chung của một món trong Đồ dùng. updated_at null: Mimi chưa tra món này lần nào. */
