@@ -7,6 +7,7 @@ compares prices; pay online with PayPal and the order lands back in the family's
 - **Live demo:** https://mimi-1-5.web.app/ (sandbox mode, no real money)
 - **Version submitted:** 2.2
 - **License:** MIT (see [LICENSE](LICENSE))
+- **Team:** SMARTLIFE LAB
 
 ## How Mimi uses PayPal
 
@@ -115,3 +116,10 @@ cd frontend && npm run build && npm run test:e2e
 ```
 
 CI (`.github/workflows/ci.yml`) runs backend tests, Firestore emulator tests, the frontend build and a secret scan on every push and pull request.
+
+## Team
+
+**SMARTLIFE LAB**
+
+- **Lien Pham**: Founder, Product Lead
+- **Quang Linh**: Engineer and Video
