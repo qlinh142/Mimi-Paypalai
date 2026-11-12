@@ -9,6 +9,25 @@ compares prices; pay online with PayPal and the order lands back in the family's
 - **License:** MIT (see [LICENSE](LICENSE))
 - **Team:** SMARTLIFE LAB
 
+## Try it (for judges)
+
+Open https://mimi-1-5.web.app/ on a phone or in a narrow browser window. Everything runs in PayPal / Braintree **sandbox** mode, so no real money is ever moved.
+
+**Sign in:** enter any email you can open and tap "Continue with email", then open the sign-in link Mimi emails you. Or use "Sign in with Google".
+
+**Suggested 5-minute tour**
+
+1. **Scan a receipt:** tap SCAN RECEIPT and upload a photo of any grocery receipt. Gemini reads the store, date and every line; review and tap "Save receipt".
+2. **My Items:** see what is running low and how many days are left for each item.
+3. **Spending:** monthly total, spending by category and by store, and the "Upcoming" tab. Tap "Spending insights" for the AG Studio analytics and "Ask Mimi" to ask questions about your own spending.
+4. **Plans:** build a shopping list in 3 steps. Step 2 compares prices from past receipts, Gemini web search and Channel3 (set Settings > Language & region > Country to United States to see Channel3 prices).
+5. **Buy online with PayPal:** from a plan, choose "Buy online", approve the basket, then pay with the PayPal button (sandbox) or "Pay by card" (Braintree sandbox). The order appears under Plans > Order history and in Spending; partial refunds are available from the order screen.
+
+**Sandbox payment details**
+
+- PayPal sandbox buyer: provided in the submission form.
+- Braintree test card ("Pay by card"): card number `4111 1111 1111 1111`, expiry `12/30`, CVV `123`.
+
 ## How Mimi uses PayPal
 
 All payments run on the **PayPal developer platform in Sandbox mode**.
