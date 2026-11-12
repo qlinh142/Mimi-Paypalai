@@ -14,6 +14,7 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { addMonths, currentMonth, formatDayMonth, formatVnd } from "../lib/text";
 import { LoadState } from "../components/LoadState";
 import { s22 } from "../i18n/s22";
+import { safeReport } from "../insights/points";
 import { BudgetBar, BudgetInvite, BudgetSheet, CategoryDonut, Noticed, SafeToSpend, Sparkline, billsLeft, monthClock, safeToSpend, useBudget } from "../components/SpendingPlus";
 
 const ym = (s: string) => s.split("-").map(Number) as [number, number];
@@ -153,7 +154,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
         </div>
       </section>
 
-      {isCurrent && (safe ? <SafeToSpend free={safe.free} perDay={safe.perDay} daysLeft={clock.left} /> : <BudgetInvite onSet={() => setEditBudget(true)} />)}
+      {isCurrent && (safe ? <SafeToSpend free={safe.free} perDay={safe.perDay} daysLeft={clock.left} ana={() => safeReport(budget!, r, prevQ.data, billsLeft(rec.data?.items, clock.end).rows, clock.day, clock.days)} /> : <BudgetInvite onSet={() => setEditBudget(true)} />)}
       {isCurrent && <Noticed r={r} prev={prevQ.data} />}
       {editBudget && <BudgetSheet current={budget} onClose={() => setEditBudget(false)} />}
 

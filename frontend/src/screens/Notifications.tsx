@@ -1,7 +1,9 @@
 import { t } from "../i18n";
 import { Link } from "react-router-dom";
 import { CalendarClock, ChevronRight, Users } from "lucide-react";
-import { useMarkNotificationRead, useNotifications } from "../api/hooks";
+import { useMarkNotificationRead, useNotifications, useReceiptHistory } from "../api/hooks";
+import { Touch } from "../insights/Insight";
+import { weekInsight } from "../insights/points";
 import type { HouseEvent, Notification } from "../api/types";
 import { m15 } from "../i18n/m15";
 import { MainFrame, TopBar } from "../components/AppShell";
@@ -56,6 +58,8 @@ export function Notifications() {
     <MainFrame>
       <TopBar title={t.notifications.title} variant="sub" />
       <div className="page">
+        {/* Điểm chạm 18: đầu tuần, tóm tắt tuần trước (bản thử tính ở máy từ lịch sử hóa đơn). */}
+        <WeekSummary />
         {q.isPending && <p className="hint">{t.common.loading}</p>}
         {q.isError && !q.data && (
           <div className="empty">
@@ -95,4 +99,9 @@ export function Notifications() {
       </div>
     </MainFrame>
   );
+}
+
+function WeekSummary() {
+  const h = useReceiptHistory();
+  return <Touch t={weekInsight(h.data)} />;
 }

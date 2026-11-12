@@ -8,6 +8,8 @@ import { MainFrame } from "../components/AppShell";
 import { MimiMark } from "../components/MimiMark";
 import { formatVnd } from "../lib/text";
 import { loadErrorText } from "../components/LoadState";
+import { useBudget } from "../components/SpendingPlus";
+import { pt } from "../insights/ptext";
 
 /**
  * Home (Mimi 1.5, ảnh mẫu 1-home.png): logo giữa, chuông phải, lời chào, 4 ô màu có hình,
@@ -18,6 +20,10 @@ export function Home({ entering = false }: { entering?: boolean }) {
   const home = useHome();
   const h = home.data;
   const unread = h?.unread_notifications ?? 0;
+  // Điểm chạm 17: ô Sổ chi tiêu thêm một dòng ngắn khi đã dùng từ 80% ngân sách tháng.
+  const budget = useBudget();
+  const used = budget && h?.spent_this_month != null ? Math.floor((h.spent_this_month / budget) * 100) : null;
+  const warn = used == null || used < 80 ? null : used >= 100 ? pt.home.over : pt.home.used(used);
 
   const tiles = [
     {
@@ -69,7 +75,7 @@ export function Home({ entering = false }: { entering?: boolean }) {
               <Link to={to} className={`h15__tile h15__tile--${tone} tile`}>
                 <Art />
                 <span className="h15__title">{title}</span>
-                <span className="h15__meta">{meta}</span>
+                <span className="h15__meta">{meta}{to === "/spending" && warn && <span className="home22__warn">{warn}</span>}</span>
               </Link>
             </li>
           ))}

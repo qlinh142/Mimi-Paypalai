@@ -11,6 +11,8 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { recurringIcon } from "../components/RecurringList";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { LoadState } from "../components/LoadState";
+import { Touch } from "../insights/Insight";
+import { riseInsight } from "../insights/points";
 
 const CYCLES: RecurringCycle[] = ["monthly", "weekly", "quarterly", "yearly"];
 const todayIso = () => {
@@ -75,6 +77,8 @@ function Detail({ r }: { r?: Recurring }) {
           <h1 className="run15__title">{r?.name || m15.rec.add}</h1>
         </div>
 
+        {/* Điểm chạm 8: kỳ này cao hơn trung bình các kỳ trước từ 20%. */}
+        <Touch t={riseInsight(r)} />
         <section className="box15 rd15__form" aria-label={m15.recd.info}>
           <label className="field15">
             <span>{m1.recurring.name}</span>

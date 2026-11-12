@@ -14,6 +14,7 @@ import { ApiError, OfflineError, apiUploadReceipt } from "../api/client";
 import { compressReceiptImage, grabFrame } from "../lib/image";
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { MimiMark } from "../components/MimiMark";
+import { AfterSaveInsights, useScanSnapshot, type ScanSnap } from "../insights/touchpoints";
 import { type EditLine, ReceiptLines, parseAmount } from "../components/ReceiptLines";
 
 const MAX_PHOTOS = 10; // BUG-05 mục 6: tối đa 10 ảnh / hóa đơn, khớp giới hạn backend
@@ -470,6 +471,9 @@ function Confirm({ draft, onDone, onNext, onContinue }: {
   const [localError, setLocalError] = useState("");
   const edited = lines !== draft.lines;
   const kept = lines.filter((l) => !l.removed);
+  // Điểm chạm 13 và 14: chụp lại kế hoạch, giá lần trước, đã chi lúc bấm Lưu.
+  const snapshot = useScanSnapshot(carts, plans.map((p) => p.id));
+  const [snap, setSnap] = useState<ScanSnap | null>(null);
   const review = kept.filter((l) => l.needs_review && !l.discount).length;
   const noPrice = kept.filter((l) => !l.discount && l.amount.trim() === "").length;
   const sum = edited ? kept.reduce((a, l) => a + (l.amount_vnd ?? 0), 0) : draft.sum_vnd;
@@ -524,6 +528,10 @@ function Confirm({ draft, onDone, onNext, onContinue }: {
           : (alloc.get(l.line_id) ?? []).map((a) => ({ plan_id: a.planId, qty: a.qty })));
       }
     }
+    setSnap(snapshot(kept.filter((l) => !l.discount).map((l) => ({
+      name: l.name, amount: l.amount_vnd ?? 0, groupKey: l.group_key, cq: l.canonical_quantity, cu: l.canonical_unit,
+      plans: (linePlans.get(l.line_id) ?? []).map((x) => x.plan_id),
+    })), purchasedOn));
     save.mutate(toSaveRequest(draft, { purchasedOn, usePrediction, confirmDuplicate, planId: currentPlanId(), assignmentId, linePlans }, kept));
   };
 
@@ -544,6 +552,7 @@ function Confirm({ draft, onDone, onNext, onContinue }: {
             )}
             {!!save.data?.recurring_matched?.length && <p>{m1.scan.recurringMatched}</p>}
           </div>
+          {snap && !save.data?.replayed && <AfterSaveInsights snap={snap} planDone={save.data?.plan_done ?? []} />}
           <dl className="facts">
             <dt>{t.confirm.store}</dt>
             <dd>{draft.store || t.confirm.unknown}</dd>

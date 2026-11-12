@@ -1,5 +1,7 @@
 import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { PlanBudgetInsight } from "../insights/touchpoints";
+import { Touch } from "../insights/Insight";
+import { cmpInsight, pickedInsight, type PlanRow } from "../insights/points";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, CircleCheckBig, CirclePlus, Globe, House, Info, Plus, ReceiptText, Search, TrendingDown, TrendingUp, RefreshCw, Store, UserRound } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -351,6 +353,16 @@ export function PlanCompare() {
                 {refresh.isError ? errText(refresh.error) : refresh.data ? (refresh.data.looked > 0 ? m1.marketPrices.refreshed(refresh.data.looked, refresh.data.found) : m1.marketPrices.upToDate) : null}
                 {st && <> {m1.marketPrices.refreshHint(st.left, st.daily)}</>}
               </p>
+              {(() => {
+                // Điểm chạm 10 (món có giá rẻ nhất vẫn đắt hơn lần trước) và 11 (cả kế hoạch theo giá đã chọn).
+                const rows: PlanRow[] = cart.items.map((item) => {
+                  const opts = optionsOf(item, byKey.get(item.key) ?? []);
+                  const market = opts.filter((o) => !o.receipt);
+                  const cur = chosen(item, opts, picks);
+                  return { item, last: opts.find((o) => o.receipt)?.total ?? null, cheapest: market.length ? Math.min(...market.map((o) => o.total)) : null, picked: cur?.total ?? null, pickedStore: cur?.store };
+                });
+                return <Touch t={cmpInsight(rows)} />;
+              })()}
               {cart.items.map((item) => {
                 const opts = optionsOf(item, byKey.get(item.key) ?? []);
                 const cur = chosen(item, opts, picks);
@@ -396,6 +408,11 @@ export function PlanCompare() {
                   </section>
                 );
               })}
+              <Touch t={pickedInsight(cart.items.map((item) => {
+                const opts = optionsOf(item, byKey.get(item.key) ?? []);
+                const cur = chosen(item, opts, picks);
+                return { item, last: opts.find((o) => o.receipt)?.total ?? null, cheapest: null, picked: cur?.total ?? null, pickedStore: cur?.store };
+              }))} />
             </>
           )}
         </>
@@ -635,6 +652,8 @@ export function PlanConfirm() {
         );
         return (
           <>
+            {/* Điểm chạm 12: trước khi trả tiền hoặc lưu, nhắc ngân sách tháng theo đúng giá đã chọn. */}
+            <PlanBudgetInsight cart={cart} plan={[...online, ...store].reduce((a, r) => a + (r.o?.total ?? 0), 0)} />
             {online.length > 0 && store.length > 0 && <p className="sent15" role="status">{p22.splitNote}</p>}
             {online.length > 0 && group(p22.payOnline, p22.payOnlineSub, online)}
             {store.length > 0 && (

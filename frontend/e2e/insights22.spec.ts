@@ -23,12 +23,12 @@ test("Mimi nhận thấy: giá món tăng ở Chi tiết món, ngân sách ở K
 
   // Điểm 6: giá đang bán rẻ nhất vẫn cao hơn lần mua gần nhất từ 10%.
   await go(page, "/items/nuoc-rua-chen");
-  const card = page.locator(".ins22");
+  const card = page.locator('.ins22[data-insight^="pi:"]');
   await expect(card).toContainText("Giá Nước rửa chén đang cao hơn 12% so với lần mua gần nhất.");
   // Món không tăng giá: không có card.
   await go(page, "/items/sua-tuoi");
   await expect(page.getByRole("heading", { name: "So sánh giá" })).toBeVisible();
-  await expect(page.locator(".ins22")).toHaveCount(0);
+  await expect(page.locator('.ins22[data-insight^="pi:"]')).toHaveCount(0);
 
   await go(page, "/items/nuoc-rua-chen");
   await card.getByRole("button", { name: "Xem phân tích" }).click();
@@ -42,7 +42,9 @@ test("Mimi nhận thấy: giá món tăng ở Chi tiết món, ngân sách ở K
 
   // Ẩn rồi thì không hiện lại khi số liệu chưa đổi.
   await card.getByRole("button", { name: "Ẩn nhận xét" }).click();
-  await expect(page.locator(".ins22")).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  // Điểm 7 vẫn ở đó: mỗi card ẩn riêng.
+  await expect(page.locator('.ins22[data-insight^="fq:"]')).toContainText("3 tháng qua nhà mình mua Nước rửa chén 3 lần");
 
   // Điểm 9: ngân sách tháng còn lại sau kế hoạch; hạ ngân sách thì thành cảnh báo vượt.
   await go(page, "/plan");
@@ -58,5 +60,68 @@ test("Mimi nhận thấy: giá món tăng ở Chi tiết món, ngân sách ở K
   await expect(page.getByRole("dialog", { name: "Ngân sách tháng này" }).locator(".ag-studio-value-widget").first()).toContainText("2.500.000đ", { timeout: 30_000 });
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("Mimi nhận thấy: các điểm chạm ở Sổ chi tiêu, định kỳ, kế hoạch, đơn online, thông báo, quét hóa đơn", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 393, height: 852 });
+  await signIn(page);
+  const open = async (title: string) => {
+    const sheet = page.getByRole("dialog", { name: title });
+    await expect(sheet.locator(".ag-studio-layout")).toBeVisible({ timeout: 30_000 });
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+  };
+
+  // 1–4: mỗi thẻ Mimi nhận thấy ở Sổ chi tiêu có nút Phân tích mở bảng nhỏ; 5: Còn tiêu được.
+  await go(page, "/spending");
+  await expect(page.locator(".noticed22__card")).toHaveCount(4);
+  await expect(page.locator(".noticed22__card .ana22")).toHaveCount(4);
+  await page.locator(".noticed22__card").filter({ hasText: "Bách Hóa Xanh chiếm" }).getByRole("button", { name: "Phân tích" }).click();
+  await open("Chi ở Bách Hóa Xanh");
+  await page.locator(".safe22").getByRole("button", { name: "Phân tích" }).click();
+  await open("Còn tiêu được");
+  // 16: đặt ngân sách thấy trung bình 3 tháng.
+  await page.getByRole("button", { name: "Sửa ngân sách" }).click();
+  await expect(page.locator(".ins22")).toContainText("3 tháng qua nhà mình chi trung bình 1.070.000đ mỗi tháng.");
+  await page.keyboard.press("Escape");
+
+  // 8: Tiền điện kỳ này cao hơn trung bình.
+  await go(page, "/items/recurring/dien");
+  await expect(page.locator(".ins22")).toContainText("Tiền điện kỳ này cao hơn trung bình các kỳ trước 26%.");
+
+  // 10 và 11: so sánh giá; đổi sang giá đắt hơn thì card cả kế hoạch hiện.
+  await go(page, "/plan/default/compare");
+  await expect(page.locator('.ins22[data-insight^="cp:"]')).toContainText("Nước rửa chén: nơi bán rẻ nhất vẫn đắt hơn lần mua trước 12%.");
+  await page.locator(".cmpi22").nth(1).getByRole("radio").nth(1).click();
+  await expect(page.locator('.ins22[data-insight^="pk:"]')).toContainText("đắt hơn lần mua trước 3.700đ");
+  await page.locator(".cmpi22").nth(1).getByRole("radio").nth(0).click();
+  // 12: bước 3 nhắc ngân sách theo giá đã chọn.
+  await go(page, "/plan/default/confirm");
+  await expect(page.locator(".ins22")).toContainText("Sau kế hoạch này, tháng này còn");
+
+  // 15: đơn online đã hoàn tiền.
+  await go(page, "/orders/o-mau");
+  await expect(page.locator(".ins22")).toContainText("Đã hoàn 37.000đ, Sổ chi tiêu đã trừ.");
+  await page.locator(".ins22").getByRole("button", { name: "Xem phân tích" }).click();
+  await open("Tiền của đơn này");
+
+  // 18: tóm tắt tuần ở Thông báo.
+  await go(page, "/notifications");
+  await expect(page.locator(".ins22")).toContainText("Tuần trước nhà mình chi");
+
+  // 13 và 14: lưu hóa đơn xong thấy chuyến mua so với dự kiến và món đắt hơn lần trước.
+  await go(page, "/");
+  await page.getByText("QUÉT HÓA ĐƠN").click();
+  const shot = await page.screenshot({ type: "jpeg" });
+  await page.locator("input[type=file]").first().setInputFiles({ name: "bill.jpg", mimeType: "image/jpeg", buffer: shot });
+  await page.getByRole("button", { name: /^Xong 1 hóa đơn/ }).click();
+  await expect(page.getByText("Sữa tươi không đường 1L")).toBeVisible();
+  await expect(page.getByText("→ Giỏ mua sắm").first()).toBeVisible();
+  await page.getByRole("button", { name: "Lưu hóa đơn" }).click();
+  await expect(page.locator('.ins22[data-insight^="tp:"]')).toContainText("các món trong kế hoạch chi 142.000đ, dự kiến 107.000đ");
+  await expect(page.locator('.ins22[data-insight^="pr:"]')).toContainText("1 món đắt hơn lần mua trước");
   expect(errors).toEqual([]);
 });

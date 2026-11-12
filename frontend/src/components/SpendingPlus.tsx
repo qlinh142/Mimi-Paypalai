@@ -9,12 +9,16 @@ import { AlertTriangle, CalendarClock, ChevronRight, Pencil, PiggyBank, Repeat, 
 import { categoryLabel, t } from "../i18n";
 import { s22 } from "../i18n/s22";
 import { ApiError } from "../api/client";
-import { useForecast, useItems, useMe, useRecurring, useSaveSettings } from "../api/hooks";
+import { useForecast, useItems, useMe, useRecurring, useSaveSettings, useSpending } from "../api/hooks";
 import type { ReceiptSummary, Recurring, SpendingReport } from "../api/types";
 import { daysUntil, goodsTier } from "../lib/displayUnit";
-import { formatVnd } from "../lib/text";
+import { addMonths, currentMonth, formatVnd } from "../lib/text";
 import { Sheet } from "./Sheet15";
 import { PlanPicker } from "./PlanPicker";
+import { AnaButton, Touch } from "../insights/Insight";
+import { avgInsight, billReport, lowReport, storeReport, trendReport } from "../insights/points";
+import { pt } from "../insights/ptext";
+import type { ReportSpec } from "../insights/reports";
 
 export const REC = "hoa-don-dinh-ky";
 const MAX_BUDGET = 1_000_000_000;
@@ -85,6 +89,7 @@ export function BudgetSheet({ current, onClose }: { current: number | null; onCl
   };
   return (
     <Sheet title={s22.budget.sheet} sub={s22.budget.sheetSub} onClose={onClose}>
+      <BudgetAvg />
       <form className="bud22__form" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
         <label className="field15">
           <span>{s22.budget.amount}</span>
@@ -109,6 +114,17 @@ export function BudgetSheet({ current, onClose }: { current: number | null; onCl
   );
 }
 
+/** Điểm chạm 16: lúc đặt ngân sách, cho biết 3 tháng qua trung bình chi bao nhiêu. */
+function BudgetAvg() {
+  const cur = currentMonth();
+  const months = [1, 2, 3].map((n) => addMonths(cur, -n));
+  const a = useSpending(months[0]), b = useSpending(months[1]), c = useSpending(months[2]);
+  const rec = useRecurring();
+  // placeholderData giữ tháng cũ khi đổi khóa: chỉ nhận báo cáo đúng tháng.
+  const pick = (m: string, r?: SpendingReport) => (r && r.month === m ? r : undefined);
+  return <Touch t={avgInsight([{ month: months[0], r: pick(months[0], a.data) }, { month: months[1], r: pick(months[1], b.data) }, { month: months[2], r: pick(months[2], c.data) }], rec.data?.monthly_total)} />;
+}
+
 /** Lời mời đặt ngân sách khi chưa có (spec Redesign mục 7). */
 export function BudgetInvite({ onSet }: { onSet: () => void }) {
   return (
@@ -126,7 +142,7 @@ export function askPath(q: string) {
 }
 
 /** Thẻ Còn tiêu được gọn như Redesign: số mỗi ngày là số lớn, nút hỏi bên phải. */
-export function SafeToSpend({ free, perDay, daysLeft }: { free: number; perDay: number; daysLeft: number }) {
+export function SafeToSpend({ free, perDay, daysLeft, ana }: { free: number; perDay: number; daysLeft: number; ana?: () => ReportSpec }) {
   const over = free < 0;
   return (
     <section className={`box15 safe22${over ? " safe22--over" : ""}`} aria-labelledby="safe22">
@@ -143,11 +159,12 @@ export function SafeToSpend({ free, perDay, daysLeft }: { free: number; perDay: 
       {!over && (
         <Link className="pill22 safe22__ask" to={askPath(s22.safe.affordQ(formatVnd(free)))}>{s22.safe.afford}</Link>
       )}
+      {ana && <AnaButton build={ana} label={pt.ana} className="ana22 safe22__ana" />}
     </section>
   );
 }
 
-type Insight = { id: string; c: string; Icon: typeof Store; text: string; sub?: string; cta: string; to?: string; plan?: { key: string; name: string } };
+type Insight = { id: string; c: string; Icon: typeof Store; text: string; sub?: string; cta: string; to?: string; plan?: { key: string; name: string }; ana?: () => ReportSpec };
 
 /**
  * Mimi nhận thấy (spec Redesign 5.1, bốn loại), tính ở máy từ API sẵn có:
@@ -173,12 +190,12 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
     const low = (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").sort((a, b) => (a.days_left ?? -1) - (b.days_left ?? -1))[0];
     if (low) {
       const p = price.get(low.key);
-      out.push({ id: `low:${low.key}`, c: "var(--c-groc, #2f9e6e)", Icon: CalendarClock, text: s22.noticed.low(low.name, low.days_left), sub: p != null ? s22.noticed.lowSub(formatVnd(p)) : undefined, cta: s22.noticed.addToPlan, plan: { key: low.key, name: low.name } });
+      out.push({ id: `low:${low.key}`, c: "var(--c-groc, #2f9e6e)", Icon: CalendarClock, text: s22.noticed.low(low.name, low.days_left), sub: p != null ? s22.noticed.lowSub(formatVnd(p)) : undefined, cta: s22.noticed.addToPlan, plan: { key: low.key, name: low.name }, ana: () => lowReport(items.data ?? [], low) });
     }
     // 2. Khoản định kỳ đến hạn sớm nhất trong 7 ngày.
     const bill = (rec.data?.items ?? []).filter((x) => x.active && daysUntil(x.next_due_at) <= 7).sort((a, b) => a.next_due_at.localeCompare(b.next_due_at))[0];
     if (bill) {
-      out.push({ id: `bill:${bill.id}`, c: "var(--c-bill, #d4538a)", Icon: Repeat, text: s22.noticed.bill(bill.name, daysUntil(bill.next_due_at)), sub: formatVnd(bill.amount), cta: s22.noticed.seeUpcoming, to: "/spending?tab=upcoming" });
+      out.push({ id: `bill:${bill.id}`, c: "var(--c-bill, #d4538a)", Icon: Repeat, text: s22.noticed.bill(bill.name, daysUntil(bill.next_due_at)), sub: formatVnd(bill.amount), cta: s22.noticed.seeUpcoming, to: "/spending?tab=upcoming", ana: () => billReport(bill, fc.data) });
     }
     // 3. Cửa hàng chiếm phần lớn nhất (khi có từ 2 cửa hàng).
     const byStore = new Map<string, { total: number; last: string; id: string }>();
@@ -192,7 +209,7 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
     const top = [...byStore.entries()].sort((a, b) => b[1].total - a[1].total)[0];
     if (top && byStore.size > 1 && r.spent > 0) {
       const pct = Math.round((top[1].total / r.spent) * 100);
-      if (pct >= 25) out.push({ id: `store:${top[0]}`, c: "var(--c-home, #2a5bd7)", Icon: Store, text: s22.noticed.store(top[0], pct), cta: s22.noticed.viewReceipt, to: `/spending/receipt/${encodeURIComponent(top[1].id)}` });
+      if (pct >= 25) out.push({ id: `store:${top[0]}`, c: "var(--c-home, #2a5bd7)", Icon: Store, text: s22.noticed.store(top[0], pct), cta: s22.noticed.viewReceipt, to: `/spending/receipt/${encodeURIComponent(top[1].id)}`, ana: () => storeReport(r, top[0]) });
     }
     // 4. Nhóm hàng đổi nhiều nhất so với tháng trước (từ 20% và 50.000đ trở lên).
     if (prev) {
@@ -206,7 +223,7 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
       if (m) {
         const up = m.diff > 0;
         const cat = categoryLabel(m.key);
-        out.push({ id: `trend:${m.key}`, c: "var(--c-care, #8b5cf6)", Icon: up ? TrendingUp : TrendingDown, text: s22.noticed.trend(cat, Math.abs(m.pct), up), cta: s22.noticed.askWhy, to: askPath(s22.noticed.whyQ(cat.toLowerCase(), up)) });
+        out.push({ id: `trend:${m.key}`, c: "var(--c-care, #8b5cf6)", Icon: up ? TrendingUp : TrendingDown, text: s22.noticed.trend(cat, Math.abs(m.pct), up), cta: s22.noticed.askWhy, to: askPath(s22.noticed.whyQ(cat.toLowerCase(), up)), ana: () => trendReport(r, prev, m.key) });
       }
     }
     return out;
@@ -226,9 +243,12 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
           <li key={x.id} className="box15 noticed22__card" style={{ ["--c" as string]: x.c }}>
             <span className="noticed22__icon"><x.Icon size={20} aria-hidden /></span>
             <p className="noticed22__text"><span>{bold(x.text)}</span>{x.sub && <small>{x.sub}</small>}</p>
-            <button type="button" className="noticed22__cta" onClick={() => (x.plan ? setPick(x.plan) : x.to && nav(x.to))}>
-              {x.cta} <ChevronRight size={16} aria-hidden />
-            </button>
+            <div className="noticed22__acts">
+              <button type="button" className="noticed22__cta" onClick={() => (x.plan ? setPick(x.plan) : x.to && nav(x.to))}>
+                {x.cta} <ChevronRight size={16} aria-hidden />
+              </button>
+              {x.ana && <AnaButton build={x.ana} label={pt.ana} />}
+            </div>
           </li>
         ))}
       </ul>

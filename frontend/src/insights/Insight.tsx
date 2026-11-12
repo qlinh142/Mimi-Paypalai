@@ -150,3 +150,28 @@ export function InsightReport({ spec, onClose }: { spec: ReportSpec | null; onCl
     document.body,
   );
 }
+
+/** Một điểm chạm trọn gói: card "Mimi nhận thấy" và bảng phân tích nhỏ của nó. Không có luật khớp thì không hiện gì. */
+export function Touch({ t }: { t: import("./points").Touchpoint | null | undefined }) {
+  const [spec, setSpec] = useState<ReportSpec | null>(null);
+  if (!t) return null;
+  return (
+    <>
+      <InsightCard id={t.id} severity={t.severity} text={t.text} sub={t.sub} onOpen={() => setSpec(t.report())} />
+      <InsightReport spec={spec} onClose={() => setSpec(null)} />
+    </>
+  );
+}
+
+/** Nút "Phân tích" gắn vào thẻ đã có (Mimi nhận thấy ở Sổ chi tiêu, Còn tiêu được): mở bảng nhỏ thay vì màn Phân tích lớn. */
+export function AnaButton({ build, label, className = "ana22" }: { build: () => ReportSpec; label: string; className?: string }) {
+  const [spec, setSpec] = useState<ReportSpec | null>(null);
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setSpec(build())}>
+        <Sparkles size={14} aria-hidden /> {label}
+      </button>
+      <InsightReport spec={spec} onClose={() => setSpec(null)} />
+    </>
+  );
+}

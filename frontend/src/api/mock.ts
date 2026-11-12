@@ -372,13 +372,13 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       detail_name: [p.brand, p.product_name].filter(Boolean).join(" ") || undefined,
     });
     const lines = [
-      line("l1", "Unsweetened fresh milk 1L", "Sữa tươi không đường 1L", 2, 64_000, "sua",
+      line("l1", "Unsweetened fresh milk 1L", "Sữa tươi không đường 1L", 2, 68_000, "sua",
         { raw_name: "VINAMILK SUA TUOI KHONG DUONG 1L", brand: "Vinamilk", product_name: L ? "Unsweetened" : "Không đường", group_key: "sua-tuoi", canonical_quantity: 2000, canonical_unit: "ml" }),
       line("l2", "Dish soap 750ml", "Nước rửa chén 750ml", 1, 38_000, "hoa-pham",
         { raw_name: "SUNLIGHT CHANH 750ML", brand: "Sunlight", product_name: L ? "Lemon" : "Chanh", group_key: "nuoc-rua-chen", canonical_quantity: 750, canonical_unit: "ml" }),
       line("l3", "Eggs, box of 10", "Trứng gà hộp 10", 1, 36_000, "tuoi-song",
         { raw_name: "TRUNG GA HOP 10", group_key: "trung-ga", canonical_quantity: 10, canonical_unit: "item" }),
-      { ...line("l4", "Butter cookies", "Bánh quy bơ", 1, 74_000, undefined, { raw_name: "BANH QUY BO" }),
+      { ...line("l4", "Butter cookies", "Bánh quy bơ", 1, 70_000, undefined, { raw_name: "BANH QUY BO" }),
         needs_review: true, review_reasons: ["missing_category", "missing_group"] as ("missing_category" | "missing_group")[] },
     ];
     const draft: ReceiptDraft = {
@@ -416,7 +416,9 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       receiptCount += 1;
       if (!body.source_plan_id && !body.assignment_id) planState = { ...planState, reconciled_on: String(body.purchased_on) };
     }
-    return json({ receipt_id: body.receipt_id, status: "saved", replayed }, replayed ? 200 : 201);
+    // Như backend: kế hoạch có món được trừ trong hóa đơn này coi như đã mua xong (bản thử không tính phần còn lại).
+    const done = [...new Set((body.lines ?? []).flatMap((l) => ((l.plans as { plan_id: string }[] | undefined) ?? []).map((x) => x.plan_id)))];
+    return json({ receipt_id: body.receipt_id, status: "saved", replayed, ...(done.length && !replayed && { plan_done: done }) }, replayed ? 200 : 201);
   }
 
   if (method === "PUT" && p === "/settings") {
@@ -444,10 +446,19 @@ async function mockCore(method: string, url: URL, init: RequestInit): Promise<Re
       month, spent: 0, spent_prev_month_pct: null, saved: 0, saved_ratio: null, receipt_count: 0,
       by_category: [], top_saving_receipts: [], recent_receipts: [],
     };
+    const ago = today.getFullYear() * 12 + today.getMonth() + 1 - (y * 12 + m);
+    const rr = (id: string, store: string, d: number, total: number) => ({ receipt_id: id, store, purchased_on: `${month}-${String(d).padStart(2, "0")}`, total_vnd: total, discount_vnd: 0 });
     if (prevOfMock) return json({ ...base, spent: 1_070_000, receipt_count: 4, by_category: [
       { key: "hoa-pham", amount: 380_000, pct: 35.5 }, { key: "sua", amount: 190_000, pct: 17.8 },
       { key: "tuoi-song", amount: 300_000, pct: 28 }, { key: "do-kho", amount: 200_000, pct: 18.7 },
-    ] });
+    ],
+    // Điểm chạm 5: đường chi cộng dồn tháng trước để so cùng ngày.
+    recent_receipts: [rr("p1", "Co.opmart", 3, 310_000), rr("p2", "Bách Hóa Xanh", 9, 220_000), rr("p3", "WinMart", 17, 280_000), rr("p4", "Co.opmart", 25, 260_000)] });
+    // Điểm chạm 16: hai tháng trước nữa để tính trung bình 3 tháng lúc đặt ngân sách.
+    if (ago === 2 || ago === 3) {
+      const spent = ago === 2 ? 1_180_000 : 960_000;
+      return json({ ...base, spent, receipt_count: ago === 2 ? 5 : 4, by_category: [{ key: "hoa-pham", amount: Math.round(spent * 0.4), pct: 40 }, { key: "sua", amount: Math.round(spent * 0.2), pct: 20 }, { key: "tuoi-song", amount: Math.round(spent * 0.4), pct: 40 }] });
+    }
     if (!sameAsMock) return json(base);
     const r = (id: string, store: string, d: number, total: number, discount: number) => ({
       receipt_id: id, store, purchased_on: `${month}-${String(d).padStart(2, "0")}`, total_vnd: total, discount_vnd: discount,
@@ -574,7 +585,9 @@ function seedOrder() {
     id: "o-mau", state: "verified", merchant: b.merchant, lines: b.lines, total_vnd: b.total_vnd, amount_usd: b.amount_usd, vnd_per_usd: VND_PER_USD,
     decision: b.decision, approved_by_user: true, provider: "paypal", paypal_order_id: `FAKE-${b.amount_usd}-mock`, paypal_capture_id: "FAKECAP-mau",
     paid_at: paid, eta: got, events: [{ state: "awaiting_payment", at: paid }, { state: "paid", at: paid }, { state: "verified", at: got }],
-    refunds: [], refunded_vnd: 0, net_vnd: b.total_vnd, suggested_refund_vnd: 0, created_at: paid,
+    // Điểm chạm 15: một chai nước rửa chén bị móp, đã hoàn tiền.
+    refunds: [{ id: "rf-mau", ref: "FAKEREF-mau", amount_vnd: 37_000, amount_usd: usd(37_000), reason: "damaged", status: "COMPLETED", at: got }],
+    refunded_vnd: 37_000, net_vnd: b.total_vnd - 37_000, suggested_refund_vnd: 0, created_at: paid,
   });
 }
 
@@ -660,8 +673,9 @@ function mockOnline(method: string, p: string, init: RequestInit): Response | nu
     orders.set(id, o);
     return json(o, 201);
   }
-  const m = p.match(/^\/orders\/(o-[0-9a-f]{16})(\/capture|\/card|\/advance|\/delivery\/read|\/verify|\/refund)?$/);
+  const m = p.match(/^\/orders\/(o-(?:[0-9a-f]{16}|mau))(\/capture|\/card|\/advance|\/delivery\/read|\/verify|\/refund)?$/);
   if (!m) return null;
+  seedOrder(); // mở thẳng chi tiết đơn mẫu (chưa qua danh sách) vẫn thấy đơn
   const o = orders.get(m[1]);
   if (!o) return json({ code: "not_found", message: "Order not found" }, 404);
   const set = (next: Order) => {
@@ -750,7 +764,7 @@ function mockLots(it: Item) {
 type MockRecurring = { id: string; name: string; amount: number; cycle: "weekly" | "monthly" | "quarterly" | "yearly"; next_due_at: string; active: boolean };
 const dueIn = (n: number) => iso(new Date(today.getTime() + n * 86_400_000));
 let recurring: MockRecurring[] = [
-  { id: "dien", name: L ? "Electricity" : "Tiền điện", amount: 680_000, cycle: "monthly", next_due_at: dueIn(0), active: true },
+  { id: "dien", name: L ? "Electricity" : "Tiền điện", amount: 760_000, cycle: "monthly", next_due_at: dueIn(0), active: true },
   { id: "internet", name: "Internet", amount: 250_000, cycle: "monthly", next_due_at: dueIn(5), active: true },
   { id: "netflix", name: "Netflix", amount: 260_000, cycle: "monthly", next_due_at: dueIn(12), active: true },
   { id: "dien-thoai", name: L ? "Phone" : "Điện thoại", amount: 150_000, cycle: "monthly", next_due_at: dueIn(28), active: true },
@@ -758,7 +772,7 @@ let recurring: MockRecurring[] = [
 const occHistory: { id: string; recurring_id: string; name: string; due_at: string; amount: number; status: "paid" | "skipped" | "matched"; paid_at?: string; source_type?: "manual" | "receipt"; source_id?: string }[] = [];
 // Góp ý 01/11 (Phần E): lịch sử các kỳ đã trả, để thấy ở màn chi tiết khoản định kỳ và Lịch sử mua hàng.
 for (const [rid, name, amount, monthsAgo, day, via] of [
-  ["dien", L ? "Electricity" : "Tiền điện", 642_000, 1, 5, "manual"], ["dien", L ? "Electricity" : "Tiền điện", 598_000, 2, 5, "manual"],
+  ["dien", L ? "Electricity" : "Tiền điện", 642_000, 1, 5, "manual"], ["dien", L ? "Electricity" : "Tiền điện", 598_000, 2, 5, "manual"], ["dien", L ? "Electricity" : "Tiền điện", 575_000, 3, 5, "manual"],
   ["internet", "Internet", 250_000, 1, 10, "manual"], ["internet", "Internet", 250_000, 2, 10, "manual"],
   ["netflix", "Netflix", 260_000, 1, 17, "manual"], ["dien-thoai", L ? "Phone" : "Điện thoại", 150_000, 1, 3, "manual"],
 ] as const) {

@@ -1,4 +1,6 @@
 import { t } from "../i18n";
+import { Touch } from "../insights/Insight";
+import { freqInsight } from "../insights/points";
 import { ItemPriceInsight } from "../insights/touchpoints";
 import { m15 } from "../i18n/m15";
 import { useEffect, useState } from "react";
@@ -39,6 +41,8 @@ export function ItemDetail() {
           <>
             <QuantityCard item={item} />
             <ItemPriceInsight itemKey={item.key} name={item.name} />
+            {/* Điểm chạm 7: món đã mua từ 3 lần trong 3 tháng. */}
+            <Touch t={freqInsight(item)} />
             <PriceCompare itemKey={item.key} unit={stockInDisplay(item)?.[1] ?? savedUnit(item)} />
             <HistoryCard itemKey={item.key} unit={stockInDisplay(item)?.[1] ?? savedUnit(item)} />
           </>

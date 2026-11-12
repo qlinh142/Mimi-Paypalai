@@ -15,6 +15,8 @@ import { FAKE_CLIENT_TOKEN, FAKE_NONCE, loadDropin, threeDSecureRejected, type D
 import { formatDayMonth, formatVnd } from "../lib/text";
 import { displayCurrency } from "../lib/money";
 import { m15 } from "../i18n/m15";
+import { Touch } from "../insights/Insight";
+import { refundInsight } from "../insights/points";
 
 const usdFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 /**
@@ -351,6 +353,8 @@ function OrderView({ order }: { order: Order }) {
   const canAdvance = order.state === "paid" || order.state === "ordered" || order.state === "shipped";
   return (
     <>
+      {/* Điểm chạm 15: sau khi hoàn tiền, cho thấy Sổ chi tiêu đã trừ và thực chi của đơn. */}
+      <Touch t={refundInsight(order)} />
       <section className="plan-sec">
         <h2>{t.orders.states[order.state]}</h2>
         <ol className="list">
