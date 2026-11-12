@@ -3,13 +3,15 @@ import { t } from "../i18n";
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Globe, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
-import { useOrders, useReceiptDetail, useReceiptHistory } from "../api/hooks";
+import { useOrders, useReceiptDetail, useReceiptHistory, useSpending } from "../api/hooks";
+import { Touch } from "../insights/Insight";
+import { storeInsight } from "../insights/points";
 import { LoadState } from "../components/LoadState";
 import type { HistoryRow, Order } from "../api/types";
 import { p22 } from "../i18n/p22";
 import { MainFrame, TopBar } from "../components/AppShell";
 import { CategoryIcon } from "../components/ItemRow";
-import { formatVnd } from "../lib/text";
+import { currentMonth, formatVnd } from "../lib/text";
 import { useRelations } from "../lib/relation";
 
 const HistoryGrid = lazy(() => import("../components/HistoryGrid"));
@@ -214,6 +216,10 @@ export function ReceiptDetailScreen() {
   const dq = useReceiptDetail(id);
   const r = dq.data;
   const { relationOf } = useRelations();
+  // Điểm chạm 2: cửa hàng của hóa đơn này chiếm phần lớn tháng (chỉ hóa đơn tháng này).
+  const month = currentMonth();
+  const sp = useSpending(month);
+  const thisMonth = r && r.kind !== "delegated" && r.purchased_at.slice(0, 7) === month && sp.data?.month === month;
   return (
     <MainFrame>
       <TopBar title={m15.history.detail} />
@@ -235,6 +241,7 @@ export function ReceiptDetailScreen() {
                 <small>{r.kind === "delegated" ? `${r.store} · ` : ""}{dayTime(r.purchased_at)}</small>
               </span>
             </section>
+            {thisMonth && <Touch t={storeInsight(sp.data, r.store)} />}
             {r.plans.length > 0 && (
               <Link to={`/plan/${encodeURIComponent(r.plans[0].id)}`} className="box15 ph15__plans">
                 <ClipboardList size={20} aria-hidden />

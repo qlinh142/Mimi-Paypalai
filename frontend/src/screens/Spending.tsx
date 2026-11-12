@@ -14,7 +14,9 @@ import { MainFrame, TopBar } from "../components/AppShell";
 import { addMonths, currentMonth, formatDayMonth, formatVnd } from "../lib/text";
 import { LoadState } from "../components/LoadState";
 import { s22 } from "../i18n/s22";
-import { safeReport } from "../insights/points";
+import { billInsight, safeInsight } from "../insights/points";
+import { Touch } from "../insights/Insight";
+import { useForecast } from "../api/hooks";
 import { BudgetBar, BudgetInvite, BudgetSheet, CategoryDonut, Noticed, SafeToSpend, Sparkline, billsLeft, monthClock, safeToSpend, useBudget } from "../components/SpendingPlus";
 
 const ym = (s: string) => s.split("-").map(Number) as [number, number];
@@ -154,7 +156,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
         </div>
       </section>
 
-      {isCurrent && (safe ? <SafeToSpend free={safe.free} perDay={safe.perDay} daysLeft={clock.left} ana={() => safeReport(budget!, r, prevQ.data, billsLeft(rec.data?.items, clock.end).rows, clock.day, clock.days)} /> : <BudgetInvite onSet={() => setEditBudget(true)} />)}
+      {isCurrent && (safe ? <SafeToSpend free={safe.free} perDay={safe.perDay} daysLeft={clock.left} /> : <BudgetInvite onSet={() => setEditBudget(true)} />)}
       {isCurrent && <Noticed r={r} prev={prevQ.data} />}
       {editBudget && <BudgetSheet current={budget} onClose={() => setEditBudget(false)} />}
 
@@ -226,6 +228,8 @@ function Upcoming() {
   ];
 
   return (
+    <>
+    <UpcomingInsights />
     <section className="hero15 fc15" aria-labelledby="fc15">
       <p id="fc15" className="fc15__label">{m15.spending.forecast}</p>
       <p className="hero15__num num">{formatVnd(recTotal + goodsTotal)}</p>
@@ -255,6 +259,25 @@ function Upcoming() {
       {recRows.length + goodsRows.length === 0 && <p className="fc15__empty">{m15.spending.forecastEmpty}</p>}
       {missing > 0 && <p className="fc15__empty">{m15.spending.missingPrices(missing)}</p>}
     </section>
+    </>
+  );
+}
+
+/** Điểm chạm 5 (Còn tiêu được) và 3 (khoản định kỳ sắp đến hạn): phân tích ở màn Sắp chi, không đặt nút trên thẻ ở Sổ chi tiêu. */
+function UpcomingInsights() {
+  const budget = useBudget();
+  const month = currentMonth();
+  const r = useSpending(month);
+  const prev = useSpending(addMonths(month, -1));
+  const rec = useRecurring();
+  const fc = useForecast();
+  const clock = monthClock();
+  const cur = r.data?.month === month ? r.data : undefined;
+  return (
+    <>
+      <Touch t={safeInsight(budget, cur, prev.data, billsLeft(rec.data?.items, clock.end).rows, clock.day, clock.days)} />
+      <Touch t={billInsight(rec.data?.items, fc.data)} />
+    </>
   );
 }
 

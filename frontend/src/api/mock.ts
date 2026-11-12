@@ -979,9 +979,11 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
     }));
     return json({ receipts: [...all.map(({ lines, plans: _p, subtotal: _s, discount: _d, ...r }) => ({ ...r, item_names: lines.map((l) => l.name) })), ...rec] });
   }
-  const histM = p.match(/^\/receipts\/(h[\w-]+)$/);
+  const histM = p.match(/^\/receipts\/((?:h|r)[\w-]+)$/);
   if (method === "GET" && histM) {
-    const d = histDetail(decodeURIComponent(histM[1]));
+    // Hóa đơn ở Sổ chi tiêu (r1–r5) mở hóa đơn cùng cửa hàng trong Lịch sử, để "Xem hóa đơn" không ra trang trống.
+    const alias: Record<string, string> = { r1: "h5", r2: "h2", r3: "h1", r4: "h3", r5: "h4" };
+    const d = histDetail(alias[histM[1]] ?? decodeURIComponent(histM[1]));
     return d ? json(d) : json({ code: "not_found", message: "Không tìm thấy." }, 404);
   }
   if (method === "GET" && p === "/taxonomy") {

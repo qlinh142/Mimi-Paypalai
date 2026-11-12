@@ -15,10 +15,8 @@ import { daysUntil, goodsTier } from "../lib/displayUnit";
 import { addMonths, currentMonth, formatVnd } from "../lib/text";
 import { Sheet } from "./Sheet15";
 import { PlanPicker } from "./PlanPicker";
-import { AnaButton, Touch } from "../insights/Insight";
-import { avgInsight, billReport, lowReport, storeReport, trendReport } from "../insights/points";
-import { pt } from "../insights/ptext";
-import type { ReportSpec } from "../insights/reports";
+import { Touch } from "../insights/Insight";
+import { avgInsight } from "../insights/points";
 
 export const REC = "hoa-don-dinh-ky";
 const MAX_BUDGET = 1_000_000_000;
@@ -142,7 +140,7 @@ export function askPath(q: string) {
 }
 
 /** Thẻ Còn tiêu được gọn như Redesign: số mỗi ngày là số lớn, nút hỏi bên phải. */
-export function SafeToSpend({ free, perDay, daysLeft, ana }: { free: number; perDay: number; daysLeft: number; ana?: () => ReportSpec }) {
+export function SafeToSpend({ free, perDay, daysLeft }: { free: number; perDay: number; daysLeft: number }) {
   const over = free < 0;
   return (
     <section className={`box15 safe22${over ? " safe22--over" : ""}`} aria-labelledby="safe22">
@@ -153,18 +151,16 @@ export function SafeToSpend({ free, perDay, daysLeft, ana }: { free: number; per
           {over ? formatVnd(Math.abs(free)) : <>{formatVnd(perDay)}<span>{s22.perDayUnit}</span></>}
         </p>
         <p className="safe22__sub">
-          {over ? <Link to="/spending?tab=upcoming">{s22.safe.overSub}</Link> : s22.freeAfter(daysLeft)}
+          {/* Phân tích Còn tiêu được nằm ở tab Sắp chi (anh chốt 12/11): dòng phụ dẫn sang đó. */}
+          <Link to="/spending?tab=upcoming">{over ? s22.safe.overSub : s22.freeAfter(daysLeft)} ›</Link>
         </p>
       </div>
-      {!over && (
-        <Link className="pill22 safe22__ask" to={askPath(s22.safe.affordQ(formatVnd(free)))}>{s22.safe.afford}</Link>
-      )}
-      {ana && <AnaButton build={ana} label={pt.ana} className="ana22 safe22__ana" />}
+      {/* Anh chốt 12/11: bỏ nút "Mình có mua nổi…?" (trùng với phân tích ở Sắp chi, chữ chưa ổn). */}
     </section>
   );
 }
 
-type Insight = { id: string; c: string; Icon: typeof Store; text: string; sub?: string; cta: string; to?: string; plan?: { key: string; name: string }; ana?: () => ReportSpec };
+type Insight = { id: string; c: string; Icon: typeof Store; text: string; sub?: string; cta: string; to?: string; plan?: { key: string; name: string } };
 
 /**
  * Mimi nhận thấy (spec Redesign 5.1, bốn loại), tính ở máy từ API sẵn có:
@@ -190,12 +186,12 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
     const low = (items.data ?? []).filter((i) => goodsTier(i) !== "plenty").sort((a, b) => (a.days_left ?? -1) - (b.days_left ?? -1))[0];
     if (low) {
       const p = price.get(low.key);
-      out.push({ id: `low:${low.key}`, c: "var(--c-groc, #2f9e6e)", Icon: CalendarClock, text: s22.noticed.low(low.name, low.days_left), sub: p != null ? s22.noticed.lowSub(formatVnd(p)) : undefined, cta: s22.noticed.addToPlan, plan: { key: low.key, name: low.name }, ana: () => lowReport(items.data ?? [], low) });
+      out.push({ id: `low:${low.key}`, c: "var(--c-groc, #2f9e6e)", Icon: CalendarClock, text: s22.noticed.low(low.name, low.days_left), sub: p != null ? s22.noticed.lowSub(formatVnd(p)) : undefined, cta: s22.noticed.addToPlan, plan: { key: low.key, name: low.name } });
     }
     // 2. Khoản định kỳ đến hạn sớm nhất trong 7 ngày.
     const bill = (rec.data?.items ?? []).filter((x) => x.active && daysUntil(x.next_due_at) <= 7).sort((a, b) => a.next_due_at.localeCompare(b.next_due_at))[0];
     if (bill) {
-      out.push({ id: `bill:${bill.id}`, c: "var(--c-bill, #d4538a)", Icon: Repeat, text: s22.noticed.bill(bill.name, daysUntil(bill.next_due_at)), sub: formatVnd(bill.amount), cta: s22.noticed.seeUpcoming, to: "/spending?tab=upcoming", ana: () => billReport(bill, fc.data) });
+      out.push({ id: `bill:${bill.id}`, c: "var(--c-bill, #d4538a)", Icon: Repeat, text: s22.noticed.bill(bill.name, daysUntil(bill.next_due_at)), sub: formatVnd(bill.amount), cta: s22.noticed.seeUpcoming, to: "/spending?tab=upcoming" });
     }
     // 3. Cửa hàng chiếm phần lớn nhất (khi có từ 2 cửa hàng).
     const byStore = new Map<string, { total: number; last: string; id: string }>();
@@ -209,7 +205,7 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
     const top = [...byStore.entries()].sort((a, b) => b[1].total - a[1].total)[0];
     if (top && byStore.size > 1 && r.spent > 0) {
       const pct = Math.round((top[1].total / r.spent) * 100);
-      if (pct >= 25) out.push({ id: `store:${top[0]}`, c: "var(--c-home, #2a5bd7)", Icon: Store, text: s22.noticed.store(top[0], pct), cta: s22.noticed.viewReceipt, to: `/spending/receipt/${encodeURIComponent(top[1].id)}`, ana: () => storeReport(r, top[0]) });
+      if (pct >= 25) out.push({ id: `store:${top[0]}`, c: "var(--c-home, #2a5bd7)", Icon: Store, text: s22.noticed.store(top[0], pct), cta: s22.noticed.viewReceipt, to: `/spending/receipt/${encodeURIComponent(top[1].id)}` });
     }
     // 4. Nhóm hàng đổi nhiều nhất so với tháng trước (từ 20% và 50.000đ trở lên).
     if (prev) {
@@ -223,7 +219,7 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
       if (m) {
         const up = m.diff > 0;
         const cat = categoryLabel(m.key);
-        out.push({ id: `trend:${m.key}`, c: "var(--c-care, #8b5cf6)", Icon: up ? TrendingUp : TrendingDown, text: s22.noticed.trend(cat, Math.abs(m.pct), up), cta: s22.noticed.askWhy, to: askPath(s22.noticed.whyQ(cat.toLowerCase(), up)), ana: () => trendReport(r, prev, m.key) });
+        out.push({ id: `trend:${m.key}`, c: "var(--c-care, #8b5cf6)", Icon: up ? TrendingUp : TrendingDown, text: s22.noticed.trend(cat, Math.abs(m.pct), up), cta: s22.noticed.askWhy, to: askPath(s22.noticed.whyQ(cat.toLowerCase(), up)) });
       }
     }
     return out;
@@ -247,7 +243,6 @@ export function Noticed({ r, prev }: { r: SpendingReport; prev?: SpendingReport 
               <button type="button" className="noticed22__cta" onClick={() => (x.plan ? setPick(x.plan) : x.to && nav(x.to))}>
                 {x.cta} <ChevronRight size={16} aria-hidden />
               </button>
-              {x.ana && <AnaButton build={x.ana} label={pt.ana} />}
             </div>
           </li>
         ))}

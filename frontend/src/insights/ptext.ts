@@ -18,11 +18,15 @@ const vi = {
   store: {
     title: (s: string) => `Chi ở ${s}`, sub: "Phần của từng nơi mua trong tháng này",
     kTotal: "Chi ở đây", kPct: "Phần trong tháng", chart: "Theo nơi mua", grid: (s: string) => `Hóa đơn ở ${s}`,
+    text: (s: string, pct: number) => `Tháng này **${s}** chiếm **${pct}%** số tiền nhà mình chi.`,
+    sub1: (v: string) => `Tổng ở đây ${v}`,
   },
   // 3. Định kỳ sắp đến hạn
   bill: {
     title: (n: string) => n, sub: "Kỳ sắp tới và các kỳ đã trả",
     kAmount: "Kỳ này", kDays: "Đến hạn sau", chart: "Các kỳ đã trả", grid: "Sắp chi 7 ngày tới",
+    text: (n: string, d: number, v: string) => `**${n}** đến hạn ${d === 0 ? "**hôm nay**" : `sau **${d} ngày**`}, **${v}**.`,
+    sub1: "Xem các kỳ đã trả và các khoản 7 ngày tới",
   },
   // 4. Món sắp hết
   low: {
@@ -36,6 +40,9 @@ const vi = {
     kBudget: "Ngân sách", kSpent: "Đã chi", kBills: "Định kỳ còn trả", kFree: "Còn tiêu được", kOver: "Vượt",
     chart: "Chi cộng dồn trong tháng", grid: "Định kỳ còn phải trả tháng này",
     note: "Tháng trước tính đến cùng ngày để so cho công bằng.",
+    text: (free: string, day: string) => `Tháng này còn tiêu được **${free}**, khoảng **${day}** mỗi ngày.`,
+    over: (v: string) => `Tính cả các khoản định kỳ, tháng này **vượt ngân sách ${v}**.`,
+    sub1: (spent: string, bills: string) => `Đã chi ${spent} · Định kỳ còn trả ${bills}`,
   },
   // 7. Chi tiết món · tần suất mua
   freq: {
@@ -137,10 +144,14 @@ const en: typeof vi = {
   store: {
     title: (s) => `Spending at ${s}`, sub: "Each store's share of this month",
     kTotal: "Spent here", kPct: "Share of month", chart: "By store", grid: (s) => `Receipts at ${s}`,
+    text: (s, pct) => `This month **${s}** is **${pct}%** of what we spent.`,
+    sub1: (v) => `Total here ${v}`,
   },
   bill: {
     title: (n) => n, sub: "Next payment and past payments",
     kAmount: "This time", kDays: "Due in", chart: "Past payments", grid: "Due in the next 7 days",
+    text: (n, d, v) => `**${n}** is due ${d === 0 ? "**today**" : `in **${d} days**`}, **${v}**.`,
+    sub1: "See past payments and bills in the next 7 days",
   },
   low: {
     title: "Running low", sub: "Mimi's estimate from daily use",
@@ -152,6 +163,9 @@ const en: typeof vi = {
     kBudget: "Budget", kSpent: "Spent", kBills: "Bills still due", kFree: "Safe to spend", kOver: "Over",
     chart: "Cumulative spending this month", grid: "Bills still due this month",
     note: "Last month is counted to the same day for a fair comparison.",
+    text: (free, day) => `**${free}** is safe to spend this month, about **${day}** a day.`,
+    over: (v) => `With bills, this month is **${v} over budget**.`,
+    sub1: (spent, bills) => `Spent ${spent} · Bills still due ${bills}`,
   },
   freq: {
     text: (name, n, days) => `In the last 3 months we bought **${name}** **${n} times**${days ? `, about every **${days} days**` : ""}.`,

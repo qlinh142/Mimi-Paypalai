@@ -75,14 +75,23 @@ test("Mimi nhận thấy: các điểm chạm ở Sổ chi tiêu, định kỳ, 
     await expect(sheet).toHaveCount(0);
   };
 
-  // 1–4: mỗi thẻ Mimi nhận thấy ở Sổ chi tiêu có nút Phân tích mở bảng nhỏ; 5: Còn tiêu được.
+  // Sổ chi tiêu không đặt nút Phân tích trên từng thẻ (anh chốt 12/11); phân tích nằm ở màn chi tiết.
   await go(page, "/spending");
   await expect(page.locator(".noticed22__card")).toHaveCount(4);
-  await expect(page.locator(".noticed22__card .ana22")).toHaveCount(4);
-  await page.locator(".noticed22__card").filter({ hasText: "Bách Hóa Xanh chiếm" }).getByRole("button", { name: "Phân tích" }).click();
+  await expect(page.locator(".ana22")).toHaveCount(0);
+  // 2: bấm Xem hóa đơn ở thẻ cửa hàng, Chi tiết hóa đơn có phân tích cửa hàng.
+  await page.locator(".noticed22__card").filter({ hasText: "Bách Hóa Xanh chiếm" }).getByRole("button", { name: /Xem hóa đơn/ }).click();
+  await expect(page.locator(".ins22")).toContainText("Tháng này Bách Hóa Xanh chiếm 46% số tiền nhà mình chi.");
+  await page.locator(".ins22").getByRole("button", { name: "Xem phân tích" }).click();
   await open("Chi ở Bách Hóa Xanh");
-  await page.locator(".safe22").getByRole("button", { name: "Phân tích" }).click();
+  // 5 và 3: dòng phụ của Còn tiêu được dẫn sang Sắp chi, ở đó có hai card phân tích.
+  await go(page, "/spending");
+  await page.locator(".safe22").getByRole("link", { name: /Sau các khoản định kỳ/ }).click();
+  await expect(page.locator('.ins22[data-insight^="sf:"]')).toContainText("Tháng này còn tiêu được");
+  await expect(page.locator('.ins22[data-insight^="bl:"]')).toContainText("Tiền điện đến hạn hôm nay, 760.000đ.");
+  await page.locator('.ins22[data-insight^="sf:"]').getByRole("button", { name: "Xem phân tích" }).click();
   await open("Còn tiêu được");
+  await go(page, "/spending");
   // 16: đặt ngân sách thấy trung bình 3 tháng.
   await page.getByRole("button", { name: "Sửa ngân sách" }).click();
   await expect(page.locator(".ins22")).toContainText("3 tháng qua nhà mình chi trung bình 1.070.000đ mỗi tháng.");

@@ -356,3 +356,51 @@ export function weekInsight(rows: HistoryReceipt[] | undefined, now = new Date()
     }),
   };
 }
+
+// ---------- Điểm 2, 3, 5 ở màn chi tiết (anh chốt 12/11: Sổ chi tiêu không đặt nút Phân tích trên từng thẻ) ----------
+
+/** Điểm 2, ở Chi tiết hóa đơn: cửa hàng của hóa đơn này chiếm từ 25% tháng (khi tháng có từ 2 nơi mua). */
+export function storeInsight(r: SpendingReport | undefined, store: string | undefined): Touchpoint | null {
+  if (!r || !store || r.spent <= 0) return null;
+  const stores = new Set(r.recent_receipts.filter((x) => !x.delegated && x.store).map((x) => x.store));
+  if (stores.size < 2 || !stores.has(store)) return null;
+  const total = sum(r.recent_receipts.filter((x) => x.store === store && !x.delegated).map((x) => x.total_vnd));
+  const pct = Math.round((total / r.spent) * 100);
+  if (pct < 25) return null;
+  return {
+    id: `st:${r.month}:${store}:${total}`,
+    severity: "info",
+    text: pt.store.text(store, pct),
+    sub: pt.store.sub1(formatVnd(total)),
+    report: () => storeReport(r, store),
+  };
+}
+
+/** Điểm 3, ở tab Sắp chi: khoản định kỳ đến hạn sớm nhất trong 7 ngày. */
+export function billInsight(list: Recurring[] | undefined, fc: Forecast | undefined): Touchpoint | null {
+  const bill = (list ?? []).filter((x) => x.active && daysFromToday(x.next_due_at) <= 7).sort((a, b) => a.next_due_at.localeCompare(b.next_due_at))[0];
+  if (!bill) return null;
+  const d = Math.max(0, daysFromToday(bill.next_due_at));
+  return {
+    id: `bl:${bill.id}:${bill.next_due_at}:${bill.amount}`,
+    severity: "info",
+    text: pt.bill.text(bill.name, d, formatVnd(bill.amount)),
+    sub: pt.bill.sub1,
+    report: () => billReport(bill, fc),
+  };
+}
+
+/** Điểm 5, ở tab Sắp chi: còn tiêu được sau định kỳ (hoặc vượt). Chưa đặt ngân sách: không có card. */
+export function safeInsight(budget: number | null, r: SpendingReport | undefined, prev: SpendingReport | undefined, bills: Recurring[], day: number, days: number): Touchpoint | null {
+  if (!budget || !r) return null;
+  const billTotal = sum(bills.map((b) => b.amount));
+  const free = budget - r.spent - billTotal;
+  const left = days - day + 1;
+  return {
+    id: `sf:${budget}:${r.spent}:${billTotal}`,
+    severity: free < 0 ? "warning" : "info",
+    text: free < 0 ? pt.safe.over(formatVnd(-free)) : pt.safe.text(formatVnd(free), formatVnd(Math.round(free / Math.max(1, left) / 100) * 100)),
+    sub: pt.safe.sub1(formatVnd(r.spent), formatVnd(billTotal)),
+    report: () => safeReport(budget, r, prev, bills, day, days),
+  };
+}
