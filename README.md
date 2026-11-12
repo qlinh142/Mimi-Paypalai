@@ -24,7 +24,7 @@ Code: `backend/internal/paypal`, `backend/internal/braintree`, `backend/internal
 
 ## How Mimi uses AI
 
-Mimi uses **Google Gemini on Vertex AI** (model set by `GEMINI_MODEL`, default `gemini-3.8-flash`).
+Mimi uses **Google Gemini on Vertex AI** (the live demo runs `gemini-3.8-flash`, set through `GEMINI_MODEL`).
 
 | AI feature | What it does |
 |---|---|
@@ -39,11 +39,11 @@ Code: `backend/internal/gcp/gemini`, `backend/internal/assistant`.
 
 | Tool | What it does in Mimi |
 |---|---|
-| **AG Grid** (`ag-grid-react`) | Purchase history and online order tables. |
+| **AG Grid** (`ag-grid-react`) | The "Table" view of Order history: every receipt and online order in one sortable, filterable grid. |
 | **AG Studio** and **AG Charts** | The "Analytics" screen: spending reports, charts and data tables built from the family's receipts. |
 | **Channel3** | Product catalog and per-store prices in the U.S. market (Walmart, Target, Costco, CVS, Walgreens…), used to compare prices when planning a trip. Payment still goes through PayPal or Braintree. |
 
-Code: `frontend/src/components/HistoryGrid.tsx`, `frontend/src/screens/Online.tsx`, `backend/internal/channel3`.
+Code: `frontend/src/components/HistoryGrid.tsx` (AG Grid), `frontend/src/analytics/` (AG Studio), `backend/internal/channel3`.
 
 ## Other technology
 
@@ -111,8 +111,8 @@ the script tells you the exact command if one is missing.
 ## Tests
 
 ```bash
-cd backend && go test ./...
-cd frontend && npm run build && npm run test:e2e
+(cd backend && go test ./...)
+(cd frontend && npm run build && npm run test:e2e)
 ```
 
 CI (`.github/workflows/ci.yml`) runs backend tests, Firestore emulator tests, the frontend build and a secret scan on every push and pull request.
