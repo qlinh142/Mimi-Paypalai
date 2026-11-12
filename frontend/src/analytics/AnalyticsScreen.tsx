@@ -22,6 +22,7 @@ import { mimiStudioTheme } from "./theme";
 import { mimiWidgets } from "./widgets";
 import { at } from "./text";
 import "./analytics.css";
+import type { ReportSpec } from "../insights/reports";
 
 /** Tên dễ đọc cho các bước tool của Hỏi Mimi trong khung chat; tool có số liệu thì kèm biểu đồ. */
 const toolDisplay = Object.fromEntries(
@@ -416,5 +417,27 @@ function Dashboard({ rows, note, phone, autoAsk, onExit }: { rows: AnalyticsRows
         </AgStudioProvider>
       </div>
     </Shell>
+  );
+}
+
+/**
+ * Bảng AG Studio nhỏ của "Mimi nhận thấy" (src/insights). Đặt ở đây để dùng chung gói tải riêng
+ * với màn Phân tích: AG Studio (~4,7 MB) chỉ tải khi mở, service worker không giữ sẵn.
+ */
+export function MiniStudio({ spec, onReady }: { spec: ReportSpec; onReady: () => void }) {
+  return (
+    <AgStudioProvider licenseKey={LICENSE}>
+      <AgStudio
+        style={{ height: "100%", width: "100%" }}
+        theme={mimiStudioTheme}
+        data={spec.data}
+        initialState={spec.report}
+        mode="view"
+        layout={{ widgetBorderEnabled: true }}
+        panels={{ view: { right: [] } }}
+        localeText={(uiLang === "vi" ? AG_STUDIO_LOCALE_VN : {}) as never}
+        onApiReady={onReady}
+      />
+    </AgStudioProvider>
   );
 }

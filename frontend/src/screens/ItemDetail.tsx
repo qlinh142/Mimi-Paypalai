@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { ItemPriceInsight } from "../insights/touchpoints";
 import { m15 } from "../i18n/m15";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -37,6 +38,7 @@ export function ItemDetail() {
         {item && (
           <>
             <QuantityCard item={item} />
+            <ItemPriceInsight itemKey={item.key} name={item.name} />
             <PriceCompare itemKey={item.key} unit={stockInDisplay(item)?.[1] ?? savedUnit(item)} />
             <HistoryCard itemKey={item.key} unit={stockInDisplay(item)?.[1] ?? savedUnit(item)} />
           </>

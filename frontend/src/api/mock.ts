@@ -830,12 +830,26 @@ const incoming: MockAssignment = {
   trip: { plan_name: L ? "Weekend shopping" : "Mua đồ cuối tuần", buy_date: iso(new Date(today.getTime() + 2 * 86_400_000)), buy_hour: 9, buy_minute: 30, trip_note: L ? "WinMart near home" : "WinMart gần nhà" },
 };
 
+/** Quy cách gói của món mẫu (lượng chuẩn hóa, đơn vị, chữ ghi trên bảng giá). */
+const MOCK_SIZE: Record<string, [number, "ml" | "g" | "item", string]> = {
+  "sua-tuoi": [1000, "ml", "1L"], "nuoc-rua-chen": [750, "ml", "750ml"], "trung-ga": [10, "item", "10 quả"], gao: [5000, "g", "5kg"],
+  "dau-goi": [650, "g", "650g"], "giay-ve-sinh": [10, "item", "10 cuộn"], "bot-giat": [3000, "g", "3kg"],
+};
+/** Bản thử: nước rửa chén có thêm các lần mua cũ để thấy giá tăng dần (điểm chạm "Mimi nhận thấy"). */
+const MOCK_OLDER: Record<string, [string, number, number][]> = {
+  "nuoc-rua-chen": [["Bách Hóa Xanh", 36_000, 41], ["Co.opmart", 35_500, 63], ["Bách Hóa Xanh", 35_000, 84]],
+};
 function priceObs(key: string) {
   const prices = MOCK_PRICES[key];
   if (!prices) return [];
-  return Object.entries(prices).flatMap(([store, price], n) => [
-    { store_name: store, paid_price: price, purchased_at: iso(new Date(today.getTime() - (n * 9 + 3) * 86_400_000)), canonical_quantity: 1000, canonical_unit: "ml", unit_price: price / 1000 },
-  ]);
+  const [qty, unit] = MOCK_SIZE[key] ?? [1000, "ml"];
+  const ob = (store: string, price: number, daysAgo: number) => ({
+    store_name: store, paid_price: price, purchased_at: iso(new Date(today.getTime() - daysAgo * 86_400_000)), canonical_quantity: qty, canonical_unit: unit, unit_price: Math.round((price / qty) * 100) / 100,
+  });
+  return [
+    ...Object.entries(prices).map(([store, price], n) => ob(store, price, n * 9 + 3)),
+    ...(MOCK_OLDER[key] ?? []).map(([store, price, d]) => ob(store, price, d)),
+  ];
 }
 
 
@@ -913,7 +927,7 @@ function mockMarketItems() {
     key: i.key, name: i.name, updated_at: new Date().toISOString(),
     prices: Object.entries(MOCK_PRICES[i.key])
       .map(([store, v]) => {
-        const vnd = Math.round((v * (i.key === "nuoc-rua-chen" ? 1.1 : 0.97)) / 100) * 100;
+        const vnd = Math.round((v * (i.key === "nuoc-rua-chen" ? 1.12 : 0.97)) / 100) * 100;
         // Bản thử: sữa và gạo ở Co.opmart đang giảm giá (có giá gạch ngang) để màn So sánh giá hiện giá trước giảm và % giảm.
         const list_vnd = store === "Co.opmart" && (i.key === "sua-tuoi" || i.key === "gao") ? Math.round((vnd * 1.2) / 1000) * 1000 : undefined;
         if (!abroad) return { store, price_vnd: vnd, list_vnd, currency: "VND", source: "gemini_search", on } as MockPrice;
@@ -932,7 +946,8 @@ function mockItemMarket(key: string, name: string) {
   const on = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
   const base = MOCK_PRICES[key] ?? (key === "kem-danh-rang" ? { WinMart: 34_000, "Co.opmart": 36_500 } : {});
   const prices = Object.entries(base)
-    .map(([store, v]) => ({ store, price_vnd: Math.round((v * 0.97) / 100) * 100, currency: "VND", source: "gemini_search", url: `${STORE_SITE[store] ?? "https://www.google.com/search?q="}${encodeURIComponent(name)}`, on }))
+    // Như bảng giá Kế hoạch (mockMarketItems): nước rửa chén online đắt hơn giá nhà mình từng mua.
+    .map(([store, v]) => ({ store, price_vnd: Math.round((v * (key === "nuoc-rua-chen" ? 1.12 : 0.97)) / 100) * 100, size: MOCK_SIZE[key]?.[2], currency: "VND", source: "gemini_search", url: `${STORE_SITE[store] ?? "https://www.google.com/search?q="}${encodeURIComponent(name)}`, on }))
     .sort((a, b) => a.price_vnd - b.price_vnd);
   return { key, name, prices, updated_at: new Date(Date.now() - 6 * 3_600_000).toISOString() };
 }
@@ -1015,7 +1030,7 @@ function mockM1(method: string, url: URL, init: RequestInit): Response | null {
     const hist = priceObs(key);
     const sorted = [...hist].sort((a, b) => a.unit_price - b.unit_price);
     return json({
-      group_key: key, purchase_count: hist.length, canonical_unit: hist.length ? "ml" : undefined,
+      group_key: key, purchase_count: hist.length, canonical_unit: hist[0]?.canonical_unit,
       last_purchase: hist[0] ?? null, lowest_historical: hist.length > 1 ? sorted[0] : null,
       average_unit_price: hist.length > 1 ? Math.round((hist.reduce((a, o) => a + o.unit_price, 0) / hist.length) * 100) / 100 : null,
       other_dimension_count: 0, history: hist, window_days: 90,

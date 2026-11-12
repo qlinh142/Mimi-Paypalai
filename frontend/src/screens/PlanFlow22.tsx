@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { PlanBudgetInsight } from "../insights/touchpoints";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, CircleCheckBig, CirclePlus, Globe, House, Info, Plus, ReceiptText, Search, TrendingDown, TrendingUp, RefreshCw, Store, UserRound } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -196,7 +197,10 @@ export function Step1Body({ id, cart }: { id: string; cart: Cart }) {
       </section>
 
       {cart.items.length > 0 ? (
-        <Lines cart={cart} onChange={() => markDraft(id)} done={new Set()} />
+        <>
+          <Lines cart={cart} onChange={() => markDraft(id)} done={new Set()} />
+          <PlanBudgetInsight cart={cart} />
+        </>
       ) : (
         <>
           <p className="hint">{p22.noItems}</p>
