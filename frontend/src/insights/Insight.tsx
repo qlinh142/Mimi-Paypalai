@@ -6,6 +6,7 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronLeft, ChevronRight, Sparkles, X } from "lucide-react";
+import { MimiMark } from "../components/MimiMark";
 import { formatDayMonth } from "../lib/text";
 import type { ReportSpec } from "./reports";
 import type { Severity } from "./rules";
@@ -46,14 +47,17 @@ export function InsightCard({ id, severity, text, sub, onOpen }: { id: string; s
   return (
     <section className={`ins22 ins22--${severity}`} aria-label={it.header} data-insight={id}>
       <div className="ins22__head">
-        <span className="ins22__icon">{severity === "warning" ? <AlertTriangle size={16} aria-hidden /> : <Sparkles size={16} aria-hidden />}</span>
+        <span className="ins22__avatar">
+          <MimiMark size={36} animated label={null} />
+          <span className="ins22__badge">{severity === "warning" ? <AlertTriangle size={12} aria-hidden /> : <Sparkles size={12} aria-hidden />}</span>
+        </span>
         <span className="ins22__label">{it.header}</span>
         <button type="button" className="ins22__x" aria-label={it.dismiss} onClick={hide}><X size={16} aria-hidden /></button>
       </div>
       <p className="ins22__text">{bold(text)}</p>
       {sub && <p className="ins22__sub">{sub}</p>}
       <button type="button" className="ins22__cta" onClick={onOpen}>
-        {it.open} <ChevronRight size={16} aria-hidden />
+        {it.open} <ChevronRight size={18} aria-hidden />
       </button>
     </section>
   );
