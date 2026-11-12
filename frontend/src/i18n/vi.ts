@@ -51,6 +51,11 @@ export const vi: Messages = {
     openMockLink: "Mở link (bản thử)",
     footer: "Càng quét nhiều hóa đơn, Mimi càng hiểu bạn.",
     langGroup: "Ngôn ngữ",
+    demoToggle: "Có tài khoản demo? Đăng nhập bằng mật khẩu",
+    demoHide: "Dùng link đăng nhập",
+    password: "Mật khẩu",
+    demoSubmit: "Đăng nhập tài khoản demo",
+    demoFailed: "Email hoặc mật khẩu chưa đúng.",
   },
   home: {
     greet: (name) => (name ? `Chào ${name}!` : "Chào bạn!"),

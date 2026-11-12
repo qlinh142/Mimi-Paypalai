@@ -5,6 +5,7 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   signInWithRedirect,
+  signInWithEmailAndPassword,
   reauthenticateWithRedirect,
   reauthenticateWithCredential,
   getRedirectResult,
@@ -29,6 +30,8 @@ type AuthCtx = {
   /** Trả về "need_email" khi link được mở ở máy khác (không có email lưu sẵn). */
   completeLinkIfPresent: (emailOverride?: string) => Promise<"none" | "ok" | "need_email" | "expired">;
   signInGoogle: () => Promise<void>;
+  /** Tài khoản demo cho ban giám khảo: email + mật khẩu tạo sẵn trong Firebase Auth. */
+  signInPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   idToken: () => Promise<string | null>;
   pendingDisplayName: () => string | null;
@@ -121,6 +124,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Redirect thay cho popup: popup hay bị chặn trong PWA iOS.
         // Cần authDomain = tên miền của app trên Firebase Hosting.
         await signInWithRedirect(firebase()!.auth, new GoogleAuthProvider());
+      },
+
+      async signInPassword(email, password) {
+        if (!live) {
+          const s = { uid: "mock-uid", email };
+          localStorage.setItem(MOCK_KEY, JSON.stringify(s));
+          setSession(s);
+          return;
+        }
+        await signInWithEmailAndPassword(firebase()!.auth, email, password);
       },
 
       async signOut() {
