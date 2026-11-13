@@ -9,6 +9,20 @@ compares prices; pay online with PayPal and the order lands back in the family's
 - **License:** MIT (see [LICENSE](LICENSE))
 - **Team:** SMARTLIFE LAB
 
+## Demo account for judges
+
+To see Mimi with about three months of household data already in it (around 30 grocery
+receipts from US stores, items running low, spending analytics), open the live demo, tap
+**"Have a demo account? Sign in with password"** and use:
+
+- Email: `judge@example.com`
+- Password: `MimiDemo2026!`
+
+The account is shared, so please don't change its settings. You can also sign up with your own
+email or Google account to start from an empty household and scan your own receipts. Payments
+run in PayPal / Braintree sandbox; the Braintree test card is `4111 1111 1111 1111`, any future
+expiry, CVV `123`.
+
 ## How Mimi uses PayPal
 
 All payments run on the **PayPal developer platform in Sandbox mode**.

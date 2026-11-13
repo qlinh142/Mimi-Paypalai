@@ -25,9 +25,11 @@ import (
 
 	"github.com/smartlife-lab/mimi/backend/internal/account"
 	"github.com/smartlife-lab/mimi/backend/internal/assistant"
+	"github.com/smartlife-lab/mimi/backend/internal/authz"
 	"github.com/smartlife-lab/mimi/backend/internal/braintree"
 	"github.com/smartlife-lab/mimi/backend/internal/config"
 	"github.com/smartlife-lab/mimi/backend/internal/demo"
+	"github.com/smartlife-lab/mimi/backend/internal/domain"
 	"github.com/smartlife-lab/mimi/backend/internal/fx"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fbauth"
 	"github.com/smartlife-lab/mimi/backend/internal/gcp/fsstore"
@@ -298,7 +300,13 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		// Thiếu WithTaxonomy thì mọi danh mục bị coi là chưa phân loại và không vào tồn kho.
 		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(groupTaxonomy.SpendingKeys())); err == nil {
 			var n int
-			n, err = demo.Seed(ctx, rs, uid, time.Now())
+			if os.Getenv("DEMO_SET") == "us" {
+				// Tài khoản demo cho ban giám khảo: ~3 tháng hóa đơn kiểu Mỹ, giao diện tiếng
+				// Anh, hiển thị USD. Cần tỷ giá USD (chạy fx-sync trước nếu chưa có).
+				n, err = seedUS(ctx, store, rs, uid)
+			} else {
+				n, err = demo.Seed(ctx, rs, uid, time.Now())
+			}
 			log.InfoContext(ctx, "seed-demo done", "receipts", n)
 		}
 	case "price-sync":
@@ -322,6 +330,26 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 	// "lần thành công gần nhất" quá cũ.
 	log.InfoContext(ctx, "job finished", "job", name, "ok", err == nil, "duration_ms", time.Since(start).Milliseconds())
 	return err
+}
+
+// seedUS ghi bộ hóa đơn Mỹ rồi đặt tài khoản demo sang tiếng Anh, nước Mỹ, USD.
+func seedUS(ctx context.Context, store *fsstore.Store, rs *receipt.Service, uid string) (int, error) {
+	now := time.Now()
+	rate, ok, err := store.Rate(ctx, "USD", domain.Today(now, time.UTC))
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, errors.New("seed-demo: chưa có tỷ giá USD, chạy job fx-sync trước")
+	}
+	n, err := demo.SeedUS(ctx, rs, uid, now, rate.Rate)
+	if err != nil {
+		return n, err
+	}
+	en, us, usd, tz := "en", "US", "USD", "America/Los_Angeles"
+	p := authz.Principal{UID: uid, Role: authz.RoleOwner, Timezone: tz}
+	_, err = user.NewSettingsService(store, nil).Update(ctx, p, user.SettingsPatch{Lang: &en, Country: &us, Currency: &usd, Timezone: &tz})
+	return n, err
 }
 
 // newMailer: chưa chọn nhà cung cấp email. Ở dev ghi log (không nội dung); ở prod từ

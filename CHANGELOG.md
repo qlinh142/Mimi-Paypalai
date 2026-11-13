@@ -5,6 +5,15 @@ Mới nhất ở trên cùng.
 
 ---
 
+## 2026-11-13 · Tài khoản demo cho ban giám khảo
+
+Nhánh `claude/demo-account`.
+
+- Màn Welcome: nút "Have a demo account? Sign in with password" mở ô mật khẩu, đăng nhập bằng Firebase Email/Password (`auth.signInPassword`).
+- `internal/demo/us.go`: bộ 30 hóa đơn kiểu Mỹ trong 90 ngày (38 món, 6 cửa hàng, giá lệch theo cửa hàng), tính lùi từ ngày chạy. Job `seed-demo` với `DEMO_SET=us` ghi bộ này và đặt tài khoản sang tiếng Anh, US, USD.
+- README: mục "Demo account for judges".
+- Kiểm tra: `TestSeedUS` (qua service thật: mọi dòng vào tồn kho, Olive oil mua lần cuối 28 ngày trước), e2e 13/13.
+
 ## 2026-11-04 · Trả bằng thẻ qua Braintree, cạnh nút PayPal
 
 Nhánh `feat/braintree` (dựa trên `feat/nen-mua-online`). Màn Mua online có thêm nút "Trả bằng thẻ" ngay dưới nút PayPal.
