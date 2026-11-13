@@ -60,6 +60,8 @@ export const en = {
     openMockLink: "Open link (demo)",
     footer: "The more receipts you scan, the smarter Mimi gets.",
     langGroup: "Language",
+    demo: "Try the demo account",
+    demoFailed: "Couldn't open the demo account. Try again in a moment.",
   },
 
   home: {

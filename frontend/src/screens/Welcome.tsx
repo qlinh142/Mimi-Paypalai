@@ -12,6 +12,11 @@ type Phase =
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// Tài khoản demo dùng chung cho ban giám khảo (cuộc thi PayPal): dữ liệu giả, thanh toán
+// sandbox, nên để công khai được. Đổi qua VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD khi build.
+const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || "judge@example.com";
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || "MimiDemo2026!";
+
 /** Trang chủ khi chưa đăng nhập: giới thiệu và đăng nhập ngay trên màn (spec mục 1). */
 export function Welcome() {
   const auth = useAuth();
@@ -33,6 +38,16 @@ export function Welcome() {
 
   function validate(v: string) {
     return EMAIL_RE.test(v.trim()) ? null : t.welcome.invalidEmail;
+  }
+
+  async function tryDemo() {
+    if (phase.kind === "sending") return;
+    setPhase({ kind: "sending" });
+    try {
+      await auth.signInPassword(DEMO_EMAIL, DEMO_PASSWORD);
+    } catch {
+      setPhase({ kind: "form", notice: navigator.onLine ? t.welcome.demoFailed : t.welcome.sendFailedOffline });
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -155,6 +170,14 @@ export function Welcome() {
                 <button className="btn btn--quiet btn--block btn--google" type="button" onClick={() => auth.signInGoogle()}>
                   <GoogleG />
                   {t.welcome.google}
+                </button>
+                <button
+                  className="btn btn--quiet btn--block welcome__demo"
+                  type="button"
+                  aria-disabled={phase.kind === "sending" || undefined}
+                  onClick={tryDemo}
+                >
+                  {t.welcome.demo}
                 </button>
               </>
             )}
