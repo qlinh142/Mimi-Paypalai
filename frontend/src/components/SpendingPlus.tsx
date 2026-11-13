@@ -242,9 +242,11 @@ const COLORS = ["var(--c-bill, #d4538a)", "var(--c-groc, #2f9e6e)", "var(--c-hom
 /**
  * Theo nhóm hàng: biểu đồ vòng bên trái, chú giải bên phải như Redesign (anh chốt 09/11).
  * Tháng hiện tại: mỗi nhóm có nhãn tăng giảm so với tháng trước; tháng cũ: phần trăm.
- * Khoản chi định kỳ vẫn đứng đầu chú giải và bấm mở Đồ dùng; nhóm khác chạm để xem số ở giữa vòng.
+ * Khoản chi định kỳ vẫn đứng đầu chú giải; bấm mở Lịch sử đơn hàng lọc sẵn các lần đã trả của
+ * tháng đang xem (cùng nguồn với số ở biểu đồ). Trước đây mở danh sách khoản định kỳ đang có,
+ * nên khoản đã xóa hoặc trả nhiều kỳ không khớp số. Nhóm khác chạm để xem số ở giữa vòng.
  */
-export function CategoryDonut({ cats, total, rateDay, prev }: { cats: SpendingReport["by_category"]; total: number; rateDay?: string; prev?: SpendingReport }) {
+export function CategoryDonut({ cats, total, rateDay, prev, month }: { cats: SpendingReport["by_category"]; total: number; rateDay?: string; prev?: SpendingReport; month: string }) {
   const [sel, setSel] = useState<string | null>(null);
   const sum = cats.reduce((a, c) => a + c.amount, 0) || 1;
   const R = 56, C = 2 * Math.PI * R; // vòng mảnh như Redesign: nét 10, chọn 13, khe 2
@@ -288,7 +290,7 @@ export function CategoryDonut({ cats, total, rateDay, prev }: { cats: SpendingRe
           return (
             <li key={c.key}>
               {c.key === REC ? (
-                <Link to="/items?tab=recurring" className="donut22__row">{body}</Link>
+                <Link to={`/plan?tab=history&kind=recurring&month=${month}`} className="donut22__row">{body}</Link>
               ) : (
                 <button type="button" className="donut22__row" aria-pressed={sel === c.key} onClick={() => setSel(sel === c.key ? null : c.key)}>{body}</button>
               )}

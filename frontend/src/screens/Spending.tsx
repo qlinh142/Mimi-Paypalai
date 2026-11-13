@@ -167,7 +167,7 @@ function Report({ r, month }: { r: SpendingReport; month: string }) {
       {cats.length > 0 && (
         <section aria-labelledby="cat15">
           <h2 id="cat15" className="h15sec">{m15.spending.byCategory}</h2>
-          <CategoryDonut cats={cats} total={r.spent} rateDay={rateDay} prev={isCurrent ? prevQ.data : undefined} />
+          <CategoryDonut cats={cats} total={r.spent} rateDay={rateDay} prev={isCurrent ? prevQ.data : undefined} month={month} />
         </section>
       )}
 

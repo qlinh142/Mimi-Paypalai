@@ -1,7 +1,7 @@
 import { m15 } from "../i18n/m15";
 import { t } from "../i18n";
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Globe, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
 import { useOrders, useReceiptDetail, useReceiptHistory } from "../api/hooks";
 import { LoadState } from "../components/LoadState";
@@ -112,10 +112,16 @@ export function OrderHistoryList() {
   const orders = useOrders();
   const h = receipts;
   const { relationOf } = useRelations();
-  const [kind, setKind] = useState<HistKind>("all");
+  // Mở từ Sổ chi tiêu (bấm "Khoản chi định kỳ"): ?kind=recurring&month=YYYY-MM lọc sẵn đúng
+  // các lần đã trả của tháng đó, để số ở danh sách khớp số ở biểu đồ.
+  const [params] = useSearchParams();
+  const initKind = params.get("kind");
+  const [kind, setKind] = useState<HistKind>(
+    initKind === "own" || initKind === "online" || initKind === "delegated" || initKind === "recurring" ? initKind : "all",
+  );
   const [q, setQ] = useState("");
   const [store, setStore] = useState("");
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(/^\d{4}-\d{2}$/.test(params.get("month") ?? "") ? params.get("month")! : "");
   const [showFilter, setShowFilter] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [view, setView] = useState<"list" | "table">("list");
