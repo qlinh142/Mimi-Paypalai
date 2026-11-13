@@ -66,7 +66,7 @@ Nên chạy 1 đến 2 ngày trước buổi demo: Sữa tươi khi đó còn kh
 
 1. Firebase console → Authentication → Sign-in method: bật **Email/Password**.
 2. Authentication → Users → Add user: `judge@example.com` / mật khẩu ghi trong README gốc.
-3. Mở app, bấm "Have a demo account? Sign in with password", đăng nhập một lần. Lấy uid ở Authentication → Users.
+3. Mở app, bấm "Try the demo account" (nút tự đăng nhập bằng tài khoản trên) một lần. Lấy uid ở Authentication → Users.
 4. Chạy job (cần có tỷ giá USD; chưa có thì chạy `mimi-job-fx-sync` trước):
 
 ```bash

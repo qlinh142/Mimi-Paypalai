@@ -12,6 +12,11 @@ type Phase =
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// Tài khoản demo dùng chung cho ban giám khảo (cuộc thi PayPal): dữ liệu giả, thanh toán
+// sandbox, nên để công khai được. Đổi qua VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD khi build.
+const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || "judge@example.com";
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || "MimiDemo2026!";
+
 /** Trang chủ khi chưa đăng nhập: giới thiệu và đăng nhập ngay trên màn (spec mục 1). */
 export function Welcome() {
   const auth = useAuth();
@@ -19,11 +24,8 @@ export function Welcome() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
-  // Tài khoản demo dùng chung cho ban giám khảo: đăng nhập bằng mật khẩu thay cho link.
-  const [pwMode, setPwMode] = useState(false);
-  const [password, setPassword] = useState("");
   const emailRef = useRef<HTMLInputElement>(null);
-  const ids = { email: useId(), name: useId(), err: useId(), help: useId(), pw: useId() };
+  const ids = { email: useId(), name: useId(), err: useId(), help: useId() };
 
   // Người dùng vừa bấm link trong email.
   useEffect(() => {
@@ -38,6 +40,16 @@ export function Welcome() {
     return EMAIL_RE.test(v.trim()) ? null : t.welcome.invalidEmail;
   }
 
+  async function tryDemo() {
+    if (phase.kind === "sending") return;
+    setPhase({ kind: "sending" });
+    try {
+      await auth.signInPassword(DEMO_EMAIL, DEMO_PASSWORD);
+    } catch {
+      setPhase({ kind: "form", notice: navigator.onLine ? t.welcome.demoFailed : t.welcome.sendFailedOffline });
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (phase.kind === "sending") return; // bấm hai lần chỉ gửi một thư
@@ -50,15 +62,6 @@ export function Welcome() {
     if (phase.kind === "ask_email") {
       const r = await auth.completeLinkIfPresent(email.trim());
       if (r === "expired") setPhase({ kind: "form", notice: t.welcome.linkExpired });
-      return;
-    }
-    if (pwMode) {
-      setPhase({ kind: "sending" });
-      try {
-        await auth.signInPassword(email.trim(), password);
-      } catch {
-        setPhase({ kind: "form", notice: navigator.onLine ? t.welcome.demoFailed : t.welcome.sendFailedOffline });
-      }
       return;
     }
     setPhase({ kind: "sending" });
@@ -136,23 +139,7 @@ export function Welcome() {
                 <span id={ids.err} className="error" role="alert">{emailError}</span>
               )}
             </div>
-            {!askOnly && pwMode && (
-              <div className="field">
-                <label htmlFor={ids.pw}>{t.welcome.password}</label>
-                <input
-                  id={ids.pw}
-                  className="input"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  enterKeyHint="go"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            )}
-            {!askOnly && !pwMode && (
+            {!askOnly && (
               <div className="field">
                 <label htmlFor={ids.name}>{t.welcome.name}</label>
                 <input
@@ -174,13 +161,7 @@ export function Welcome() {
               type="submit"
               aria-disabled={phase.kind === "sending" || undefined}
             >
-              {phase.kind === "sending"
-                ? t.welcome.sending
-                : askOnly
-                  ? t.welcome.signIn
-                  : pwMode
-                    ? t.welcome.demoSubmit
-                    : t.welcome.submit}
+              {phase.kind === "sending" ? t.welcome.sending : askOnly ? t.welcome.signIn : t.welcome.submit}
             </button>
 
             {!askOnly && (
@@ -191,15 +172,12 @@ export function Welcome() {
                   {t.welcome.google}
                 </button>
                 <button
-                  className="btn btn--quiet btn--block"
+                  className="btn btn--quiet btn--block welcome__demo"
                   type="button"
-                  aria-pressed={pwMode}
-                  onClick={() => {
-                    setPwMode(!pwMode);
-                    setPhase({ kind: "form" });
-                  }}
+                  aria-disabled={phase.kind === "sending" || undefined}
+                  onClick={tryDemo}
                 >
-                  {pwMode ? t.welcome.demoHide : t.welcome.demoToggle}
+                  {t.welcome.demo}
                 </button>
               </>
             )}

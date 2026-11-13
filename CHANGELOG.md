@@ -9,7 +9,7 @@ Mới nhất ở trên cùng.
 
 Nhánh `claude/demo-account`.
 
-- Màn Welcome: nút "Have a demo account? Sign in with password" mở ô mật khẩu, đăng nhập bằng Firebase Email/Password (`auth.signInPassword`).
+- Màn Welcome: nút "Try the demo account" bấm một lần là vào tài khoản demo (Firebase Email/Password, `auth.signInPassword`; đổi tài khoản qua `VITE_DEMO_EMAIL` / `VITE_DEMO_PASSWORD`).
 - `internal/demo/us.go`, `us_bills.json`: 50 hóa đơn kiểu Mỹ anh Linh cung cấp (sheet Bills_50_Combined: 30 tại cửa hàng, 20 online qua Channel3 và PayPal sandbox, 280 dòng, $3,763.44), mỗi món gán nhóm hàng và quy cách gói để vào tồn kho. Job `seed-demo` với `DEMO_SET=us` ghi bộ này và đặt tài khoản sang tiếng Anh, US, USD.
 - README: mục "Demo account for judges".
 - Kiểm tra: `TestSeedUS` (qua service thật: đủ 50 hóa đơn, 280 dòng, tổng khớp file Excel, mọi dòng vào tồn kho), e2e 13/13.

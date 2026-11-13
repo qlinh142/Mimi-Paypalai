@@ -60,11 +60,8 @@ export const en = {
     openMockLink: "Open link (demo)",
     footer: "The more receipts you scan, the smarter Mimi gets.",
     langGroup: "Language",
-    demoToggle: "Have a demo account? Sign in with password",
-    demoHide: "Use a sign-in link instead",
-    password: "Password",
-    demoSubmit: "Sign in to demo account",
-    demoFailed: "Email or password is incorrect.",
+    demo: "Try the demo account",
+    demoFailed: "Couldn't open the demo account. Try again in a moment.",
   },
 
   home: {
