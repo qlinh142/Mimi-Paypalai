@@ -62,7 +62,7 @@ gcloud run jobs execute mimi-job-seed-demo --region asia-southeast1 --update-env
 
 Nên chạy 1 đến 2 ngày trước buổi demo: Sữa tươi khi đó còn khoảng 2 ngày, Trứng gà sắp hết, Dầu gội còn khoảng 5 ngày. Chạy lại cùng ngày không ghi trùng.
 
-**Tài khoản demo cho ban giám khảo (`DEMO_SET=us`).** Ghi khoảng 3 tháng hóa đơn kiểu Mỹ (30 hóa đơn tiếng Anh ở Trader Joe's, Costco, Target...), quy đổi từ USD theo tỷ giá mới nhất trong `fx_rates`, rồi đặt tài khoản sang tiếng Anh, nước Mỹ, hiển thị USD. Olive oil còn khoảng 2 ngày, Milk và Eggs sắp hết.
+**Tài khoản demo cho ban giám khảo (`DEMO_SET=us`).** Ghi 50 hóa đơn đồ gia dụng kiểu Mỹ (`internal/demo/us_bills.json`, 01/09 đến 11/11/2026: 30 hóa đơn tại cửa hàng, 20 đơn online qua Channel3 và PayPal sandbox, tổng $3,763.44), quy đổi từ USD theo tỷ giá mới nhất trong `fx_rates`, rồi đặt tài khoản sang tiếng Anh, nước Mỹ, hiển thị USD.
 
 1. Firebase console → Authentication → Sign-in method: bật **Email/Password**.
 2. Authentication → Users → Add user: `judge@example.com` / mật khẩu ghi trong README gốc.

@@ -11,8 +11,9 @@ compares prices; pay online with PayPal and the order lands back in the family's
 
 ## Demo account for judges
 
-To see Mimi with about three months of household data already in it (around 30 grocery
-receipts from US stores, items running low, spending analytics), open the live demo, tap
+To see Mimi with household data already in it (50 receipts from September to November 2026:
+30 in-store receipts from US retailers and 20 online orders found through Channel3 and paid with
+PayPal sandbox), open the live demo, tap
 **"Have a demo account? Sign in with password"** and use:
 
 - Email: `judge@example.com`

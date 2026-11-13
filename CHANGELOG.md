@@ -10,9 +10,9 @@ Mới nhất ở trên cùng.
 Nhánh `claude/demo-account`.
 
 - Màn Welcome: nút "Have a demo account? Sign in with password" mở ô mật khẩu, đăng nhập bằng Firebase Email/Password (`auth.signInPassword`).
-- `internal/demo/us.go`: bộ 30 hóa đơn kiểu Mỹ trong 90 ngày (38 món, 6 cửa hàng, giá lệch theo cửa hàng), tính lùi từ ngày chạy. Job `seed-demo` với `DEMO_SET=us` ghi bộ này và đặt tài khoản sang tiếng Anh, US, USD.
+- `internal/demo/us.go`, `us_bills.json`: 50 hóa đơn kiểu Mỹ anh Linh cung cấp (sheet Bills_50_Combined: 30 tại cửa hàng, 20 online qua Channel3 và PayPal sandbox, 280 dòng, $3,763.44), mỗi món gán nhóm hàng và quy cách gói để vào tồn kho. Job `seed-demo` với `DEMO_SET=us` ghi bộ này và đặt tài khoản sang tiếng Anh, US, USD.
 - README: mục "Demo account for judges".
-- Kiểm tra: `TestSeedUS` (qua service thật: mọi dòng vào tồn kho, Olive oil mua lần cuối 28 ngày trước), e2e 13/13.
+- Kiểm tra: `TestSeedUS` (qua service thật: đủ 50 hóa đơn, 280 dòng, tổng khớp file Excel, mọi dòng vào tồn kho), e2e 13/13.
 
 ## 2026-11-04 · Trả bằng thẻ qua Braintree, cạnh nút PayPal
 

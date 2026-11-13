@@ -301,7 +301,7 @@ func runJob(ctx context.Context, name string, cfg config.Config, log *slog.Logge
 		if rs, err = receipt.New(nil, store, store, store, store, log, receipt.WithTaxonomy(groupTaxonomy.SpendingKeys())); err == nil {
 			var n int
 			if os.Getenv("DEMO_SET") == "us" {
-				// Tài khoản demo cho ban giám khảo: ~3 tháng hóa đơn kiểu Mỹ, giao diện tiếng
+				// Tài khoản demo cho ban giám khảo: 50 hóa đơn kiểu Mỹ, giao diện tiếng
 				// Anh, hiển thị USD. Cần tỷ giá USD (chạy fx-sync trước nếu chưa có).
 				n, err = seedUS(ctx, store, rs, uid)
 			} else {
@@ -342,7 +342,7 @@ func seedUS(ctx context.Context, store *fsstore.Store, rs *receipt.Service, uid 
 	if !ok {
 		return 0, errors.New("seed-demo: chưa có tỷ giá USD, chạy job fx-sync trước")
 	}
-	n, err := demo.SeedUS(ctx, rs, uid, now, rate.Rate)
+	n, err := demo.SeedUS(ctx, rs, uid, rate.Rate)
 	if err != nil {
 		return n, err
 	}
