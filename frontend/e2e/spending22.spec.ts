@@ -54,3 +54,13 @@ test("Sổ chi tiêu 2.2: ngân sách, Còn tiêu được, Mimi nhận thấy, 
   await expect(page.getByRole("button", { name: "Lịch sử đơn hàng" })).toHaveAttribute("aria-pressed", "true");
   expect(errors).toEqual([]);
 });
+
+// Bấm "Khoản chi định kỳ" ở biểu đồ mở đúng các lần đã trả của tháng (số khớp biểu đồ),
+// không mở danh sách khoản định kỳ đang có (khoản đã xóa hoặc trả nhiều kỳ sẽ lệch số).
+test("Khoản chi định kỳ ở biểu đồ mở lịch sử lọc sẵn định kỳ của tháng", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/spending");
+  await page.locator(".donut22__legend li").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/plan\?tab=history&kind=recurring&month=\d{4}-\d{2}/);
+  await expect(page.getByRole("button", { name: "Định kỳ", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
